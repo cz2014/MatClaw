@@ -1,0 +1,17 @@
+# LLM configuration for MLFF agent
+# See smolagents docs: https://huggingface.co/docs/smolagents
+
+model:
+  # Options: "openai", "anthropic", "huggingface", etc.
+  provider: "openai"
+  name: "gpt-4o"
+
+  # Provider-specific parameters
+  parameters:
+    temperature: 0.0
+    max_tokens: 4096
+
+# Agent execution settings
+agent:
+  max_steps: 10
+  verbosity_level: 1
