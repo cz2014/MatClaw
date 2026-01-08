@@ -23,6 +23,10 @@ workflow = [
     "jobflow",
     "fireworks",
 ]
+telemetry = [
+    "arize-phoenix",
+    "openinference-instrumentation-smolagents",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

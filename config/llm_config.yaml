@@ -9,7 +9,7 @@ providers:
     api_key: ${OPENAI_API_KEY}
 
   gemini:
-    model_id: gemini/gemini-2.0-flash
+    model_id: gemini-3-flash-preview
     api_key: ${EMBEDDING_API_KEY}
 
   deepseek:
@@ -22,3 +22,4 @@ agent:
   additional_authorized_imports:
     - math
     - numpy
+    - pymatgen
