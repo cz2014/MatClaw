@@ -9,10 +9,8 @@ description = "Code-first agent for ML force-field workflows"
 readme = "project_intro.md"
 requires-python = ">=3.10"
 dependencies = [
-    "smolagents",
+    "smolagents[litellm]",
     "pymatgen",
-    "opentelemetry-api",
-    "opentelemetry-sdk",
     "pyyaml",
 ]
 

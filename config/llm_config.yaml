@@ -1,17 +1,24 @@
 # LLM configuration for MLFF agent
-# See smolagents docs: https://huggingface.co/docs/smolagents
+# API keys use ${ENV_VAR} syntax - expanded at runtime
 
-model:
-  # Options: "openai", "anthropic", "huggingface", etc.
-  provider: "openai"
-  name: "gpt-4o"
+default_provider: gemini
 
-  # Provider-specific parameters
-  parameters:
-    temperature: 0.0
-    max_tokens: 4096
+providers:
+  openai:
+    model_id: gpt-4o
+    api_key: ${OPENAI_API_KEY}
+
+  gemini:
+    model_id: gemini/gemini-2.0-flash
+    api_key: ${EMBEDDING_API_KEY}
+
+  deepseek:
+    model_id: deepseek/deepseek-chat
+    api_key: ${DEEPSEEK_API_KEY}
 
 # Agent execution settings
 agent:
   max_steps: 10
-  verbosity_level: 1
+  additional_authorized_imports:
+    - math
+    - numpy
