@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from smolagents import CodeAgent, LiteLLMModel
+from smolagents import CodeAgent, LiteLLMModel, LocalPythonExecutor
 from smolagents.agents import (
     FinalAnswerPromptTemplate,
     PlanningPromptTemplate,
@@ -19,7 +19,6 @@ from smolagents.agents import (
 
 PROJECT_ROOT = Path(__file__).parent.parent
 CONFIG_DIR = PROJECT_ROOT / "config"
-WORKSPACE_DIR = PROJECT_ROOT / "workspace"
 
 _ENV_PATTERN = re.compile(r"\$\{[^}]+\}")  # leftover ${VAR} after expandvars
 
@@ -62,6 +61,33 @@ def _step_jsonl_logger(log_file: Path):
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
     return cb
+
+
+def _create_sandbox_functions(workspace: Path) -> dict[str, callable]:
+    """Create sandboxed file I/O functions bound to workspace."""
+    workspace = workspace.resolve()
+
+    def _safe_path(rel_path: str) -> Path:
+        p = (workspace / rel_path).resolve()
+        if p == workspace or workspace in p.parents:
+            return p
+        raise ValueError(f"Path outside workspace: {rel_path}")
+
+    def write_text(rel_path: str, content: str) -> str:
+        """Write text to a file in workspace. Returns absolute path."""
+        p = _safe_path(rel_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        if len(content) > 5_000_000:
+            raise ValueError("Refusing to write >5MB in one call")
+        p.write_text(content, encoding="utf-8")
+        return str(p)
+
+    def read_text(rel_path: str) -> str:
+        """Read text from a file in workspace."""
+        p = _safe_path(rel_path)
+        return p.read_text(encoding="utf-8")
+
+    return {"write_text": write_text, "read_text": read_text}
 
 
 def _build_prompt_templates(prompts_cfg: dict[str, Any]) -> PromptTemplates | None:
@@ -111,7 +137,7 @@ def _build_prompt_templates(prompts_cfg: dict[str, Any]) -> PromptTemplates | No
 def create_agent(
     provider_name: str | None = None,
     enable_step_logging: bool = True,
-    workspace_dir: Path = WORKSPACE_DIR,
+    workspace_dir: Path | None = None,
     planning_interval: int | None = None,
 ) -> CodeAgent:
     """Create a CodeAgent with config from YAML files.
@@ -119,12 +145,14 @@ def create_agent(
     Args:
         provider_name: LLM provider name. Defaults to config default_provider.
         enable_step_logging: Whether to log steps to JSONL file in workspace.
-        workspace_dir: Directory for log files. Defaults to WORKSPACE_DIR.
+        workspace_dir: Directory for workspace and logs. Required.
         planning_interval: Steps between planning updates. None disables planning.
 
     Returns:
         Configured CodeAgent instance.
     """
+    if workspace_dir is None:
+        raise ValueError("workspace_dir is required")
     llm_cfg = _read_yaml(CONFIG_DIR / "llm_config.yaml")
     prompts_path = CONFIG_DIR / "prompts.yaml"
     prompts_cfg = _read_yaml(prompts_path) if prompts_path.exists() else {}
@@ -140,9 +168,19 @@ def create_agent(
     agent_cfg = llm_cfg.get("agent", {})
     prompt_templates = _build_prompt_templates(prompts_cfg)
 
+    # Create executor with sandboxed file functions
+    additional_imports = agent_cfg.get("additional_authorized_imports") or []
+    sandbox_funcs = _create_sandbox_functions(workspace_dir)
+    executor = LocalPythonExecutor(
+        additional_imports,
+        additional_functions=sandbox_funcs,
+    )
+
     kwargs: dict[str, Any] = dict(
         tools=[],
         model=model,
+        executor=executor,
+        additional_authorized_imports=additional_imports,
         max_steps=agent_cfg.get("max_steps", 10),
         add_base_tools=False,
         return_full_result=True,
@@ -151,9 +189,9 @@ def create_agent(
     if prompt_templates is not None:
         kwargs["prompt_templates"] = prompt_templates
 
-    additional_imports = agent_cfg.get("additional_authorized_imports") or []
-    if additional_imports:
-        kwargs["additional_authorized_imports"] = additional_imports
+    instructions = agent_cfg.get("instructions")
+    if instructions:
+        kwargs["instructions"] = instructions
 
     if planning_interval is not None:
         kwargs["planning_interval"] = planning_interval
