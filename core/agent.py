@@ -13,6 +13,7 @@ import yaml
 from smolagents import CodeAgent, LiteLLMModel, LocalPythonExecutor
 from smolagents.agents import (
     FinalAnswerPromptTemplate,
+    ManagedAgentPromptTemplate,
     PlanningPromptTemplate,
     PromptTemplates,
 )
@@ -100,6 +101,7 @@ def _build_prompt_templates(prompts_cfg: dict[str, Any]) -> PromptTemplates | No
 
     system_prompt = prompts_cfg.get("system_prompt")
     planning_cfg = prompts_cfg.get("planning") or {}
+    managed_cfg = prompts_cfg.get("managed_agent") or {}
     final_cfg = prompts_cfg.get("final_answer") or {}
 
     # Determine if anything is actually provided
@@ -107,9 +109,11 @@ def _build_prompt_templates(prompts_cfg: dict[str, Any]) -> PromptTemplates | No
         bool(x)
         for x in [
             system_prompt,
-            planning_cfg.get("plan"),
+            planning_cfg.get("initial_plan"),
             planning_cfg.get("update_plan_pre_messages"),
             planning_cfg.get("update_plan_post_messages"),
+            managed_cfg.get("task"),
+            managed_cfg.get("report"),
             final_cfg.get("pre_messages"),
             final_cfg.get("post_messages"),
         ]
@@ -118,9 +122,13 @@ def _build_prompt_templates(prompts_cfg: dict[str, Any]) -> PromptTemplates | No
         return None
 
     planning = PlanningPromptTemplate(
-        plan=planning_cfg.get("plan"),
+        initial_plan=planning_cfg.get("initial_plan"),
         update_plan_pre_messages=planning_cfg.get("update_plan_pre_messages"),
         update_plan_post_messages=planning_cfg.get("update_plan_post_messages"),
+    )
+    managed_agent = ManagedAgentPromptTemplate(
+        task=managed_cfg.get("task"),
+        report=managed_cfg.get("report"),
     )
     final_answer = FinalAnswerPromptTemplate(
         pre_messages=final_cfg.get("pre_messages"),
@@ -130,6 +138,7 @@ def _build_prompt_templates(prompts_cfg: dict[str, Any]) -> PromptTemplates | No
     return PromptTemplates(
         system_prompt=system_prompt,
         planning=planning,
+        managed_agent=managed_agent,
         final_answer=final_answer,
     )
 

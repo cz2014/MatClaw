@@ -31,4 +31,4 @@ agent:
     You have access to these file I/O functions:
     - write_text(path, content) -> str  (writes file under workspace, returns absolute path)
     - read_text(path) -> str  (reads file from workspace)
-    Never use open() for file operations. Always use write_text/read_text.
+    Never use open() for file operations. Always use write_text/read_text directly. These two functions are already imported. 
