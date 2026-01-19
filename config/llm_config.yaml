@@ -18,7 +18,7 @@ providers:
 
 # Agent execution settings
 agent:
-  max_steps: 10
+  max_steps: 20
   additional_authorized_imports:
     - math
     - numpy
@@ -27,8 +27,21 @@ agent:
     - scipy.*
     - pymatgen
     - pymatgen.*
+    - jobflow
+    - jobflow.*
+    - jobflow_remote
+    - jobflow_remote.*
+    - atomate2
+    - atomate2.*
   instructions: |
     You have access to these file I/O functions:
     - write_text(path, content) -> str  (writes file under workspace, returns absolute path)
     - read_text(path) -> str  (reads file from workspace)
-    Never use open() for file operations. Always use write_text/read_text directly. These two functions are already imported. 
+    Never use open() for file operations. Always use write_text/read_text directly. These two functions are already imported.
+
+    If real computations are requested, use jobflow-remote to submit jobs to remote HPC:
+    - Use Project name = "default" unless the user specifies otherwise
+    - Use Worker = "local_shell" (runs on the remote compute node)
+    - Prefer to use atomate2 Makers (e.g., RelaxMaker) to create jobs if possible, otherwise define custom jobs
+    - Use submit_flow() to submit, then wait_for_job() to block until completion
+    - Output is a dict: output["output"]["energy"], output["output"]["structure"]

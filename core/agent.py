@@ -11,6 +11,8 @@ from typing import Any
 
 import yaml
 from smolagents import CodeAgent, LiteLLMModel, LocalPythonExecutor
+
+from core.tools import wait_for_jobflow
 from smolagents.agents import (
     FinalAnswerPromptTemplate,
     ManagedAgentPromptTemplate,
@@ -186,7 +188,7 @@ def create_agent(
     )
 
     kwargs: dict[str, Any] = dict(
-        tools=[],
+        tools=[wait_for_jobflow],
         model=model,
         executor=executor,
         additional_authorized_imports=additional_imports,
