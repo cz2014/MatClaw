@@ -34,12 +34,13 @@ def wait_for_jobflow(
     from jobflow_remote.jobs.state import JobState
 
     POLL_S = 10
-    TERMINAL_ERROR_STATES = {
-        JobState.FAILED,
-        JobState.REMOTE_ERROR,
-        JobState.TERMINATED,
-        JobState.STOPPED,
-        JobState.USER_STOPPED,
+    # Use .value for comparison since state can be string or enum
+    TERMINAL_ERROR_VALUES = {
+        JobState.FAILED.value,
+        JobState.REMOTE_ERROR.value,
+        JobState.TERMINATED.value,
+        JobState.STOPPED.value,
+        JobState.USER_STOPPED.value,
     }
 
     jc = JobController.from_project_name(project_name)
@@ -82,10 +83,11 @@ def wait_for_jobflow(
         # Check for failures
         for job in jobs:
             state = _get(job, "state")
-            if state in TERMINAL_ERROR_STATES:
+            state_val = _state_val(state)
+            if state_val in TERMINAL_ERROR_VALUES:
                 raise RuntimeError(
                     f"Job '{_get(job, 'name')}' ({_get(job, 'uuid')}) failed: "
-                    f"state={state}, error={_get(job, 'error') if isinstance(job, dict) else getattr(job, 'error', None)}"
+                    f"state={state_val}, error={_get(job, 'error') if isinstance(job, dict) else getattr(job, 'error', None)}"
                 )
 
         # Print state changes

@@ -44,4 +44,4 @@ agent:
     - Use Worker = "local_shell" (runs on the remote compute node)
     - Prefer to use atomate2 Makers (e.g., RelaxMaker) to create jobs if possible, otherwise define custom jobs
     - Use submit_flow() to submit, then wait_for_job() to block until completion
-    - Output is a dict: output["output"]["energy"], output["output"]["structure"]
+    - Output is a dict: e.g., output["output"]["energy"], output["output"]["structure"]
