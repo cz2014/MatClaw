@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from smolagents import tool
+from smolagents import Tool, tool
 
 
 @tool
@@ -121,44 +121,86 @@ def wait_for_jobflow(
         time.sleep(POLL_S)
 
 
-@tool
-def train_deepmd(
-    vasp_dir: str,
-    type_map: list[str] = ["C"],
-    numb_steps: int = 2000,
-    net_size_preset: str = "balanced",
-    overrides: dict | None = None,
-) -> dict[str, Any]:
-    """Train a DeePMD model from VASP OUTCAR.
+class TrainDeePMDTool(Tool):
+    """Tool that creates a DeePMD training job for use in jobflow.
 
-    Reads VASP MD trajectory (all frames), prepares training/validation data (80/20 split),
-    trains the model, and returns accuracy metrics.
-
-    Args:
-        vasp_dir: Path to VASP run directory containing OUTCAR.
-        type_map: Element symbols in order (e.g., ["C"] for graphene).
-        numb_steps: Number of training steps.
-        net_size_preset: Network architecture preset:
-            - 'sanity_check': ONLY to verify pipeline runs without errors.
-            - 'fast': Rapid iterations, Active Learning loops, or limited compute.
-            - 'balanced': Default recommended choice for production-quality force fields.
-
-            Mapping (descriptor_neuron, fitting_neuron):
-            - sanity_check -> ([5, 10, 20], [20, 20, 20])
-            - fast         -> ([10, 20, 40], [40, 40, 40])
-            - balanced     -> ([20, 40, 80], [80, 80, 80])
-            
-        overrides: Optional dict to override any DeePMD input.json parameters.
-
-    Returns:
-        Dict with mae_e, rmse_e, mae_f, rmse_f (accuracy metrics) and model_path.
+    Returns a jobflow Job object (not execution result), to be used in Flow with submit_flow().
     """
-    from remote_jobs._deepmd import train_deepmd_impl
 
-    return train_deepmd_impl(
-        vasp_dir,
-        type_map=tuple(type_map),
-        numb_steps=numb_steps,
-        net_size_preset=net_size_preset,
-        overrides=overrides,
-    )
+    name = "train_deepmd"
+    description = """Create a DeePMD training job from VASP MD output.
+
+Returns a jobflow Job object. Use it in a Flow with submit_flow():
+    dp_job = train_deepmd(md_job.output, type_map=["C"], numb_steps=500)
+    flow = Flow([md_job, dp_job])
+    submit_flow(flow, worker="local_shell", project="default")
+    out = wait_for_jobflow("default", dp_job.uuid)
+
+Output structure (atomate2-compatible, same pattern as RelaxMaker/MDMaker):
+    out["output"]["mae_e"]      # Energy MAE (eV/atom), float or None
+    out["output"]["rmse_e"]     # Energy RMSE (eV/atom), float or None
+    out["output"]["mae_f"]      # Force MAE (eV/Angstrom), float or None
+    out["output"]["rmse_f"]     # Force RMSE (eV/Angstrom), float or None
+    out["output"]["model_path"] # Absolute path to frozen model (.pb)
+
+Network presets:
+- 'sanity_check': Pipeline validation only (fast, low accuracy)
+- 'fast': Active learning loops or limited compute
+- 'balanced': Production-quality force fields (default)
+"""
+    inputs = {
+        "vasp_source": {
+            "type": "any",
+            "description": "TaskDoc output from MDMaker (md_job.output), or path to VASP dir with OUTCAR",
+        },
+        "type_map": {
+            "type": "array",
+            "description": "Element symbols in order, e.g. ['C'] or ['Mo', 'S']",
+            "nullable": True,
+        },
+        "numb_steps": {
+            "type": "integer",
+            "description": "Number of training steps (500 for sanity, 2000+ for production)",
+            "nullable": True,
+        },
+        "net_size_preset": {
+            "type": "string",
+            "description": "Network size: 'sanity_check', 'fast', or 'balanced'",
+            "nullable": True,
+        },
+        "overrides": {
+            "type": "object",
+            "description": "Optional dict to override DeePMD input.json parameters",
+            "nullable": True,
+        },
+    }
+    output_type = "object"
+
+    def forward(
+        self,
+        vasp_source: Any,
+        type_map: list[str] | None = None,
+        numb_steps: int | None = None,
+        net_size_preset: str | None = None,
+        overrides: dict | None = None,
+    ):
+        # Import here to avoid circular imports at module load time
+        from remote_jobs.jobs import train_deepmd as _train_deepmd_job
+
+        # Build kwargs, only including non-None values to use @job defaults
+        kwargs: dict[str, Any] = {}
+        if type_map is not None:
+            kwargs["type_map"] = tuple(type_map) if isinstance(type_map, list) else type_map
+        if numb_steps is not None:
+            kwargs["numb_steps"] = numb_steps
+        if net_size_preset is not None:
+            kwargs["net_size_preset"] = net_size_preset
+        if overrides is not None:
+            kwargs["overrides"] = overrides
+
+        # Call @job function - returns a Job object
+        return _train_deepmd_job(vasp_source, **kwargs)
+
+
+# Instantiate tool for use in agent
+train_deepmd = TrainDeePMDTool()

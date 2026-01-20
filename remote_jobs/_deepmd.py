@@ -136,12 +136,16 @@ def train_deepmd_impl(
         overrides: Optional dict to deep-merge into the DeePMD input.json config.
 
     Returns:
-        Dict with keys:
-            mae_e: Energy MAE (eV/atom) or None
-            rmse_e: Energy RMSE (eV/atom) or None
-            mae_f: Force MAE (eV/A) or None
-            rmse_f: Force RMSE (eV/A) or None
-            model_path: Absolute path to frozen deepmd_model.pb model
+        Dict with atomate2-compatible structure:
+            {
+                "output": {
+                    "mae_e": float or None,      # Energy MAE (eV/atom)
+                    "rmse_e": float or None,     # Energy RMSE (eV/atom)
+                    "mae_f": float or None,      # Force MAE (eV/Angstrom)
+                    "rmse_f": float or None,     # Force RMSE (eV/Angstrom)
+                    "model_path": str,           # Absolute path to frozen model
+                }
+            }
     """
     import dpdata
     import numpy as np
@@ -267,10 +271,13 @@ def train_deepmd_impl(
 
     metrics = _parse_dp_test_metrics(cp.stderr)
 
+    # Return in atomate2-compatible structure: {"output": {...}}
     return {
-        "mae_e": metrics.get("mae_e"),
-        "rmse_e": metrics.get("rmse_e"),
-        "mae_f": metrics.get("mae_f"),
-        "rmse_f": metrics.get("rmse_f"),
-        "model_path": str(model_path.resolve()),
+        "output": {
+            "mae_e": metrics.get("mae_e"),
+            "rmse_e": metrics.get("rmse_e"),
+            "mae_f": metrics.get("mae_f"),
+            "rmse_f": metrics.get("rmse_f"),
+            "model_path": str(model_path.resolve()),
+        }
     }
