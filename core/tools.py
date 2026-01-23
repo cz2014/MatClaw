@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from typing import Any
 
 from smolagents import Tool, tool
+
+# Project paths for RAG
+_PROJECT_ROOT = Path(__file__).parent.parent
+_DEFAULT_CORPUS_PATH = _PROJECT_ROOT / "data" / "corpus"
 
 
 @tool
@@ -202,5 +207,110 @@ Network presets:
         return _train_deepmd_job(vasp_source, **kwargs)
 
 
-# Instantiate tool for use in agent
+class RagSearchTool(Tool):
+    """Tool for searching code documentation and examples via RAG.
+
+    Returns verbatim code snippets from indexed package source code.
+    Trust tier SOURCE indicates direct source code.
+    """
+
+    name = "rag_search"
+    description = """Search for code documentation, API signatures, and examples.
+
+Use this tool when:
+- You encounter AttributeError, TypeError, or "has no attribute" errors in your execution environment.
+- You need to verify correct method names, signatures, or kwargs before writing code.
+- You need to see a real-world code snippet to understand how to initialize a complex object.
+
+Returns {"results": [{"source": "path/file.py:10-50", "snippet": "code..."}, ...]}.
+
+Example: rag_search("Structure from_file", software=["pymatgen"])
+"""
+    inputs = {
+        "query": {
+            "type": "string",
+            "description": "Search query (e.g., 'MDMaker' or 'submit_flow jobflow')",
+        },
+        "software": {
+            "type": "array",
+            "description": "Filter by package names, e.g. ['pymatgen', 'atomate2']. None for all.",
+            "nullable": True,
+        },
+    }
+    output_type = "object"
+
+    def __init__(self, corpus_path: Path | None = None, top_k: int = 5):
+        """Initialize RAG search tool.
+
+        Args:
+            corpus_path: Path to corpus directory. Defaults to data/corpus.
+            top_k: Number of results to return. Defaults to 5.
+        """
+        super().__init__()
+        self._corpus_path = corpus_path or _DEFAULT_CORPUS_PATH
+        self._top_k = top_k
+        self._index = None
+
+    def _load_index(self) -> None:
+        """Lazy-load the RAG index."""
+        if self._index is not None:
+            return
+
+        if not self._corpus_path.exists():
+            raise FileNotFoundError(
+                f"RAG corpus not found at {self._corpus_path}. "
+                "Run 'python scripts/build_corpus.py' first."
+            )
+
+        from core.rag import RagIndex
+
+        self._index = RagIndex.load(self._corpus_path)
+
+    def forward(
+        self,
+        query: str,
+        software: list[str] | None = None,
+    ) -> dict:
+        """Execute RAG search.
+
+        Args:
+            query: Search query
+            software: Optional package filter
+
+        Returns:
+            Dict with results list containing source locations and code snippets.
+        """
+        from core.rag import search
+
+        self._load_index()
+
+        results = search(
+            self._index,
+            query=query,
+            top_k=self._top_k,
+            software=software,
+        )
+
+        if not results:
+            # Check if software filter caused empty results
+            if software:
+                available = {c.software for c in self._index._chunks}
+                missing = [s for s in software if s not in available]
+                if missing:
+                    return {
+                        "results": [],
+                        "note": f"Package(s) not in corpus: {missing}. Available: {sorted(available)}",
+                    }
+            return {"results": [], "note": "No relevant code found for this query"}
+
+        return {
+            "results": [
+                {"source": r.source, "snippet": r.snippet}
+                for r in results
+            ]
+        }
+
+
+# Instantiate tools for use in agent
 train_deepmd = TrainDeePMDTool()
+rag_search = RagSearchTool()

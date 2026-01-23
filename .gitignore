@@ -41,6 +41,10 @@ ENV/
 workspace/*
 !workspace/.gitkeep
 
+# RAG data (copied sources and index)
+data/corpus/
+data/sources/
+
 # OpenTelemetry traces
 *.otlp
 traces/

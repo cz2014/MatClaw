@@ -27,6 +27,10 @@ telemetry = [
     "arize-phoenix",
     "openinference-instrumentation-smolagents",
 ]
+rag = [
+    "bm25s>=0.2",
+    "tiktoken>=0.5",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -12,7 +12,7 @@ from typing import Any
 import yaml
 from smolagents import CodeAgent, LiteLLMModel, LocalPythonExecutor
 
-from core.tools import train_deepmd, wait_for_jobflow
+from core.tools import rag_search, train_deepmd, wait_for_jobflow
 from smolagents.agents import (
     FinalAnswerPromptTemplate,
     ManagedAgentPromptTemplate,
@@ -24,6 +24,10 @@ PROJECT_ROOT = Path(__file__).parent.parent
 CONFIG_DIR = PROJECT_ROOT / "config"
 
 _ENV_PATTERN = re.compile(r"\$\{[^}]+\}")  # leftover ${VAR} after expandvars
+_API_ERROR_PATTERN = re.compile(
+    r"(AttributeError|TypeError|ImportError|ModuleNotFoundError|has no attribute|unexpected keyword)",
+    re.IGNORECASE,
+)
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:
@@ -64,6 +68,36 @@ def _step_jsonl_logger(log_file: Path):
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
     return cb
+
+
+def _rag_nudge_on_api_error(step, agent) -> None:
+    """Nudge agent to use rag_search when API errors occur."""
+    from smolagents import ActionStep
+
+    if not isinstance(step, ActionStep):
+        return
+    if not step.error:
+        return
+
+    # Only nudge if rag_search tool is available
+    if "rag_search" not in agent.tools:
+        return
+
+    err_msg = str(step.error)
+    if not _API_ERROR_PATTERN.search(err_msg):
+        return
+
+    # Soft nudge - append hint to error message
+    hint = (
+        "\n\nHint: If you are not 100% certain about an API path or kwarg, "
+        "call rag_search before trying variants."
+    )
+    new_msg = err_msg + hint
+    # Update both .message attr and Exception.args for str() compatibility
+    if hasattr(step.error, "message"):
+        step.error.message = new_msg
+    step.error.args = (new_msg,)
+    print(f"[rag_nudge] Added hint to step {step.step_number}")
 
 
 def _create_sandbox_functions(workspace: Path) -> dict[str, callable]:
@@ -188,7 +222,7 @@ def create_agent(
     )
 
     kwargs: dict[str, Any] = dict(
-        tools=[wait_for_jobflow, train_deepmd],
+        tools=[wait_for_jobflow, train_deepmd, rag_search],
         model=model,
         executor=executor,
         additional_authorized_imports=additional_imports,
@@ -207,9 +241,13 @@ def create_agent(
     if planning_interval is not None:
         kwargs["planning_interval"] = planning_interval
 
+    # RAG nudge callback runs first to modify errors before logging
+    callbacks = [_rag_nudge_on_api_error]
     if enable_step_logging:
         steps_log = _make_steps_log_path(workspace_dir)
-        kwargs["step_callbacks"] = [_step_jsonl_logger(steps_log)]
+        callbacks.append(_step_jsonl_logger(steps_log))
         print(f"[agent] steps_log={steps_log}")
+
+    kwargs["step_callbacks"] = callbacks
 
     return CodeAgent(**kwargs)
