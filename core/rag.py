@@ -144,6 +144,93 @@ def _make_chunk_id(file_path: str, index: int) -> str:
 
 
 # -----------------------------------------------------------------------------
+# Chunking: Line-aligned splitting for large AST nodes
+# -----------------------------------------------------------------------------
+
+
+def _chunk_lines_aligned(
+    lines: list[str],
+    file_path: str,
+    software: str,
+    start_line_offset: int,
+    symbol: str,
+    max_tokens: int,
+    overlap_lines: int = 3,
+) -> list[Chunk]:
+    """Split source lines into chunks at line boundaries respecting token budget.
+
+    Args:
+        lines: Source code lines (already extracted for a node)
+        file_path: Path for metadata
+        software: Package name
+        start_line_offset: 1-indexed line number where these lines start in original file
+        symbol: Symbol name (function/class) for metadata
+        max_tokens: Maximum tokens per chunk
+        overlap_lines: Number of lines to overlap between chunks for context
+
+    Returns:
+        List of Chunk objects with line-aligned boundaries
+    """
+    if not lines:
+        return []
+
+    tokenizer = _get_tokenizer()
+    chunks = []
+    chunk_idx = 0
+    lines_emitted = 0
+
+    while lines_emitted < len(lines):
+        # Start from current position (with overlap from previous chunk)
+        start_idx = lines_emitted
+        chunk_lines = []
+        token_count = 0
+
+        # Accumulate lines until we approach token budget
+        idx = start_idx
+        while idx < len(lines):
+            line = lines[idx]
+            line_tokens = len(tokenizer.encode(line + "\n"))
+
+            # If adding this line exceeds budget and we have content, stop
+            if token_count + line_tokens > max_tokens and chunk_lines:
+                break
+
+            chunk_lines.append(line)
+            token_count += line_tokens
+            idx += 1
+
+        if chunk_lines:
+            chunk_content = "\n".join(chunk_lines)
+            chunk_start = start_line_offset + start_idx
+            chunk_end = start_line_offset + start_idx + len(chunk_lines) - 1
+
+            chunks.append(
+                Chunk(
+                    chunk_id=_make_chunk_id(f"{file_path}:{symbol}", chunk_idx),
+                    software=software,
+                    file_path=file_path,
+                    start_line=chunk_start,
+                    end_line=chunk_end,
+                    symbol=symbol,
+                    content=chunk_content,
+                )
+            )
+            chunk_idx += 1
+
+            # Move forward, but keep overlap_lines for context
+            new_emitted = start_idx + len(chunk_lines)
+            if new_emitted < len(lines):
+                lines_emitted = new_emitted - overlap_lines
+                lines_emitted = max(lines_emitted, start_idx + 1)  # Ensure progress
+            else:
+                lines_emitted = new_emitted
+        else:
+            break
+
+    return chunks
+
+
+# -----------------------------------------------------------------------------
 # Chunking: AST-based chunking (Method B)
 # -----------------------------------------------------------------------------
 
@@ -171,20 +258,16 @@ def chunk_ast(
         tree = ast.parse(content)
     except SyntaxError:
         # Fall back to fixed-width for unparseable files
-        return chunk_fixed_width(content, file_path, software)
+        return chunk_fixed_width(content, file_path, software, chunk_size=max_tokens)
 
     lines = content.split("\n")
     chunks = []
     tokenizer = _get_tokenizer()
 
-    # Extract top-level classes and functions
-    for node in ast.walk(tree):
+    # Extract top-level classes and functions only (not nested)
+    for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            # Get the symbol name
-            if isinstance(node, ast.ClassDef):
-                symbol = node.name
-            else:
-                symbol = node.name
+            symbol = node.name
 
             # Get line range (1-indexed in AST)
             start_line = node.lineno
@@ -209,43 +292,44 @@ def chunk_ast(
                     )
                 )
             else:
-                # Large node: split with fixed-width
-                sub_chunks = chunk_fixed_width(
-                    node_content,
+                # Large node: split at line boundaries for readable chunks
+                sub_chunks = _chunk_lines_aligned(
+                    node_lines,
                     file_path,
                     software,
-                    chunk_size=max_tokens // 2,
+                    start_line_offset=start_line,
+                    symbol=symbol,
+                    max_tokens=max_tokens,
                 )
-                for sc in sub_chunks:
-                    sc.symbol = symbol
-                    sc.start_line += start_line - 1
-                    sc.end_line += start_line - 1
                 chunks.extend(sub_chunks)
 
-    # Also capture module-level docstring if present
+    # Also capture module-level docstring if present (as raw source lines)
     if (
         tree.body
         and isinstance(tree.body[0], ast.Expr)
         and isinstance(tree.body[0].value, ast.Constant)
         and isinstance(tree.body[0].value.value, str)
     ):
-        docstring = tree.body[0].value.value
+        doc_node = tree.body[0]
+        doc_start = doc_node.lineno
+        doc_end = doc_node.end_lineno or doc_start
+        doc_content = "\n".join(lines[doc_start - 1 : doc_end])
         chunks.insert(
             0,
             Chunk(
                 chunk_id=_make_chunk_id(f"{file_path}:module_doc", 0),
                 software=software,
                 file_path=file_path,
-                start_line=1,
-                end_line=tree.body[0].end_lineno or 1,
+                start_line=doc_start,
+                end_line=doc_end,
                 symbol="__module__",
-                content=docstring,
+                content=doc_content,
             ),
         )
 
     # If no functions/classes found, fall back to fixed-width
     if not chunks:
-        return chunk_fixed_width(content, file_path, software)
+        return chunk_fixed_width(content, file_path, software, chunk_size=max_tokens)
 
     return chunks
 
@@ -274,7 +358,8 @@ def get_package_source_path(package_name: str) -> Path | None:
             origin = Path(spec.origin)
             if origin.name == "__init__.py":
                 return origin.parent
-            return origin.parent / package_name
+            # Single-file module: return parent directory
+            return origin.parent
 
         # Handle namespace packages (spec.origin is None)
         if spec.submodule_search_locations:
@@ -347,7 +432,7 @@ def build_chunks_from_directory(
 
     for py_file in source_dir.rglob("*.py"):
         try:
-            content = py_file.read_text(encoding="utf-8", errors="ignore")
+            content = py_file.read_text(encoding="utf-8", errors="replace")
         except Exception:
             continue
 
