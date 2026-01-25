@@ -31,6 +31,12 @@ rag = [
     "bm25s>=0.2",
     "tiktoken>=0.5",
 ]
+rag-vector = [
+    "bm25s>=0.2",
+    "tiktoken>=0.5",
+    "faiss-cpu>=1.7",
+    "google-genai>=0.3",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -12,7 +12,7 @@ from typing import Any
 import yaml
 from smolagents import CodeAgent, LiteLLMModel, LocalPythonExecutor
 
-from core.tools import rag_search, train_deepmd, wait_for_jobflow
+from core.tools import train_deepmd, wait_for_jobflow
 from smolagents.agents import (
     FinalAnswerPromptTemplate,
     ManagedAgentPromptTemplate,
@@ -70,8 +70,8 @@ def _step_jsonl_logger(log_file: Path):
     return cb
 
 
-def _rag_nudge_on_api_error(step, agent) -> None:
-    """Nudge agent to use rag_search when API errors occur."""
+def _on_step_error(step, agent) -> None:
+    """Add hints to step errors to help agent self-correct."""
     from smolagents import ActionStep
 
     if not isinstance(step, ActionStep):
@@ -97,7 +97,7 @@ def _rag_nudge_on_api_error(step, agent) -> None:
     if hasattr(step.error, "message"):
         step.error.message = new_msg
     step.error.args = (new_msg,)
-    print(f"[rag_nudge] Added hint to step {step.step_number}")
+    print(f"[step_error] Added hint to step {step.step_number}")
 
 
 def _create_sandbox_functions(workspace: Path) -> dict[str, callable]:
@@ -222,7 +222,7 @@ def create_agent(
     )
 
     kwargs: dict[str, Any] = dict(
-        tools=[wait_for_jobflow, train_deepmd, rag_search],
+        tools=[wait_for_jobflow, train_deepmd],
         model=model,
         executor=executor,
         additional_authorized_imports=additional_imports,
@@ -241,8 +241,8 @@ def create_agent(
     if planning_interval is not None:
         kwargs["planning_interval"] = planning_interval
 
-    # RAG nudge callback runs first to modify errors before logging
-    callbacks = [_rag_nudge_on_api_error]
+    # Error hint callback runs first to modify errors before logging
+    callbacks = [_on_step_error]
     if enable_step_logging:
         steps_log = _make_steps_log_path(workspace_dir)
         callbacks.append(_step_jsonl_logger(steps_log))

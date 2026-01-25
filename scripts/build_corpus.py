@@ -1,8 +1,11 @@
 #!/usr/bin/env python
 """CLI script to build RAG corpus from installed packages.
 
+Supports multiple retriever backends (BM25, Gemini embeddings).
+
 Usage:
     python scripts/build_corpus.py
+    python scripts/build_corpus.py --retriever gemini
     python scripts/build_corpus.py --packages pymatgen atomate2
     python scripts/build_corpus.py --method ast --chunk-size 600
 """
@@ -19,10 +22,10 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from core.rag import (
     ChunkMethod,
-    RagIndex,
     build_chunks_from_directory,
     copy_package_source,
 )
+from core.retrievers import BaseRetriever, get_retriever
 
 DEFAULT_PACKAGES = ["pymatgen", "atomate2", "jobflow", "jobflow_remote"]
 DEFAULT_SOURCES_DIR = PROJECT_ROOT / "data" / "sources"
@@ -33,22 +36,24 @@ def build_corpus(
     packages: list[str],
     sources_dir: Path,
     corpus_dir: Path,
+    retriever_method: str = "bm25",
     method: ChunkMethod = "fixed",
     chunk_size: int = 400,
     skip_copy: bool = False,
-) -> RagIndex:
+) -> BaseRetriever:
     """Build RAG corpus from packages.
 
     Args:
         packages: List of package names to index
         sources_dir: Directory to copy source files to
         corpus_dir: Directory to save index
+        retriever_method: Retriever backend ("bm25" or "gemini")
         method: Chunking method ("fixed" or "ast")
         chunk_size: Token size for chunks
         skip_copy: If True, use existing sources without copying
 
     Returns:
-        Built RagIndex
+        Built retriever instance
     """
     sources_dir.mkdir(parents=True, exist_ok=True)
     corpus_dir.mkdir(parents=True, exist_ok=True)
@@ -82,15 +87,24 @@ def build_corpus(
 
     if not all_chunks:
         print("\nWARNING: No chunks created. Check that packages are installed.")
-        return RagIndex()
+        return get_retriever(retriever_method)
 
-    # Step 3: Build and save index
-    print(f"\nBuilding BM25 index with {len(all_chunks)} total chunks...")
-    index = RagIndex(all_chunks)
-    index.save(corpus_dir)
-    print(f"Index saved to: {corpus_dir}")
+    # Step 3: Build retriever and add chunks
+    print(f"\nBuilding {retriever_method} index with {len(all_chunks)} total chunks...")
+    retriever = get_retriever(retriever_method)
+    retriever.add_chunks(all_chunks)
 
-    return index
+    # Step 4: Save index
+    # BM25 saves to corpus_dir directly, vector retrievers save to subdirectory
+    if retriever_method == "bm25":
+        save_path = corpus_dir
+    else:
+        save_path = corpus_dir / retriever_method
+
+    retriever.save(save_path)
+    print(f"Index saved to: {save_path}")
+
+    return retriever
 
 
 def main():
@@ -100,10 +114,17 @@ def main():
         epilog="""
 Examples:
   python scripts/build_corpus.py
+  python scripts/build_corpus.py --retriever gemini
   python scripts/build_corpus.py --packages pymatgen atomate2
   python scripts/build_corpus.py --method ast --chunk-size 600
   python scripts/build_corpus.py --skip-copy  # reindex existing sources
 """,
+    )
+    parser.add_argument(
+        "--retriever",
+        choices=["bm25", "gemini"],
+        default="bm25",
+        help="Retriever backend to use (default: bm25)",
     )
     parser.add_argument(
         "--packages",
@@ -126,8 +147,8 @@ Examples:
     parser.add_argument(
         "--method",
         choices=["fixed", "ast"],
-        default="fixed",
-        help="Chunking method (default: fixed)",
+        default="ast",
+        help="Chunking method (default: ast)",
     )
     parser.add_argument(
         "--chunk-size",
@@ -143,7 +164,8 @@ Examples:
 
     args = parser.parse_args()
 
-    print(f"RAG Corpus Builder")
+    print("RAG Corpus Builder")
+    print(f"  Retriever: {args.retriever}")
     print(f"  Packages: {args.packages}")
     print(f"  Sources:  {args.sources_dir}")
     print(f"  Corpus:   {args.corpus_dir}")
@@ -152,15 +174,16 @@ Examples:
     print()
 
     try:
-        index = build_corpus(
+        retriever = build_corpus(
             packages=args.packages,
             sources_dir=args.sources_dir,
             corpus_dir=args.corpus_dir,
+            retriever_method=args.retriever,
             method=args.method,
             chunk_size=args.chunk_size,
             skip_copy=args.skip_copy,
         )
-        print(f"\nDone. Total chunks indexed: {index.chunk_count}")
+        print(f"\nDone. Total chunks indexed: {retriever.chunk_count}")
     except ImportError as e:
         print(f"\nERROR: Missing dependency: {e}")
         print("Install RAG dependencies with: pip install -e '.[rag]'")

@@ -447,175 +447,12 @@ def build_chunks_from_directory(
 
 
 # -----------------------------------------------------------------------------
-# BM25 Index
-# -----------------------------------------------------------------------------
-
-
-class RagIndex:
-    """BM25-based retrieval index for code chunks."""
-
-    def __init__(self, chunks: list[Chunk] | None = None):
-        """Initialize index with optional chunks.
-
-        Args:
-            chunks: List of chunks to index (can be added later)
-        """
-        self._chunks: list[Chunk] = []
-        self._retriever = None
-
-        if chunks:
-            self.add_chunks(chunks)
-
-    def add_chunks(self, chunks: list[Chunk]) -> None:
-        """Add chunks to the index and rebuild.
-
-        Args:
-            chunks: Chunks to add
-        """
-        self._chunks.extend(chunks)
-        self._build_index()
-
-    def _build_index(self) -> None:
-        """Build BM25 index from current chunks."""
-        if not self._chunks:
-            return
-
-        import bm25s
-
-        # Tokenize chunk content for BM25
-        corpus = [c.content for c in self._chunks]
-        corpus_tokens = bm25s.tokenize(corpus, show_progress=False)
-
-        self._retriever = bm25s.BM25()
-        self._retriever.index(corpus_tokens, show_progress=False)
-
-    def search(
-        self,
-        query: str,
-        top_k: int = 5,
-        software_filter: list[str] | None = None,
-    ) -> list[tuple[Chunk, float]]:
-        """Search for relevant chunks.
-
-        Args:
-            query: Search query
-            top_k: Number of results to return
-            software_filter: Optional list of package names to filter by
-
-        Returns:
-            List of (chunk, score) tuples, sorted by relevance.
-        """
-        if not self._retriever or not self._chunks:
-            return []
-
-        import bm25s
-
-        query_tokens = bm25s.tokenize([query], show_progress=False)
-
-        # Get more results if filtering
-        fetch_k = top_k * 3 if software_filter else top_k
-        results, scores = self._retriever.retrieve(
-            query_tokens, k=min(fetch_k, len(self._chunks)), show_progress=False
-        )
-
-        # results shape: (1, k), scores shape: (1, k)
-        results_flat = results[0]
-        scores_flat = scores[0]
-
-        output = []
-        for idx, score in zip(results_flat, scores_flat):
-            chunk = self._chunks[idx]
-
-            # Apply software filter
-            if software_filter and chunk.software not in software_filter:
-                continue
-
-            output.append((chunk, float(score)))
-
-            if len(output) >= top_k:
-                break
-
-        return output
-
-    def save(self, path: Path) -> None:
-        """Save index to disk.
-
-        Args:
-            path: Directory to save index files
-        """
-        path.mkdir(parents=True, exist_ok=True)
-
-        # Save chunks as JSON
-        chunks_data = [
-            {
-                "chunk_id": c.chunk_id,
-                "software": c.software,
-                "file_path": c.file_path,
-                "start_line": c.start_line,
-                "end_line": c.end_line,
-                "symbol": c.symbol,
-                "content": c.content,
-            }
-            for c in self._chunks
-        ]
-        with (path / "chunks.json").open("w", encoding="utf-8") as f:
-            json.dump(chunks_data, f, ensure_ascii=False)
-
-        # Save BM25 index
-        if self._retriever:
-            self._retriever.save(str(path / "bm25"))
-
-    @classmethod
-    def load(cls, path: Path) -> RagIndex:
-        """Load index from disk.
-
-        Args:
-            path: Directory containing index files
-
-        Returns:
-            Loaded RagIndex instance.
-        """
-        import bm25s
-
-        instance = cls()
-
-        # Load chunks
-        with (path / "chunks.json").open("r", encoding="utf-8") as f:
-            chunks_data = json.load(f)
-
-        instance._chunks = [
-            Chunk(
-                chunk_id=c["chunk_id"],
-                software=c["software"],
-                file_path=c["file_path"],
-                start_line=c["start_line"],
-                end_line=c["end_line"],
-                symbol=c["symbol"],
-                content=c["content"],
-            )
-            for c in chunks_data
-        ]
-
-        # Load BM25 index
-        bm25_path = path / "bm25"
-        if bm25_path.exists():
-            instance._retriever = bm25s.BM25.load(str(bm25_path), load_corpus=False)
-
-        return instance
-
-    @property
-    def chunk_count(self) -> int:
-        """Number of indexed chunks."""
-        return len(self._chunks)
-
-
-# -----------------------------------------------------------------------------
 # Search API
 # -----------------------------------------------------------------------------
 
 
 def search(
-    index: RagIndex,
+    index,  # BaseRetriever or RagIndex (backward compat)
     query: str,
     top_k: int = 5,
     software: list[str] | None = None,
@@ -623,10 +460,10 @@ def search(
     """Search the RAG index and return list of results.
 
     Args:
-        index: RagIndex instance
-        query: Search query
-        top_k: Number of results
-        software: Optional package filter
+        index: Retriever instance (BaseRetriever or legacy RagIndex).
+        query: Search query.
+        top_k: Number of results.
+        software: Optional package filter.
 
     Returns:
         List of SearchResult with source location and code snippet.

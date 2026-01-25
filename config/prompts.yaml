@@ -50,7 +50,7 @@ system_prompt: |-
   print("Old species:", old_species, "-> New species: Ge")
   print("Note: distances in Angstrom; energies in eV unless stated otherwise.")
 
-  write_text("POSCAR", Poscar(struct).get_str())
+  write_text("POSCAR", str(Poscar(struct)))
   # INCAR/KPOINTS omitted: set as needed for the task
   final_answer("POSCAR written for Ge-doped Si supercell.")
   {{code_block_closing_tag}}

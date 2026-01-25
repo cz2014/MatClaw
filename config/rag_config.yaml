@@ -1,5 +1,10 @@
 # RAG Configuration for MLFF Agent
-# v0: Local source code + BM25
+# v1: Supports BM25 and vector-based retrieval
+
+# Retriever settings
+retriever:
+  # Method: "bm25" (keyword-based) or "gemini" (embedding-based)
+  method: bm25
 
 # Packages to index (from installed site-packages)
 packages:

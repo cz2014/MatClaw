@@ -11,6 +11,17 @@ from smolagents import Tool, tool
 # Project paths for RAG
 _PROJECT_ROOT = Path(__file__).parent.parent
 _DEFAULT_CORPUS_PATH = _PROJECT_ROOT / "data" / "corpus"
+_RAG_CONFIG_PATH = _PROJECT_ROOT / "config" / "rag_config.yaml"
+
+
+def _load_rag_config() -> dict:
+    """Load RAG configuration from rag_config.yaml."""
+    if not _RAG_CONFIG_PATH.exists():
+        return {}
+    import yaml
+
+    with open(_RAG_CONFIG_PATH) as f:
+        return yaml.safe_load(f) or {}
 
 
 @tool
@@ -239,32 +250,53 @@ Example: rag_search("Structure from_file", software=["pymatgen"])
     }
     output_type = "object"
 
-    def __init__(self, corpus_path: Path | None = None, top_k: int = 5):
+    def __init__(
+        self,
+        corpus_path: Path | None = None,
+        top_k: int = 5,
+        retriever_method: str | None = None,
+    ):
         """Initialize RAG search tool.
 
         Args:
             corpus_path: Path to corpus directory. Defaults to data/corpus.
             top_k: Number of results to return. Defaults to 5.
+            retriever_method: Override retriever method (bm25/gemini). Defaults to config value.
         """
         super().__init__()
         self._corpus_path = corpus_path or _DEFAULT_CORPUS_PATH
         self._top_k = top_k
+        self._retriever_method = retriever_method
         self._index = None
 
     def _load_index(self) -> None:
-        """Lazy-load the RAG index."""
+        """Lazy-load the RAG retriever."""
         if self._index is not None:
             return
 
-        if not self._corpus_path.exists():
+        # Determine retriever method from config or override
+        if self._retriever_method is not None:
+            method = self._retriever_method
+        else:
+            config = _load_rag_config()
+            method = config.get("retriever", {}).get("method", "bm25")
+
+        # Determine index path based on method
+        if method == "bm25":
+            index_path = self._corpus_path
+        else:
+            # Vector retrievers use subdirectory (e.g., data/corpus/gemini)
+            index_path = self._corpus_path / method
+
+        if not index_path.exists():
             raise FileNotFoundError(
-                f"RAG corpus not found at {self._corpus_path}. "
-                "Run 'python scripts/build_corpus.py' first."
+                f"RAG corpus not found at {index_path}. "
+                f"Run 'python scripts/build_corpus.py --retriever {method}' first."
             )
 
-        from core.rag import RagIndex
+        from core.retrievers import load_retriever
 
-        self._index = RagIndex.load(self._corpus_path)
+        self._index = load_retriever(method, index_path)
 
     def forward(
         self,
