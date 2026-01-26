@@ -30,6 +30,7 @@ telemetry = [
 rag = [
     "bm25s>=0.2",
     "tiktoken>=0.5",
+    "astchunk",
 ]
 rag-vector = [
     "bm25s>=0.2",

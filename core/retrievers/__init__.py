@@ -74,11 +74,12 @@ class BaseRetriever(ABC):
         ...
 
 
-def get_retriever(method: str = "bm25") -> BaseRetriever:
+def get_retriever(method: str = "bm25", use_code_tokenize: bool = True) -> BaseRetriever:
     """Factory function to create a retriever by method name.
 
     Args:
         method: Retriever method ("bm25" or "gemini").
+        use_code_tokenize: For BM25, whether to use code-aware tokenization.
 
     Returns:
         Configured retriever instance.
@@ -89,7 +90,7 @@ def get_retriever(method: str = "bm25") -> BaseRetriever:
     if method == "bm25":
         from .bm25 import BM25Retriever
 
-        return BM25Retriever()
+        return BM25Retriever(use_code_tokenize=use_code_tokenize)
     elif method == "gemini":
         from .gemini import GeminiEmbedder
         from .vector import VectorRetriever

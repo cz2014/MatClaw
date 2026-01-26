@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Literal
 
 # Type aliases
-ChunkMethod = Literal["fixed", "ast"]
+ChunkMethod = Literal["fixed", "ast", "code-chunk", "cast"]
 
 
 @dataclass
@@ -335,6 +335,144 @@ def chunk_ast(
 
 
 # -----------------------------------------------------------------------------
+# Chunking: cAST / astchunk (Method D)
+# -----------------------------------------------------------------------------
+
+# Conversion factor: tokens to non-whitespace characters
+# astchunk measures chunk size in non-whitespace chars, not tokens
+# Empirically ~2.5 non-ws chars per token for Python code, using 3 conservatively
+CAST_TOKENS_TO_NONWS_CHARS = 3
+
+
+def chunk_cast(
+    content: str,
+    file_path: str,
+    software: str,
+    chunk_size: int = 800,
+) -> list[Chunk]:
+    """Chunk Python source using astchunk (cAST method).
+
+    Uses chunk_expansion to prepend context headers (filepath, class/function ancestors)
+    to each chunk for better retrieval.
+
+    Args:
+        content: Python source code
+        file_path: Path for locator metadata
+        software: Package name
+        chunk_size: Maximum tokens per chunk (converted internally)
+
+    Returns:
+        List of Chunk objects
+    """
+    from astchunk import ASTChunkBuilder
+
+    # Convert tokens to non-whitespace characters (astchunk's unit)
+    max_nonws_chars = chunk_size * CAST_TOKENS_TO_NONWS_CHARS
+
+    builder = ASTChunkBuilder(
+        max_chunk_size=max_nonws_chars,
+        language="python",
+        metadata_template="default",
+    )
+
+    try:
+        # Enable chunk_expansion for context headers (filepath, class/function path)
+        result = builder.chunkify(
+            content,
+            chunk_expansion=True,
+            chunk_overlap=1,
+            repo_level_metadata={"filepath": file_path},
+        )
+    except Exception:
+        # Fall back to fixed-width for unparseable files
+        return chunk_fixed_width(content, file_path, software, chunk_size=chunk_size)
+
+    if not result:
+        return chunk_fixed_width(content, file_path, software, chunk_size=chunk_size)
+
+    chunks = []
+    for i, item in enumerate(result):
+        # Content already includes context header from chunk_expansion
+        chunk_content = item.get("content", "")
+        metadata = item.get("metadata", {})
+
+        # Extract line numbers from metadata
+        start_line = metadata.get("start_line_no", 1)
+        end_line = metadata.get("end_line_no", start_line)
+
+        chunks.append(
+            Chunk(
+                chunk_id=_make_chunk_id(f"{file_path}:{i}", i),
+                software=software,
+                file_path=file_path,
+                start_line=start_line,
+                end_line=end_line,
+                symbol=None,  # astchunk doesn't provide symbol name directly
+                content=chunk_content,
+            )
+        )
+
+    return chunks
+
+
+# -----------------------------------------------------------------------------
+# Chunking: code-chunk JSONL loader (Method C)
+# -----------------------------------------------------------------------------
+
+
+def load_chunks_from_jsonl(jsonl_path: str | Path) -> list[Chunk]:
+    """Load chunks from code-chunk JSONL output.
+
+    Uses contextualizedText as chunk content for better retrieval.
+    The contextualizedText includes scope chain (e.g., "Scope: Kpoints")
+    and entity definitions that help BM25 match class-method queries.
+
+    Args:
+        jsonl_path: Path to JSONL file from chunk_with_context.mjs
+
+    Returns:
+        List of Chunk objects
+    """
+    chunks = []
+    with open(jsonl_path, "r", encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            data = json.loads(line)
+
+            # Use contextualizedText (includes scope/entity headers)
+            content = data.get("contextualizedText") or data.get("text", "")
+
+            # Parse line range [start, end]
+            line_range = data.get("lineRange", [1, 1])
+            start_line = line_range[0] if isinstance(line_range, list) else 1
+            end_line = line_range[1] if isinstance(line_range, list) else start_line
+
+            # Extract symbol from context.entities[0].name
+            symbol = None
+            ctx = data.get("context", {})
+            entities = ctx.get("entities", [])
+            if entities:
+                symbol = entities[0].get("name")
+
+            chunk_id = _make_chunk_id(data["filepath"], data.get("index", 0))
+
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id,
+                    software=data["software"],
+                    file_path=data["filepath"],
+                    start_line=start_line,
+                    end_line=end_line,
+                    symbol=symbol,
+                    content=content,
+                )
+            )
+
+    return chunks
+
+
+# -----------------------------------------------------------------------------
 # Corpus Builder
 # -----------------------------------------------------------------------------
 
@@ -421,14 +559,19 @@ def build_chunks_from_directory(
     Args:
         source_dir: Directory containing Python files
         software: Package name for metadata
-        method: Chunking method ("fixed" or "ast")
+        method: Chunking method ("fixed", "ast", or "cast")
         chunk_size: Token size for fixed-width chunking
 
     Returns:
         List of all chunks.
     """
     chunks = []
-    chunk_fn = chunk_ast if method == "ast" else chunk_fixed_width
+    if method == "cast":
+        chunk_fn = chunk_cast
+    elif method == "ast":
+        chunk_fn = chunk_ast
+    else:
+        chunk_fn = chunk_fixed_width
 
     for py_file in source_dir.rglob("*.py"):
         try:

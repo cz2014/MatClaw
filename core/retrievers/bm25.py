@@ -45,14 +45,21 @@ def _code_tokenize(text: str) -> list[str]:
 class BM25Retriever(BaseRetriever):
     """BM25-based retrieval using bm25s library."""
 
-    def __init__(self, chunks: list[Chunk] | None = None):
+    def __init__(
+        self,
+        chunks: list[Chunk] | None = None,
+        use_code_tokenize: bool = True,
+    ):
         """Initialize retriever with optional chunks.
 
         Args:
             chunks: List of chunks to index (can be added later via add_chunks).
+            use_code_tokenize: If True, use code-aware tokenization (split snake_case,
+                CamelCase, dotted.paths). If False, use default bm25s tokenization.
         """
         self._chunks: list[Chunk] = []
         self._retriever = None
+        self._use_code_tokenize = use_code_tokenize
 
         if chunks:
             self.add_chunks(chunks)
@@ -70,8 +77,13 @@ class BM25Retriever(BaseRetriever):
         import bm25s
 
         corpus = [c.content for c in self._chunks]
-        # Use code-aware tokenizer for better matching of snake_case, dots, CamelCase
-        corpus_tokens = [_code_tokenize(doc) for doc in corpus]
+
+        if self._use_code_tokenize:
+            # Use code-aware tokenizer for better matching of snake_case, dots, CamelCase
+            corpus_tokens = [_code_tokenize(doc) for doc in corpus]
+        else:
+            # Use default bm25s tokenization
+            corpus_tokens = bm25s.tokenize(corpus, show_progress=False)
 
         self._retriever = bm25s.BM25()
         self._retriever.index(corpus_tokens, show_progress=False)
@@ -86,8 +98,13 @@ class BM25Retriever(BaseRetriever):
         if not self._retriever or not self._chunks:
             return []
 
-        # Use same code-aware tokenizer for query
-        query_tokens = [_code_tokenize(query)]
+        import bm25s
+
+        # Use same tokenizer as indexing
+        if self._use_code_tokenize:
+            query_tokens = [_code_tokenize(query)]
+        else:
+            query_tokens = bm25s.tokenize([query], show_progress=False)
 
         # Get more results if filtering
         fetch_k = top_k * 3 if software_filter else top_k
@@ -118,21 +135,24 @@ class BM25Retriever(BaseRetriever):
         """Save index to disk."""
         path.mkdir(parents=True, exist_ok=True)
 
-        # Save chunks as JSON
-        chunks_data = [
-            {
-                "chunk_id": c.chunk_id,
-                "software": c.software,
-                "file_path": c.file_path,
-                "start_line": c.start_line,
-                "end_line": c.end_line,
-                "symbol": c.symbol,
-                "content": c.content,
-            }
-            for c in self._chunks
-        ]
+        # Save chunks and settings as JSON
+        data = {
+            "use_code_tokenize": self._use_code_tokenize,
+            "chunks": [
+                {
+                    "chunk_id": c.chunk_id,
+                    "software": c.software,
+                    "file_path": c.file_path,
+                    "start_line": c.start_line,
+                    "end_line": c.end_line,
+                    "symbol": c.symbol,
+                    "content": c.content,
+                }
+                for c in self._chunks
+            ],
+        }
         with (path / "chunks.json").open("w", encoding="utf-8") as f:
-            json.dump(chunks_data, f, ensure_ascii=False)
+            json.dump(data, f, ensure_ascii=False)
 
         # Save BM25 index
         if self._retriever:
@@ -143,11 +163,10 @@ class BM25Retriever(BaseRetriever):
         """Load index from disk."""
         import bm25s
 
-        instance = cls()
-
-        # Load chunks
         with (path / "chunks.json").open("r", encoding="utf-8") as f:
-            chunks_data = json.load(f)
+            data = json.load(f)
+
+        instance = cls(use_code_tokenize=data["use_code_tokenize"])
 
         instance._chunks = [
             Chunk(
@@ -159,7 +178,7 @@ class BM25Retriever(BaseRetriever):
                 symbol=c["symbol"],
                 content=c["content"],
             )
-            for c in chunks_data
+            for c in data["chunks"]
         ]
 
         # Load BM25 index
