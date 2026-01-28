@@ -40,6 +40,9 @@ ENV/
 # Workspace outputs (keep directory, ignore contents)
 workspace/*
 !workspace/.gitkeep
+benchmark/qa/workspace/
+benchmark/qa/results_*.jsonl
+benchmark/qa/results_*.json
 
 # RAG data (copied sources and index)
 data/corpus/

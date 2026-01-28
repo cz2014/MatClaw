@@ -21,7 +21,6 @@ from smolagents.agents import (
 )
 
 PROJECT_ROOT = Path(__file__).parent.parent
-CONFIG_DIR = PROJECT_ROOT / "config"
 
 _ENV_PATTERN = re.compile(r"\$\{[^}]+\}")  # leftover ${VAR} after expandvars
 _API_ERROR_PATTERN = re.compile(
@@ -180,34 +179,44 @@ def _build_prompt_templates(prompts_cfg: dict[str, Any]) -> PromptTemplates | No
 
 
 def create_agent(
+    config_dir: Path,
+    workspace_dir: Path,
     provider_name: str | None = None,
+    tools: list | None = None,
     enable_step_logging: bool = True,
-    workspace_dir: Path | None = None,
     planning_interval: int | None = None,
 ) -> CodeAgent:
     """Create a CodeAgent with config from YAML files.
 
     Args:
+        config_dir: Directory containing llm_config.yaml, prompts.yaml, rag_config.yaml.
+        workspace_dir: Directory for workspace and logs.
         provider_name: LLM provider name. Defaults to config default_provider.
+        tools: Custom tools list. Defaults to [wait_for_jobflow, train_deepmd].
         enable_step_logging: Whether to log steps to JSONL file in workspace.
-        workspace_dir: Directory for workspace and logs. Required.
         planning_interval: Steps between planning updates. None disables planning.
 
     Returns:
         Configured CodeAgent instance.
     """
-    if workspace_dir is None:
-        raise ValueError("workspace_dir is required")
-    llm_cfg = _read_yaml(CONFIG_DIR / "llm_config.yaml")
-    prompts_path = CONFIG_DIR / "prompts.yaml"
+    # Read all configs from config_dir
+    llm_cfg = _read_yaml(config_dir / "llm_config.yaml")
+
+    prompts_path = config_dir / "prompts.yaml"
     prompts_cfg = _read_yaml(prompts_path) if prompts_path.exists() else {}
 
     provider_name = provider_name or llm_cfg["default_provider"]
     provider_cfg = llm_cfg["providers"][provider_name]
 
+    # Forward any extra provider config keys (e.g. timeout, api_base) to LiteLLM
+    model_kwargs = {
+        k: v for k, v in provider_cfg.items()
+        if k not in ("model_id", "api_key")
+    }
     model = LiteLLMModel(
         model_id=provider_cfg["model_id"],
         api_key=_expand_env_strict(provider_cfg["api_key"]),
+        **model_kwargs,
     )
 
     agent_cfg = llm_cfg.get("agent", {})
@@ -221,12 +230,19 @@ def create_agent(
         additional_functions=sandbox_funcs,
     )
 
+    # Tools: use custom list or default
+    if tools is None:
+        tools = [wait_for_jobflow, train_deepmd]
+
+    # Max steps from config
+    max_steps = agent_cfg.get("max_steps", 10)
+
     kwargs: dict[str, Any] = dict(
-        tools=[wait_for_jobflow, train_deepmd],
+        tools=tools,
         model=model,
         executor=executor,
         additional_authorized_imports=additional_imports,
-        max_steps=agent_cfg.get("max_steps", 10),
+        max_steps=max_steps,
         add_base_tools=False,
         return_full_result=True,
     )

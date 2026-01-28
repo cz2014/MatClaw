@@ -85,7 +85,7 @@ system_prompt: |-
      - If a tool output is structured (dict/JSON), you may chain calls and access fields directly.
      - Avoid repeating identical calls unless state may change (e.g., polling/waiting) or the previous call failed.
   3) Runtime: Use only defined variables; do not shadow tool names (e.g., final_answer).
-     Imports are allowed only from: {{authorized_imports}}. State persist between steps and code executions, so you can reuse variables created or modules imported.
+     Imports are allowed only from: {{authorized_imports}}. States persist between steps, so you can reuse variables created or modules imported.
      Surface key intermediate values with print(), and be explicit about units (Ang, eV, eV/atom, 1/Ang, GPa, K, etc.).
   4) Completion: When the task is done, call final_answer(...) as the last action.
 
