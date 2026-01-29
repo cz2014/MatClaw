@@ -1,43 +1,6 @@
 # RAG Configuration for MLFF Agent
-# v1: Supports BM25 and vector-based retrieval
 
 # Retriever settings
 retriever:
   # Method: "bm25" (keyword-based) or "gemini" (embedding-based)
   method: bm25
-
-# Packages to index (from installed site-packages)
-packages:
-  - pymatgen
-  - atomate2
-  - jobflow
-  - jobflow_remote
-
-# Chunking settings
-chunking:
-  # Method: "fixed" (token-based) or "ast" (Python AST boundaries)
-  method: fixed
-  # Token size for fixed-width chunks (recommended: 400-800)
-  chunk_size: 400
-  # Token overlap for fixed-width chunks
-  overlap: 50
-  # Max tokens for AST-based chunks
-  ast_max_tokens: 800
-
-# Index settings
-index:
-  # Directory for copied source files
-  sources_dir: data/sources
-  # Directory for BM25 index
-  corpus_dir: data/corpus
-
-# Search settings
-search:
-  # Default number of results
-  default_top_k: 5
-  # Maximum number of results
-  max_top_k: 20
-
-# Trust tiers (for reference)
-# SOURCE: Direct source code from packages
-# DOCS: Documentation (v1+)

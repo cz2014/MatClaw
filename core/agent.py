@@ -156,18 +156,21 @@ def _build_prompt_templates(prompts_cfg: dict[str, Any]) -> PromptTemplates | No
     if not has_any:
         return None
 
+    # Use "" for any None/missing fields -- smolagents TypedDicts require all keys
+    # present, and populate_template(None, {}) crashes. The framework itself uses
+    # "" in EMPTY_PROMPT_TEMPLATES for unused fields.
     planning = PlanningPromptTemplate(
-        initial_plan=planning_cfg.get("initial_plan"),
-        update_plan_pre_messages=planning_cfg.get("update_plan_pre_messages"),
-        update_plan_post_messages=planning_cfg.get("update_plan_post_messages"),
+        initial_plan=planning_cfg.get("initial_plan") or "",
+        update_plan_pre_messages=planning_cfg.get("update_plan_pre_messages") or "",
+        update_plan_post_messages=planning_cfg.get("update_plan_post_messages") or "",
     )
     managed_agent = ManagedAgentPromptTemplate(
-        task=managed_cfg.get("task"),
-        report=managed_cfg.get("report"),
+        task=managed_cfg.get("task") or "",
+        report=managed_cfg.get("report") or "",
     )
     final_answer = FinalAnswerPromptTemplate(
-        pre_messages=final_cfg.get("pre_messages"),
-        post_messages=final_cfg.get("post_messages"),
+        pre_messages=final_cfg.get("pre_messages") or "",
+        post_messages=final_cfg.get("post_messages") or "",
     )
 
     return PromptTemplates(

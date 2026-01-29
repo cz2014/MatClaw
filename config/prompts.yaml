@@ -99,22 +99,22 @@ system_prompt: |-
 # Planning prompts - used when planning_interval is set
 planning:
   # Initial plan prompt
-  initial_plan: null
+  initial_plan: ""
   # Messages before updating the plan
-  update_plan_pre_messages: null
+  update_plan_pre_messages: ""
   # Messages after updating the plan
-  update_plan_post_messages: null
+  update_plan_post_messages: ""
 
 # Managed agent prompts - used for sub-agents
 managed_agent:
   # Task prompt for managed agent
-  task: null
+  task: ""
   # Report prompt for managed agent
-  report: null
+  report: ""
 
 # Final answer prompts
 final_answer:
   # Messages before the final answer
-  pre_messages: null
+  pre_messages: ""
   # Messages after the final answer
-  post_messages: null
+  post_messages: ""
