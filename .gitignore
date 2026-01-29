@@ -44,9 +44,11 @@ benchmark/qa/workspace/
 benchmark/qa/results_*.jsonl
 benchmark/qa/results_*.json
 
-# RAG data (copied sources and index)
+# RAG data (copied sources and index; rebuild with scripts/build_corpus.py)
 data/corpus/
 data/sources/
+benchmark/qa/corpus/
+benchmark/qa/sources/
 
 # OpenTelemetry traces
 *.otlp
