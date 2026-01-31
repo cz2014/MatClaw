@@ -188,6 +188,7 @@ def create_agent(
     tools: list | None = None,
     enable_step_logging: bool = True,
     planning_interval: int | None = None,
+    final_answer_checks: list | None = None,
 ) -> CodeAgent:
     """Create a CodeAgent with config from YAML files.
 
@@ -198,6 +199,7 @@ def create_agent(
         tools: Custom tools list. Defaults to [wait_for_jobflow, train_deepmd].
         enable_step_logging: Whether to log steps to JSONL file in workspace.
         planning_interval: Steps between planning updates. None disables planning.
+        final_answer_checks: List of check functions passed to CodeAgent.
 
     Returns:
         Configured CodeAgent instance.
@@ -259,6 +261,9 @@ def create_agent(
 
     if planning_interval is not None:
         kwargs["planning_interval"] = planning_interval
+
+    if final_answer_checks:
+        kwargs["final_answer_checks"] = final_answer_checks
 
     # Error hint callback runs first to modify errors before logging
     callbacks = [_on_step_error]
