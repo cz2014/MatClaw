@@ -12,7 +12,7 @@ from typing import Any
 import yaml
 from smolagents import CodeAgent, LiteLLMModel, LocalPythonExecutor
 
-from core.tools import train_deepmd, wait_for_jobflow
+from core.tools import api_probe, train_deepmd, wait_for_jobflow
 from smolagents.agents import (
     FinalAnswerPromptTemplate,
     ManagedAgentPromptTemplate,
@@ -78,8 +78,16 @@ def _on_step_error(step, agent) -> None:
     if not step.error:
         return
 
-    # Only nudge if rag_search tool is available
-    if "rag_search" not in agent.tools:
+    # Build tool hint from available tools
+    has_rag = "rag_search" in agent.tools
+    has_probe = "api_probe" in agent.tools
+    if has_rag and has_probe:
+        tool_hint = "rag_search or api_probe"
+    elif has_probe:
+        tool_hint = "api_probe"
+    elif has_rag:
+        tool_hint = "rag_search"
+    else:
         return
 
     err_msg = str(step.error)
@@ -89,7 +97,7 @@ def _on_step_error(step, agent) -> None:
     # Soft nudge - append hint to error message
     hint = (
         "\n\nHint: If you are not 100% certain about an API path or kwarg, "
-        "call rag_search before trying variants."
+        f"call {tool_hint} before trying variants."
     )
     new_msg = err_msg + hint
     # Update both .message attr and Exception.args for str() compatibility
@@ -237,7 +245,7 @@ def create_agent(
 
     # Tools: use custom list or default
     if tools is None:
-        tools = [wait_for_jobflow, train_deepmd]
+        tools = [wait_for_jobflow, train_deepmd, api_probe]
 
     # Max steps from config
     max_steps = agent_cfg.get("max_steps", 10)

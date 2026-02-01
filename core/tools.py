@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import importlib
+import inspect
 import time
+import types
 from pathlib import Path
 from typing import Any
 
@@ -218,6 +221,145 @@ Network presets:
         return _train_deepmd_job(vasp_source, **kwargs)
 
 
+class ApiProbeTool(Tool):
+    """Runtime API introspection via dir() + inspect.getattr_static()."""
+
+    name = "api_probe"
+    description = """Inspect the live Python runtime API for a module/class/function.
+
+Introspects what is actually importable in the current environment. Returns:
+- resolved: target summary (kind, name, module, signature, doc)
+- dir: public dir() listing with counts
+
+Usage: pass the full dotted path to the symbol you want to inspect.
+  api_probe("pymatgen.analysis.defects.utils")           # module overview + dir
+  api_probe("pymatgen.analysis.defects.utils.get_avg_chg")  # drill into function
+
+Workflow: probe module/class -> read dir -> probe specific member by appending to path.
+
+Use this tool when:
+- You got AttributeError/TypeError and need correct attribute names or signatures.
+- You suspect retrieval results refer to a different package/version.
+- You want a dir()-like view without writing probing code.
+
+After you find the correct symbol name, use rag_search for verbatim code snippets.
+"""
+
+    inputs = {
+        "target": {
+            "type": "string",
+            "description": (
+                "Full dotted import path to probe. "
+                "Examples: 'pymatgen.analysis.defects.utils', "
+                "'pymatgen.core.structure.Structure', "
+                "'pymatgen.analysis.defects.utils.get_avg_chg'."
+            ),
+        },
+    }
+    output_type = "object"
+
+    _DIR_LIMIT = 200
+    _DOC_CHARS = 2000
+
+    def forward(self, target: str) -> dict:
+        def fail(msg: str, exc: Exception | None = None) -> dict:
+            return {
+                "ok": False,
+                "error": f"{msg} ({type(exc).__name__}: {exc})" if exc else msg,
+                "target": target,
+            }
+
+        def _truncate_doc(text: str | None) -> str | None:
+            if not text:
+                return None
+            s = " ".join(text.strip().split())
+            if len(s) > self._DOC_CHARS:
+                return s[: self._DOC_CHARS - 3] + "..."
+            return s
+
+        def _safe_signature(obj) -> str | None:
+            try:
+                return str(inspect.signature(obj))
+            except Exception:
+                return None
+
+        def _resolve_target(t: str):
+            """Resolve import path to object."""
+            if ":" in t:
+                mod, rest = t.split(":", 1)
+                mod = mod.strip()
+                chain = [p for p in rest.strip().split(".") if p] if rest.strip() else []
+                module = importlib.import_module(mod)
+                obj = module
+                for a in chain:
+                    obj = inspect.getattr_static(obj, a)
+                return obj
+
+            # Longest importable prefix strategy
+            parts = [p for p in t.split(".") if p]
+            last_exc = None
+            for i in range(len(parts), 0, -1):
+                mod = ".".join(parts[:i])
+                chain = parts[i:]
+                try:
+                    module = importlib.import_module(mod)
+                    obj = module
+                    for a in chain:
+                        obj = inspect.getattr_static(obj, a)
+                    return obj
+                except Exception as e:
+                    last_exc = e
+            raise ModuleNotFoundError(f"Could not resolve '{t}'") from last_exc
+
+        # -- Main flow --
+        try:
+            obj = _resolve_target(target)
+        except Exception as e:
+            return fail("Failed to resolve target.", e)
+
+        # Resolved summary
+        kind = "data"
+        if isinstance(obj, types.ModuleType):
+            kind = "module"
+        elif inspect.isclass(obj):
+            kind = "class"
+        elif inspect.isfunction(obj):
+            kind = "function"
+        elif inspect.isbuiltin(obj):
+            kind = "builtin"
+        elif callable(obj):
+            kind = "callable"
+
+        resolved = {
+            "kind": kind,
+            "name": getattr(obj, "__name__", type(obj).__name__),
+            "module": getattr(obj, "__module__", None),
+            "signature": _safe_signature(obj) if callable(obj) else None,
+            "doc": _truncate_doc(inspect.getdoc(obj)),
+        }
+
+        # dir() listing
+        try:
+            all_names = sorted(dir(obj))
+        except Exception as e:
+            return fail("dir() failed on target.", e)
+
+        public_names = [n for n in all_names if not n.startswith("_")]
+        dir_info = {
+            "public_count": len(public_names),
+            "public_listed": public_names[: self._DIR_LIMIT],
+            "public_truncated": len(public_names) > self._DIR_LIMIT,
+            "all_count": len(all_names),
+        }
+
+        return {
+            "ok": True,
+            "resolved": resolved,
+            "dir": dir_info,
+            "error": None,
+        }
+
+
 class RagSearchTool(Tool):
     """Tool for searching code documentation and examples via RAG.
 
@@ -229,9 +371,10 @@ class RagSearchTool(Tool):
     description = """Search for code documentation, API signatures, and examples.
 
 Use this tool when:
-- You encounter AttributeError, TypeError, or "has no attribute" errors in your execution environment.
-- You need to verify correct method names, signatures, or kwargs before writing code.
-- You need to see a real-world code snippet to understand how to initialize a complex object.
+- You need to discover where a symbol lives (module/class/function) across packages.
+- You need a verbatim code snippet/example to copy a correct usage pattern.
+- You want to verify behavior by reading surrounding implementation context.
+- You encounter AttributeError, TypeError, or "has no attribute" and want source evidence.
 
 Returns {"results": [{"source": "path/file.py:10-50", "snippet": "code..."}, ...]}.
 
@@ -345,4 +488,5 @@ Example: rag_search("Structure from_file", software=["pymatgen"])
 
 # Instantiate tools for use in agent
 train_deepmd = TrainDeePMDTool()
+api_probe = ApiProbeTool()
 rag_search = RagSearchTool()
