@@ -100,12 +100,16 @@ def get_retriever(method: str = "bm25", use_code_tokenize: bool = True) -> BaseR
         raise ValueError(f"Unknown retriever method: {method}")
 
 
-def load_retriever(method: str, path: Path) -> BaseRetriever:
+def load_retriever(
+    method: str, path: Path, gemini_task_type: str = "RETRIEVAL_QUERY"
+) -> BaseRetriever:
     """Load a pre-built retriever from disk.
 
     Args:
         method: Retriever method ("bm25" or "gemini").
         path: Directory containing index files.
+        gemini_task_type: Task type for Gemini query embeddings.
+            Options: RETRIEVAL_QUERY (for docs), CODE_RETRIEVAL_QUERY (for code).
 
     Returns:
         Loaded retriever instance.
@@ -121,6 +125,6 @@ def load_retriever(method: str, path: Path) -> BaseRetriever:
         from .gemini import GeminiEmbedder
         from .vector import VectorRetriever
 
-        return VectorRetriever.load(path, GeminiEmbedder())
+        return VectorRetriever.load(path, GeminiEmbedder(query_task_type=gemini_task_type))
     else:
         raise ValueError(f"Unknown retriever method: {method}")

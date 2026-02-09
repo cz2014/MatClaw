@@ -364,11 +364,14 @@ class RagSearchTool(Tool):
     """Tool for searching code documentation and examples via RAG.
 
     Returns verbatim code snippets from indexed package source code.
-    Trust tier SOURCE indicates direct source code.
+    Uses multi-query RRF fusion when multiple queries are provided.
     """
 
     name = "rag_search"
     description = """Search for code documentation, API signatures, and examples.
+
+Provide 1-3 search queries in the `queries` list. Multiple paraphrases improve recall.
+Keep technical terms (ALL_CAPS tags, filenames, exact values) in all queries.
 
 Use this tool when:
 - You need to discover where a symbol lives (module/class/function) across packages.
@@ -378,12 +381,18 @@ Use this tool when:
 
 Returns {"results": [{"source": "path/file.py:10-50", "snippet": "code..."}, ...]}.
 
-Example: rag_search("Structure from_file", software=["pymatgen"])
+Example:
+rag_search(queries=[
+    "ALGO blocked-Davidson-iteration scheme",
+    "ALGO Normal IALGO 38 blocked Davidson",
+    "blocked Davidson algorithm ALGO setting"
+], software=["vasp"])
 """
     inputs = {
-        "query": {
-            "type": "string",
-            "description": "Search query (e.g., 'MDMaker' or 'submit_flow jobflow')",
+        "queries": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "1-3 search queries (paraphrases improve recall)",
         },
         "software": {
             "type": "array",
@@ -417,12 +426,17 @@ Example: rag_search("Structure from_file", software=["pymatgen"])
         if self._index is not None:
             return
 
+        # Load config once for all settings
+        config = _load_rag_config()
+
         # Determine retriever method from config or override
         if self._retriever_method is not None:
             method = self._retriever_method
         else:
-            config = _load_rag_config()
             method = config.get("retriever", {}).get("method", "bm25")
+
+        # Get Gemini task type from config
+        gemini_task_type = config.get("gemini_task_type", "RETRIEVAL_QUERY")
 
         # Determine index path based on method
         if method == "bm25":
@@ -439,31 +453,33 @@ Example: rag_search("Structure from_file", software=["pymatgen"])
 
         from core.retrievers import load_retriever
 
-        self._index = load_retriever(method, index_path)
+        self._index = load_retriever(method, index_path, gemini_task_type=gemini_task_type)
 
     def forward(
         self,
-        query: str,
+        queries: list[str],
         software: list[str] | None = None,
     ) -> dict:
-        """Execute RAG search.
+        """Execute RAG search with multi-query fusion.
 
         Args:
-            query: Search query
+            queries: List of 1-3 search query paraphrases
             software: Optional package filter
 
         Returns:
             Dict with results list containing source locations and code snippets.
         """
-        from core.rag import search
+        from core.rag import search_multi
 
         self._load_index()
 
-        results = search(
+        results = search_multi(
             self._index,
-            query=query,
+            queries=queries,
             top_k=self._top_k,
             software=software,
+            per_query_k=20,
+            rrf_k=60,
         )
 
         if not results:

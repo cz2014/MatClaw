@@ -24,7 +24,14 @@ class GeminiEmbedder(BaseEmbedder):
     MAX_RETRIES = 5
     INITIAL_RETRY_DELAY = 30.0  # seconds
 
-    def __init__(self):
+    def __init__(self, query_task_type: str = "RETRIEVAL_QUERY"):
+        """Initialize Gemini embedder.
+
+        Args:
+            query_task_type: Task type for query embeddings.
+                Options: RETRIEVAL_QUERY (for docs), CODE_RETRIEVAL_QUERY (for code).
+        """
+        self._query_task_type = query_task_type
         self._client = None
         self._last_request_time = 0.0
         self._tokenizer = None
@@ -133,6 +140,6 @@ class GeminiEmbedder(BaseEmbedder):
         result = self._get_client().models.embed_content(
             model=self.MODEL,
             contents=[query],
-            config=types.EmbedContentConfig(task_type="CODE_RETRIEVAL_QUERY"),
+            config=types.EmbedContentConfig(task_type=self._query_task_type),
         )
         return np.array(result.embeddings[0].values, dtype=np.float32).reshape(1, -1)
