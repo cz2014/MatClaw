@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Literal
 
 # Type aliases
-ChunkMethod = Literal["fixed", "ast", "code-chunk", "cast"]
+ChunkMethod = Literal["fixed", "ast", "code-chunk", "cast", "markdown"]
 
 
 @dataclass
@@ -141,6 +141,253 @@ def _make_chunk_id(file_path: str, index: int) -> str:
     """Create a deterministic chunk ID."""
     h = hashlib.md5(f"{file_path}:{index}".encode()).hexdigest()[:8]
     return f"chunk_{h}"
+
+
+# -----------------------------------------------------------------------------
+# Chunking: Markdown-aware chunking (Method E)
+# -----------------------------------------------------------------------------
+
+
+@dataclass
+class _MarkdownSection:
+    """Internal helper for markdown section parsing."""
+
+    header_path: str  # e.g., "IBRION/Molecular dynamics"
+    header_level: int  # 1 for #, 2 for ##
+    start_line: int  # 1-indexed
+    lines: list[str]
+
+
+def _match_header(line: str) -> tuple[int, str] | None:
+    """Match a markdown header line.
+
+    Args:
+        line: A single line of text
+
+    Returns:
+        (level, text) tuple if line is a header, None otherwise.
+        Level is 1 for #, 2 for ##, etc.
+    """
+    stripped = line.lstrip()
+    if not stripped.startswith("#"):
+        return None
+
+    # Count leading hashes
+    level = 0
+    for ch in stripped:
+        if ch == "#":
+            level += 1
+        else:
+            break
+
+    # Must have space after hashes (or be header-only like "##")
+    rest = stripped[level:]
+    if rest and not rest[0].isspace():
+        return None
+
+    header_text = rest.strip()
+    return (level, header_text)
+
+
+def _parse_markdown_sections(content: str) -> list[_MarkdownSection]:
+    """Parse markdown content into sections based on headers.
+
+    Tracks header stack to build hierarchical paths like "IBRION/Molecular dynamics".
+    Preserves code fences (``` blocks) by ignoring headers inside them.
+
+    Args:
+        content: Full markdown content
+
+    Returns:
+        List of _MarkdownSection objects
+    """
+    lines = content.split("\n")
+    sections: list[_MarkdownSection] = []
+    header_stack: list[tuple[int, str]] = []  # (level, text)
+    in_code_fence = False
+
+    current_section_lines: list[str] = []
+    current_header_path = ""
+    current_header_level = 0
+    current_start_line = 1
+
+    for i, line in enumerate(lines):
+        line_num = i + 1  # 1-indexed
+
+        # Toggle code fence state
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_code_fence = not in_code_fence
+            current_section_lines.append(line)
+            continue
+
+        # Inside code fence: just accumulate
+        if in_code_fence:
+            current_section_lines.append(line)
+            continue
+
+        # Check for header
+        header_match = _match_header(line)
+        if header_match:
+            level, text = header_match
+
+            # Save previous section if it has content
+            if current_section_lines:
+                sections.append(
+                    _MarkdownSection(
+                        header_path=current_header_path,
+                        header_level=current_header_level,
+                        start_line=current_start_line,
+                        lines=current_section_lines,
+                    )
+                )
+
+            # Update header stack: pop levels >= current, then push new
+            while header_stack and header_stack[-1][0] >= level:
+                header_stack.pop()
+            header_stack.append((level, text))
+
+            # Build header path from stack
+            current_header_path = "/".join(h[1] for h in header_stack)
+            current_header_level = level
+            current_start_line = line_num
+            current_section_lines = [line]
+        else:
+            current_section_lines.append(line)
+
+    # Don't forget the last section
+    if current_section_lines:
+        sections.append(
+            _MarkdownSection(
+                header_path=current_header_path,
+                header_level=current_header_level,
+                start_line=current_start_line,
+                lines=current_section_lines,
+            )
+        )
+
+    return sections
+
+
+def chunk_markdown_aware(
+    content: str,
+    file_path: str,
+    software: str,
+    max_tokens: int = 800,
+    overlap_lines: int = 3,
+) -> list[Chunk]:
+    """Chunk markdown by accumulating sections until token budget is filled.
+
+    Like code-chunk: combines small sections together, respects section boundaries,
+    and adds context header showing which sections are included.
+
+    Args:
+        content: Markdown content
+        file_path: Path for locator metadata
+        software: Package name
+        max_tokens: Maximum tokens per chunk
+        overlap_lines: Line overlap for sub-chunking large sections
+
+    Returns:
+        List of Chunk objects
+    """
+    sections = _parse_markdown_sections(content)
+
+    if not sections:
+        return []
+
+    tokenizer = _get_tokenizer()
+    chunks: list[Chunk] = []
+    chunk_idx = 0
+
+    # Accumulator state
+    acc_lines: list[str] = []
+    acc_headers: list[str] = []
+    acc_start_line: int = 1
+    acc_tokens: int = 0
+
+    def _flush_accumulator() -> None:
+        """Emit accumulated content as a chunk."""
+        nonlocal acc_lines, acc_headers, acc_start_line, acc_tokens, chunk_idx
+
+        if not acc_lines:
+            return
+
+        # Build context header (like code-chunk's contextualizedText)
+        context_header = f"# {file_path}\n"
+        if acc_headers:
+            context_header += f"# Sections: {', '.join(acc_headers)}\n"
+        context_header += "\n"
+
+        chunk_content = context_header + "\n".join(acc_lines)
+        end_line = acc_start_line + len(acc_lines) - 1
+
+        # Use first header as symbol (primary section)
+        symbol = acc_headers[0] if acc_headers else None
+
+        chunks.append(
+            Chunk(
+                chunk_id=_make_chunk_id(f"{file_path}:{chunk_idx}", chunk_idx),
+                software=software,
+                file_path=file_path,
+                start_line=acc_start_line,
+                end_line=end_line,
+                symbol=symbol,
+                content=chunk_content,
+            )
+        )
+        chunk_idx += 1
+
+        # Reset accumulator
+        acc_lines = []
+        acc_headers = []
+        acc_start_line = 1
+        acc_tokens = 0
+
+    for section in sections:
+        section_content = "\n".join(section.lines)
+        section_tokens = len(tokenizer.encode(section_content))
+
+        if section_tokens > max_tokens:
+            # Large section: flush accumulator, then sub-chunk this section
+            _flush_accumulator()
+
+            sub_chunks = _chunk_lines_aligned(
+                lines=section.lines,
+                file_path=file_path,
+                software=software,
+                start_line_offset=section.start_line,
+                symbol=section.header_path or "__section__",
+                max_tokens=max_tokens,
+                overlap_lines=overlap_lines,
+            )
+            for sub in sub_chunks:
+                sub.chunk_id = _make_chunk_id(f"{file_path}:{chunk_idx}", chunk_idx)
+                chunk_idx += 1
+            chunks.extend(sub_chunks)
+
+        elif acc_tokens + section_tokens > max_tokens:
+            # Would exceed budget: flush, then start new accumulator
+            _flush_accumulator()
+
+            acc_lines = section.lines[:]
+            acc_headers = [section.header_path] if section.header_path else []
+            acc_start_line = section.start_line
+            acc_tokens = section_tokens
+
+        else:
+            # Fits in current accumulator
+            if not acc_lines:
+                acc_start_line = section.start_line
+            acc_lines.extend(section.lines)
+            if section.header_path:
+                acc_headers.append(section.header_path)
+            acc_tokens += section_tokens
+
+    # Flush any remaining content
+    _flush_accumulator()
+
+    return chunks
 
 
 # -----------------------------------------------------------------------------
@@ -619,4 +866,78 @@ def search(
             snippet=chunk.content,
         )
         for chunk, _ in results
+    ]
+
+
+def _rrf_fuse(
+    ranked_lists: list[list[tuple[Chunk, float]]],
+    k: int = 60,
+) -> list[tuple[Chunk, float]]:
+    """Reciprocal Rank Fusion of multiple ranked lists.
+
+    Combines multiple ranked result lists into a single fused ranking.
+    RRF score = sum(1 / (k + rank)) across all lists where the chunk appears.
+
+    Args:
+        ranked_lists: List of ranked results, each is [(Chunk, score), ...].
+        k: RRF constant (default 60, per original RRF paper).
+
+    Returns:
+        Fused ranked list sorted by RRF score descending.
+    """
+    scores: dict[str, float] = {}  # chunk_id -> accumulated RRF score
+    chunks: dict[str, Chunk] = {}  # chunk_id -> Chunk
+
+    for ranked_list in ranked_lists:
+        for rank, (chunk, _) in enumerate(ranked_list, start=1):
+            rrf_score = 1.0 / (k + rank)
+            if chunk.chunk_id not in scores:
+                scores[chunk.chunk_id] = 0.0
+                chunks[chunk.chunk_id] = chunk
+            scores[chunk.chunk_id] += rrf_score
+
+    fused = [(chunks[cid], score) for cid, score in scores.items()]
+    fused.sort(key=lambda x: x[1], reverse=True)
+    return fused
+
+
+def search_multi(
+    index,  # BaseRetriever
+    queries: list[str],
+    top_k: int = 5,
+    software: list[str] | None = None,
+    per_query_k: int = 20,
+    rrf_k: int = 60,
+) -> list[SearchResult]:
+    """Multi-query search with RRF fusion.
+
+    Retrieves results for each query, then fuses with Reciprocal Rank Fusion.
+
+    Args:
+        index: Retriever instance.
+        queries: List of search queries (paraphrases of the same question).
+        top_k: Number of final results to return.
+        software: Optional package filter.
+        per_query_k: Results to retrieve per query before fusion.
+        rrf_k: RRF constant (default 60).
+
+    Returns:
+        List of SearchResult with source location and code snippet.
+    """
+    # Retrieve for each query
+    ranked_lists = []
+    for q in queries:
+        results = index.search(q, top_k=per_query_k, software_filter=software)
+        ranked_lists.append(results)
+
+    # Fuse with RRF
+    fused = _rrf_fuse(ranked_lists, k=rrf_k)
+
+    # Convert to SearchResult
+    return [
+        SearchResult(
+            source=f"{c.file_path}:{c.start_line}-{c.end_line}",
+            snippet=c.content,
+        )
+        for c, _ in fused[:top_k]
     ]

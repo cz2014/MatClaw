@@ -197,6 +197,7 @@ def create_agent(
     enable_step_logging: bool = True,
     planning_interval: int | None = None,
     final_answer_checks: list | None = None,
+    prompts_file: str = "prompts.yaml",
 ) -> CodeAgent:
     """Create a CodeAgent with config from YAML files.
 
@@ -208,6 +209,7 @@ def create_agent(
         enable_step_logging: Whether to log steps to JSONL file in workspace.
         planning_interval: Steps between planning updates. None disables planning.
         final_answer_checks: List of check functions passed to CodeAgent.
+        prompts_file: Prompts YAML filename in config_dir. Defaults to "prompts.yaml".
 
     Returns:
         Configured CodeAgent instance.
@@ -215,7 +217,7 @@ def create_agent(
     # Read all configs from config_dir
     llm_cfg = _read_yaml(config_dir / "llm_config.yaml")
 
-    prompts_path = config_dir / "prompts.yaml"
+    prompts_path = config_dir / prompts_file
     prompts_cfg = _read_yaml(prompts_path) if prompts_path.exists() else {}
 
     provider_name = provider_name or llm_cfg["default_provider"]

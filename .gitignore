@@ -43,6 +43,11 @@ workspace/*
 benchmark/qa/workspace/
 benchmark/qa/results_*.jsonl
 benchmark/qa/results_*.json
+benchmark/qa_vasp/workspace/
+benchmark/qa_vasp/corpus/
+benchmark/qa_vasp/data/
+benchmark/qa_vasp/raw/
+benchmark/tasks/workspace/
 
 # RAG data (copied sources and index; rebuild with scripts/build_corpus.py)
 data/corpus/
