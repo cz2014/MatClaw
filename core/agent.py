@@ -198,7 +198,6 @@ def create_agent(
     planning_interval: int | None = None,
     final_answer_checks: list | None = None,
     prompts_file: str = "prompts.yaml",
-    enable_preflight: bool = False,
 ) -> CodeAgent:
     """Create a CodeAgent with config from YAML files.
 
@@ -211,7 +210,6 @@ def create_agent(
         planning_interval: Steps between planning updates. None disables planning.
         final_answer_checks: List of check functions passed to CodeAgent.
         prompts_file: Prompts YAML filename in config_dir. Defaults to "prompts.yaml".
-        enable_preflight: Patch atomate2 write_vasp_input_set with LLM pre-flight validation.
 
     Returns:
         Configured CodeAgent instance.
@@ -236,11 +234,6 @@ def create_agent(
         api_key=api_key,
         **model_kwargs,
     )
-
-    if enable_preflight:
-        from core.vasp_preflight import install_preflight
-
-        install_preflight(api_key=api_key)
 
     agent_cfg = llm_cfg.get("agent", {})
     prompt_templates = _build_prompt_templates(prompts_cfg)
