@@ -13,7 +13,7 @@ from smolagents import Tool, tool
 
 # Project paths for RAG
 _PROJECT_ROOT = Path(__file__).parent.parent
-_DEFAULT_CORPUS_PATH = _PROJECT_ROOT / "data" / "corpus"
+_DEFAULT_CORPUS_DIR = _PROJECT_ROOT / "data" / "corpus"
 _RAG_CONFIG_PATH = _PROJECT_ROOT / "config" / "rag_config.yaml"
 
 
@@ -360,6 +360,41 @@ After you find the correct symbol name, use rag_search for verbatim code snippet
         }
 
 
+def _load_chunks_from_paths(paths: list[Path]) -> list:
+    """Read chunks.json from each path and return combined chunk list.
+
+    Each chunks.json has format: {"use_code_tokenize": bool, "chunks": [...]}.
+    Returns list of Chunk objects.
+    """
+    from core.rag import Chunk
+
+    all_chunks = []
+    for p in paths:
+        chunks_file = p / "chunks.json"
+        if not chunks_file.exists():
+            raise FileNotFoundError(
+                f"No chunks.json at {chunks_file}. "
+                f"Run 'python scripts/build_corpus.py' or 'python scripts/split_corpus.py' first."
+            )
+        import json
+
+        with chunks_file.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        for c in data["chunks"]:
+            all_chunks.append(
+                Chunk(
+                    chunk_id=c["chunk_id"],
+                    software=c["software"],
+                    file_path=c["file_path"],
+                    start_line=c["start_line"],
+                    end_line=c["end_line"],
+                    symbol=c["symbol"],
+                    content=c["content"],
+                )
+            )
+    return all_chunks
+
+
 class RagSearchTool(Tool):
     """Tool for searching code documentation and examples via RAG.
 
@@ -404,56 +439,99 @@ rag_search(queries=[
 
     def __init__(
         self,
+        corpus: list[str] | None = None,
         corpus_path: Path | None = None,
-        top_k: int = 5,
+        corpus_dir: Path | None = None,
+        top_k: int | None = None,
         retriever_method: str | None = None,
     ):
         """Initialize RAG search tool.
 
         Args:
-            corpus_path: Path to corpus directory. Defaults to data/corpus.
-            top_k: Number of results to return. Defaults to 5.
+            corpus: List of package names to load (e.g. ["vasp", "atomate2"]).
+                Each name maps to a subdir under corpus_dir.
+            corpus_path: Legacy: single pre-built corpus directory.
+            corpus_dir: Base directory for per-package subdirs. Defaults to data/corpus.
+            top_k: Number of results to return. Overrides config value.
             retriever_method: Override retriever method (bm25/gemini). Defaults to config value.
         """
         super().__init__()
-        self._corpus_path = corpus_path or _DEFAULT_CORPUS_PATH
-        self._top_k = top_k
+        self._corpus = corpus
+        self._corpus_path = corpus_path
+        self._corpus_dir = corpus_dir or _DEFAULT_CORPUS_DIR
+        self._top_k_override = top_k
         self._retriever_method = retriever_method
         self._index = None
+        self._top_k = 5  # default, overridden in _load_index
 
     def _load_index(self) -> None:
         """Lazy-load the RAG retriever."""
         if self._index is not None:
             return
 
-        # Load config once for all settings
         config = _load_rag_config()
+        defaults = config.get("defaults", {})
 
-        # Determine retriever method from config or override
+        if self._corpus_path:
+            # Legacy mode: single pre-built corpus directory
+            if self._retriever_method is not None:
+                method = self._retriever_method
+            else:
+                method = defaults.get("retriever_method",
+                                      config.get("retriever", {}).get("method", "bm25"))
+
+            gemini_task_type = config.get("gemini_task_type", "RETRIEVAL_QUERY")
+
+            if method == "bm25":
+                index_path = self._corpus_path
+            else:
+                index_path = self._corpus_path / method
+
+            if not index_path.exists():
+                raise FileNotFoundError(
+                    f"RAG corpus not found at {index_path}. "
+                    f"Run 'python scripts/build_corpus.py --retriever {method}' first."
+                )
+
+            from core.retrievers import load_retriever
+
+            self._index = load_retriever(method, index_path, gemini_task_type=gemini_task_type)
+            self._top_k = self._top_k_override or defaults.get("top_k", 5)
+            return
+
+        # New mode: per-package subdirs under corpus_dir
+        corpus_registry = config.get("corpus", {})
+        packages = self._corpus or list(corpus_registry.keys())
+
+        # Resolve retriever method
         if self._retriever_method is not None:
             method = self._retriever_method
         else:
-            method = config.get("retriever", {}).get("method", "bm25")
+            methods = set()
+            for pkg in packages:
+                pkg_cfg = corpus_registry.get(pkg, {})
+                methods.add(pkg_cfg.get("retriever_method",
+                                        defaults.get("retriever_method", "bm25")))
+            if len(methods) > 1:
+                raise ValueError(
+                    f"Cannot combine corpora with different retriever methods: {methods}"
+                )
+            method = methods.pop() if methods else defaults.get("retriever_method", "bm25")
 
-        # Get Gemini task type from config
-        gemini_task_type = config.get("gemini_task_type", "RETRIEVAL_QUERY")
+        self._top_k = self._top_k_override or defaults.get("top_k", 5)
+        paths = [self._corpus_dir / pkg for pkg in packages]
 
-        # Determine index path based on method
-        if method == "bm25":
-            index_path = self._corpus_path
+        # Single package with pre-built BM25 index: load directly
+        if len(paths) == 1 and (paths[0] / "bm25").exists() and method == "bm25":
+            from core.retrievers import load_retriever
+
+            self._index = load_retriever(method, paths[0])
         else:
-            # Vector retrievers use subdirectory (e.g., data/corpus/gemini)
-            index_path = self._corpus_path / method
+            # Multiple packages: load chunks and build combined in-memory index
+            from core.retrievers.bm25 import BM25Retriever
 
-        if not index_path.exists():
-            raise FileNotFoundError(
-                f"RAG corpus not found at {index_path}. "
-                f"Run 'python scripts/build_corpus.py --retriever {method}' first."
-            )
-
-        from core.retrievers import load_retriever
-
-        self._index = load_retriever(method, index_path, gemini_task_type=gemini_task_type)
+            all_chunks = _load_chunks_from_paths(paths)
+            self._index = BM25Retriever(chunks=all_chunks)
 
     def forward(
         self,

@@ -1,6 +1,20 @@
 # RAG Configuration for MLFF Agent
+# Central registry: defines all available corpora under data/corpus/
 
-# Retriever settings
-retriever:
-  # Method: "bm25" (keyword-based) or "gemini" (embedding-based)
-  method: bm25
+# Per-corpus configuration (each subdir under data/corpus/)
+corpus:
+  pymatgen:
+    retriever_method: bm25
+  atomate2:
+    retriever_method: bm25
+  jobflow:
+    retriever_method: bm25
+  jobflow_remote:
+    retriever_method: bm25
+  vasp:
+    retriever_method: bm25
+
+# Defaults (used when per-corpus config omits a field)
+defaults:
+  retriever_method: bm25
+  top_k: 5

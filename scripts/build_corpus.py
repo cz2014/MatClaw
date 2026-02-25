@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 """CLI script to build RAG corpus from installed packages.
 
-Supports multiple retriever backends (BM25, Gemini embeddings).
+Outputs per-package subdirs under data/corpus/{package}/, each with
+chunks.json + bm25/ index. Supports multiple retriever backends.
 
 Usage:
     python scripts/build_corpus.py
@@ -15,6 +16,7 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+from collections import defaultdict
 from pathlib import Path
 
 # Add project root to path for imports
@@ -103,13 +105,16 @@ def build_corpus(
     chunk_size: int = 400,
     skip_copy: bool = False,
     use_code_tokenize: bool = True,
-) -> BaseRetriever:
-    """Build RAG corpus from packages.
+) -> int:
+    """Build RAG corpus from packages, saving per-package subdirs.
+
+    Output layout:
+        corpus_dir/{package}/chunks.json + bm25/  (for each package)
 
     Args:
         packages: List of package names to index
         sources_dir: Directory to copy source files to
-        corpus_dir: Directory to save index
+        corpus_dir: Base directory for per-package output
         retriever_method: Retriever backend ("bm25" or "gemini")
         method: Chunking method ("fixed", "ast", or "code-chunk")
         chunk_size: Token size for chunks
@@ -117,7 +122,7 @@ def build_corpus(
         use_code_tokenize: For BM25, use code-aware tokenization
 
     Returns:
-        Built retriever instance
+        Total number of chunks indexed across all packages.
     """
     sources_dir.mkdir(parents=True, exist_ok=True)
     corpus_dir.mkdir(parents=True, exist_ok=True)
@@ -159,24 +164,29 @@ def build_corpus(
 
     if not all_chunks:
         print("\nWARNING: No chunks created. Check that packages are installed.")
-        return get_retriever(retriever_method, use_code_tokenize=use_code_tokenize)
+        return 0
 
-    # Step 3: Build retriever and add chunks
-    print(f"\nBuilding {retriever_method} index with {len(all_chunks)} total chunks...")
-    retriever = get_retriever(retriever_method, use_code_tokenize=use_code_tokenize)
-    retriever.add_chunks(all_chunks)
+    # Step 3: Group chunks by software and save per-package
+    groups: dict[str, list] = defaultdict(list)
+    for chunk in all_chunks:
+        groups[chunk.software].append(chunk)
 
-    # Step 4: Save index
-    # BM25 saves to corpus_dir directly, vector retrievers save to subdirectory
-    if retriever_method == "bm25":
-        save_path = corpus_dir
-    else:
-        save_path = corpus_dir / retriever_method
+    print(f"\nSaving per-package indices ({len(all_chunks)} total chunks)...")
+    total = 0
+    for pkg_name, pkg_chunks in sorted(groups.items()):
+        pkg_dir = corpus_dir / pkg_name
+        retriever = get_retriever(retriever_method, use_code_tokenize=use_code_tokenize)
+        retriever.add_chunks(pkg_chunks)
+        retriever.save(pkg_dir)
+        print(f"  {pkg_name}: {len(pkg_chunks)} chunks -> {pkg_dir}")
+        total += len(pkg_chunks)
 
-    retriever.save(save_path)
-    print(f"Index saved to: {save_path}")
+    # Clean up code-chunk JSONL intermediate file if it exists
+    jsonl_intermediate = corpus_dir / "code_chunk_output.jsonl"
+    if jsonl_intermediate.exists():
+        jsonl_intermediate.unlink()
 
-    return retriever
+    return total
 
 
 def main():
@@ -257,7 +267,7 @@ For code-chunk method, first run: cd scripts && npm install
     print()
 
     try:
-        retriever = build_corpus(
+        total = build_corpus(
             packages=args.packages,
             sources_dir=args.sources_dir,
             corpus_dir=args.corpus_dir,
@@ -267,7 +277,7 @@ For code-chunk method, first run: cd scripts && npm install
             skip_copy=args.skip_copy,
             use_code_tokenize=use_code_tokenize,
         )
-        print(f"\nDone. Total chunks indexed: {retriever.chunk_count}")
+        print(f"\nDone. Total chunks indexed: {total}")
     except ImportError as e:
         print(f"\nERROR: Missing dependency: {e}")
         print("Install RAG dependencies with: pip install -e '.[rag]'")

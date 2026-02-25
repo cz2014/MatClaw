@@ -198,6 +198,7 @@ def create_agent(
     planning_interval: int | None = None,
     final_answer_checks: list | None = None,
     prompts_file: str = "prompts.yaml",
+    enable_preflight: bool = False,
 ) -> CodeAgent:
     """Create a CodeAgent with config from YAML files.
 
@@ -210,6 +211,7 @@ def create_agent(
         planning_interval: Steps between planning updates. None disables planning.
         final_answer_checks: List of check functions passed to CodeAgent.
         prompts_file: Prompts YAML filename in config_dir. Defaults to "prompts.yaml".
+        enable_preflight: Patch atomate2 write_vasp_input_set with LLM pre-flight validation.
 
     Returns:
         Configured CodeAgent instance.
@@ -228,11 +230,17 @@ def create_agent(
         k: v for k, v in provider_cfg.items()
         if k not in ("model_id", "api_key")
     }
+    api_key = _expand_env_strict(provider_cfg["api_key"])
     model = LiteLLMModel(
         model_id=provider_cfg["model_id"],
-        api_key=_expand_env_strict(provider_cfg["api_key"]),
+        api_key=api_key,
         **model_kwargs,
     )
+
+    if enable_preflight:
+        from core.vasp_preflight import install_preflight
+
+        install_preflight(api_key=api_key)
 
     agent_cfg = llm_cfg.get("agent", {})
     prompt_templates = _build_prompt_templates(prompts_cfg)
@@ -240,6 +248,7 @@ def create_agent(
     # Create executor with sandboxed file functions
     additional_imports = agent_cfg.get("additional_authorized_imports") or []
     sandbox_funcs = _create_sandbox_functions(workspace_dir)
+    os.chdir(workspace_dir.resolve())
     executor = LocalPythonExecutor(
         additional_imports,
         additional_functions=sandbox_funcs,
