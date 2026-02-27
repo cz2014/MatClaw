@@ -11,7 +11,6 @@ providers:
   gemini:
     model_id: gemini/gemini-3-flash-preview
     api_key: ${EMBEDDING_API_KEY}
-    num_retries: 3
 
   deepseek:
     model_id: deepseek/deepseek-chat

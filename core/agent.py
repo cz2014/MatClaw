@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -19,6 +21,8 @@ from smolagents.agents import (
     PlanningPromptTemplate,
     PromptTemplates,
 )
+
+logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).parent.parent
 
@@ -189,6 +193,76 @@ def _build_prompt_templates(prompts_cfg: dict[str, Any]) -> PromptTemplates | No
     )
 
 
+class RetryingLiteLLMModel(LiteLLMModel):
+    """LiteLLMModel that retries when the API returns empty content.
+
+    Gemini intermittently returns content=None with completion_tokens=0.
+    LiteLLM treats this as success (HTTP 200), so its built-in retries
+    don't trigger. This subclass retries up to EMPTY_RETRIES times
+    before returning the empty response to smolagents.
+    """
+
+    EMPTY_RETRIES = 3
+    EMPTY_RETRY_WAIT = 1.0  # seconds, doubles each retry
+
+    def _inject_cache_control(self, messages):
+        """Add cache_control breakpoints for Anthropic prompt caching.
+
+        Marks the last content block of the last message with cache_control.
+        Anthropic's incremental caching will read previously cached prefixes
+        and extend the cache with each new step. Per the docs: "blocks that
+        were previously marked with cache_control are later not marked with
+        this, but they will still be considered a cache hit."
+
+        Also marks the system message for caching (effective when the system
+        prompt alone exceeds 2048 tokens, e.g. with large tool definitions).
+        """
+        if not self.model_id.startswith("anthropic/"):
+            return
+        # Mark system message
+        for msg in messages:
+            role = msg.role if hasattr(msg, "role") else msg.get("role")
+            if role == "system" or (hasattr(role, "value") and role.value == "system"):
+                content = msg.content if hasattr(msg, "content") else msg.get("content")
+                if isinstance(content, list) and content:
+                    content[-1]["cache_control"] = {"type": "ephemeral"}
+                break
+        # Mark the last message for incremental conversation caching
+        if len(messages) >= 2:
+            last = messages[-1]
+            content = last.content if hasattr(last, "content") else last.get("content")
+            if isinstance(content, list) and content:
+                content[-1]["cache_control"] = {"type": "ephemeral"}
+            elif isinstance(content, str):
+                new_content = [{"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}]
+                if hasattr(last, "content"):
+                    last.content = new_content
+                else:
+                    last["content"] = new_content
+
+    def generate(self, messages, stop_sequences=None, **kwargs):
+        self._inject_cache_control(messages)
+        last_response = None
+        for attempt in range(self.EMPTY_RETRIES + 1):
+            result = super().generate(messages, stop_sequences=stop_sequences, **kwargs)
+            if result.content is not None:
+                return result
+            last_response = result
+            if attempt < self.EMPTY_RETRIES:
+                wait = self.EMPTY_RETRY_WAIT * (2 ** attempt)
+                logger.warning(
+                    "Empty response from %s (attempt %d/%d, completion_tokens=0). "
+                    "Retrying in %.1fs...",
+                    self.model_id, attempt + 1, self.EMPTY_RETRIES, wait,
+                )
+                time.sleep(wait)
+        logger.warning(
+            "Empty response from %s persisted after %d retries.",
+            self.model_id, self.EMPTY_RETRIES,
+        )
+        return last_response
+
+
 def create_agent(
     config_dir: Path,
     workspace_dir: Path,
@@ -229,7 +303,7 @@ def create_agent(
         if k not in ("model_id", "api_key")
     }
     api_key = _expand_env_strict(provider_cfg["api_key"])
-    model = LiteLLMModel(
+    model = RetryingLiteLLMModel(
         model_id=provider_cfg["model_id"],
         api_key=api_key,
         **model_kwargs,
