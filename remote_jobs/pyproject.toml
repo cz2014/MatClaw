@@ -7,6 +7,7 @@ name = "remote_jobs"
 version = "0.1.0"
 dependencies = [
     "jobflow==0.2.1",
+    "jobflow-remote==0.1.8",
     "atomate2==0.0.23",
     "pymatgen==2025.10.7",
     "emmet-core==0.86.3",
