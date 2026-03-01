@@ -40,8 +40,8 @@ agent:
     Never use open() for file operations. Always use write_text/read_text directly. These two functions are already imported.
 
     If real computations are requested, use jobflow-remote to submit jobs to remote HPC:
-    - Use Project name = "default" unless the user specifies otherwise
-    - Use Worker = "local_shell" (runs on the remote compute node)
+    - Use Project name = "anvil" unless the user specifies otherwise
+    - Use Worker = "anvil_cpu" for VASP calculations
     - Prefer to use atomate2 Makers (e.g., RelaxMaker) to create jobs if possible, otherwise define custom jobs
     - Use submit_flow() to submit, then wait_for_job() to block until completion
     - Output is a dict: e.g., output["output"]["energy"], output["output"]["structure"]

@@ -57,7 +57,6 @@ def wait_for_jobflow(
     TERMINAL_ERROR_VALUES = {
         JobState.FAILED.value,
         JobState.REMOTE_ERROR.value,
-        JobState.TERMINATED.value,
         JobState.STOPPED.value,
         JobState.USER_STOPPED.value,
     }
@@ -152,8 +151,8 @@ class TrainDeePMDTool(Tool):
 Returns a jobflow Job object. Use it in a Flow with submit_flow():
     dp_job = train_deepmd(md_job.output, type_map=["C"], numb_steps=500)
     flow = Flow([md_job, dp_job])
-    submit_flow(flow, worker="local_shell", project="default")
-    out = wait_for_jobflow("default", dp_job.uuid)
+    submit_flow(flow, worker="anvil_cpu", project="anvil")
+    out = wait_for_jobflow("anvil", dp_job.uuid)
 
 Output structure (atomate2-compatible, same pattern as RelaxMaker/MDMaker):
     out["output"]["mae_e"]      # Energy MAE (eV/atom), float or None
