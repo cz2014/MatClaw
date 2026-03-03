@@ -33,6 +33,8 @@ agent:
     - jobflow_remote.*
     - atomate2
     - atomate2.*
+    - dpdata
+    - dpdata.*
   instructions: |
     You have access to these file I/O functions:
     - write_text(path, content) -> str  (writes file under workspace, returns absolute path)

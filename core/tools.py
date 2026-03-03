@@ -31,7 +31,7 @@ def _load_rag_config() -> dict:
 def wait_for_jobflow(
     project_name: str,
     job_uuid: str,
-    timeout_s: int = 3600,
+    timeout_s: int = 43200,
 ) -> dict:
     """Block until all jobs in a jobflow complete, showing progress for each.
 
@@ -39,15 +39,20 @@ def wait_for_jobflow(
       1. Finds the parent flow containing that job
       2. Polls all jobs in the flow, printing status updates
       3. Returns the output of the specified job when complete
-      4. Raises an exception if any job fails or times out
+      4. Raises an exception if any job fails
+
+    On timeout, returns {"status": "timeout", "flow_uuid": ..., "elapsed_s": ...,
+    "job_states": ...} instead of raising. If you receive a timeout status, re-call
+    this tool with the same job_uuid to continue waiting, or consider an alternative
+    action.
 
     Args:
         project_name: The jobflow-remote project (as configured in ~/.jfremote).
         job_uuid: Any Job UUID from the flow to monitor.
-        timeout_s: Maximum wall time to wait, in seconds. Default 3600 (1 hour).
+        timeout_s: Maximum wall time to wait, in seconds. Default 43200 (12 hours).
 
     Returns:
-        The output dict of the specified job (e.g., DeePMD metrics).
+        The output dict of the specified job, or a timeout status dict.
     """
     from jobflow_remote.jobs.jobcontroller import JobController
     from jobflow_remote.jobs.state import JobState
@@ -129,12 +134,18 @@ def wait_for_jobflow(
                 print(f"  {status} after {int(elapsed)}s", flush=True)
                 return jc.get_job_output(job_id=job_uuid, load=True)
 
-        # Timeout check
+        # Timeout check -- return status dict instead of raising
         if elapsed > timeout_s:
-            states_summary = ", ".join(
-                f"{_get(j, 'name')}={_state_val(_get(j, 'state'))}" for j in jobs
-            )
-            raise TimeoutError(f"Timed out after {timeout_s}s. States: {states_summary}")
+            job_states = {
+                _get(j, "name"): _state_val(_get(j, "state")) for j in jobs
+            }
+            print(f"  Timeout after {int(elapsed)}s. Job states: {job_states}", flush=True)
+            return {
+                "status": "timeout",
+                "flow_uuid": flow_uuid,
+                "elapsed_s": int(elapsed),
+                "job_states": job_states,
+            }
 
         time.sleep(POLL_S)
 

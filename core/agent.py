@@ -21,10 +21,24 @@ from smolagents.agents import (
     PlanningPromptTemplate,
     PromptTemplates,
 )
+from smolagents.models import CODEAGENT_RESPONSE_FORMAT
 
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).parent.parent
+
+# Extend structured output schema with summary field.
+# Placed last so the LLM generates thought and code first, then summarizes.
+_so_schema = CODEAGENT_RESPONSE_FORMAT["json_schema"]["schema"]
+_so_schema["properties"]["summary"] = {
+    "description": (
+        "One-line summary of what this step does "
+        "(e.g. 'Search RAG for VASP INCAR parameters')."
+    ),
+    "title": "Summary",
+    "type": "string",
+}
+_so_schema["required"].append("summary")
 
 _ENV_PATTERN = re.compile(r"\$\{[^}]+\}")  # leftover ${VAR} after expandvars
 _API_ERROR_PATTERN = re.compile(
@@ -65,10 +79,10 @@ def _step_jsonl_logger(log_file: Path):
         rec = {
             "ts": datetime.now(timezone.utc).isoformat(),
             "step_type": type(step).__name__,
-            "step": step.model_dump() if hasattr(step, "model_dump") else repr(step),
+            "step": step.dict() if hasattr(step, "dict") else repr(step),
         }
         with log_file.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+            f.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
 
     return cb
 
@@ -336,6 +350,7 @@ def create_agent(
         max_steps=max_steps,
         add_base_tools=False,
         return_full_result=True,
+        use_structured_outputs_internally=True,
     )
 
     if prompt_templates is not None:
