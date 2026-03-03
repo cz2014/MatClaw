@@ -14,7 +14,7 @@ from typing import Any
 import yaml
 from smolagents import CodeAgent, LiteLLMModel, LocalPythonExecutor
 
-from core.tools import api_probe, train_deepmd, wait_for_jobflow
+from core.tools import rag_search, train_deepmd, wait_for_jobflow
 from smolagents.agents import (
     FinalAnswerPromptTemplate,
     ManagedAgentPromptTemplate,
@@ -96,17 +96,10 @@ def _on_step_error(step, agent) -> None:
     if not step.error:
         return
 
-    # Build tool hint from available tools
-    has_rag = "rag_search" in agent.tools
-    has_probe = "api_probe" in agent.tools
-    if has_rag and has_probe:
-        tool_hint = "rag_search or api_probe"
-    elif has_probe:
-        tool_hint = "api_probe"
-    elif has_rag:
-        tool_hint = "rag_search"
-    else:
+    # Only add hints if rag_search is available
+    if "rag_search" not in agent.tools:
         return
+    tool_hint = "rag_search"
 
     err_msg = str(step.error)
     if not _API_ERROR_PATTERN.search(err_msg):
@@ -330,14 +323,19 @@ def create_agent(
     additional_imports = agent_cfg.get("additional_authorized_imports") or []
     sandbox_funcs = _create_sandbox_functions(workspace_dir)
     os.chdir(workspace_dir.resolve())
+    # Disable smolagents' 30s code execution timeout. It's broken in v1.24.0:
+    # ThreadPoolExecutor.shutdown(wait=True) blocks until the thread finishes,
+    # making the timeout useless. Our wait_for_jobflow has its own timeout.
+    # See debug.md for full analysis.
     executor = LocalPythonExecutor(
         additional_imports,
         additional_functions=sandbox_funcs,
+        timeout_seconds=None,
     )
 
-    # Tools: use custom list or default
+    # Tools: use custom list or default (includes rag_search for main agent)
     if tools is None:
-        tools = [wait_for_jobflow, train_deepmd, api_probe]
+        tools = [wait_for_jobflow, train_deepmd, rag_search]
 
     # Max steps from config
     max_steps = agent_cfg.get("max_steps", 10)
