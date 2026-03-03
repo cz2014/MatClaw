@@ -19,6 +19,8 @@ providers:
 # Agent execution settings
 agent:
   max_steps: 20
+  context_pruning: true         # enable two-layer context management (default: true)
+  # context_window: 100000      # optional cap in tokens; omit to use model's actual limit
   additional_authorized_imports:
     - math
     - numpy

@@ -317,6 +317,37 @@ def create_agent(
     )
 
     agent_cfg = llm_cfg.get("agent", {})
+
+    # Context window management (Layer 1: pruning + Layer 2: token cap)
+    if agent_cfg.get("context_pruning", True):
+        from core.context import wrap_model_with_context_management
+
+        model_id = provider_cfg["model_id"]
+        try:
+            import litellm as _litellm
+            _model_info = _litellm.get_model_info(model_id)
+            detected_tokens = _model_info.get("max_input_tokens", 128_000)
+        except Exception:
+            detected_tokens = 128_000
+            logger.warning(
+                "Unknown model %s, using default context_window=128000", model_id
+            )
+
+        # Config cap: only lowers, never raises
+        config_cap = agent_cfg.get("context_window")
+        if config_cap and config_cap < detected_tokens:
+            context_tokens = config_cap
+            logger.info(
+                "Context window capped to %d tokens (model has %d)",
+                config_cap, detected_tokens,
+            )
+        else:
+            context_tokens = detected_tokens
+
+        model = wrap_model_with_context_management(model, context_tokens, model_id)
+    else:
+        logger.info("Context management disabled (context_pruning: false)")
+
     prompt_templates = _build_prompt_templates(prompts_cfg)
 
     # Create executor with sandboxed file functions
