@@ -279,6 +279,7 @@ def create_agent(
     planning_interval: int | None = None,
     final_answer_checks: list | None = None,
     prompts_file: str = "prompts.yaml",
+    instructions_extra: str | None = None,
 ) -> CodeAgent:
     """Create a CodeAgent with config from YAML files.
 
@@ -291,6 +292,8 @@ def create_agent(
         planning_interval: Steps between planning updates. None disables planning.
         final_answer_checks: List of check functions passed to CodeAgent.
         prompts_file: Prompts YAML filename in config_dir. Defaults to "prompts.yaml".
+        instructions_extra: Extra instructions appended to config instructions
+            (e.g. project/worker override from --project CLI flag).
 
     Returns:
         Configured CodeAgent instance.
@@ -385,7 +388,21 @@ def create_agent(
     if prompt_templates is not None:
         kwargs["prompt_templates"] = prompt_templates
 
-    instructions = agent_cfg.get("instructions")
+    instructions = agent_cfg.get("instructions", "")
+    if instructions_extra:
+        # Remove conflicting project/worker lines from base instructions
+        # when override is provided (LLMs follow the first instruction they see,
+        # so appending an override alone isn't reliable)
+        for line in instructions_extra.strip().splitlines():
+            if "Project name" in line:
+                instructions = re.sub(
+                    r"^.*Use Project name = .*$\n?", "", instructions, flags=re.MULTILINE
+                )
+            elif "Worker" in line:
+                instructions = re.sub(
+                    r"^.*Use Worker = .*$\n?", "", instructions, flags=re.MULTILINE
+                )
+        instructions = instructions.rstrip() + "\n" + instructions_extra
     if instructions:
         kwargs["instructions"] = instructions
 
