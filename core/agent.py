@@ -421,4 +421,61 @@ def create_agent(
 
     kwargs["step_callbacks"] = callbacks
 
+    # Save Class A config for checkpoint/resume
+    save_agent_config(
+        workspace_dir,
+        config_dir=config_dir,
+        provider_name=provider_name,
+        planning_interval=planning_interval,
+        prompts_file=prompts_file,
+        instructions_extra=instructions_extra,
+    )
+
     return CodeAgent(**kwargs)
+
+
+# ---------------------------------------------------------------------------
+# Checkpoint/resume: Class A state persistence
+# ---------------------------------------------------------------------------
+
+_AGENT_CONFIG_FILENAME = "agent_config.json"
+
+
+def save_agent_config(workspace_dir: Path, **kwargs) -> Path:
+    """Save create_agent() arguments to workspace/agent_config.json.
+
+    Called once at agent creation time. The task field is added later
+    by save_task_to_config() when main() has the task string.
+    """
+    config = {
+        "version": 1,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "config_dir": str(kwargs["config_dir"]),
+        "workspace_dir": str(workspace_dir),
+        "provider_name": kwargs.get("provider_name"),
+        "planning_interval": kwargs.get("planning_interval"),
+        "prompts_file": kwargs.get("prompts_file", "prompts.yaml"),
+        "instructions_extra": kwargs.get("instructions_extra"),
+    }
+    out = workspace_dir / _AGENT_CONFIG_FILENAME
+    out.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n")
+    return out
+
+
+def save_task_to_config(workspace_dir: Path, task: str):
+    """Add the task string to an existing agent_config.json."""
+    path = workspace_dir / _AGENT_CONFIG_FILENAME
+    config = json.loads(path.read_text())
+    config["task"] = task
+    path.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n")
+
+
+def load_agent_config(workspace_dir: Path) -> dict:
+    """Load agent_config.json from workspace directory."""
+    path = workspace_dir / _AGENT_CONFIG_FILENAME
+    if not path.exists():
+        raise FileNotFoundError(
+            f"No agent_config.json in {workspace_dir}. "
+            "Was the original run started with checkpoint support?"
+        )
+    return json.loads(path.read_text())
