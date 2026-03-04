@@ -26,6 +26,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from core.rag import (
     ChunkMethod,
     build_chunks_from_directory,
+    chunk_markdown_aware,
     copy_package_source,
     load_chunks_from_jsonl,
 )
@@ -189,17 +190,82 @@ def build_corpus(
     return total
 
 
+def build_docs_corpus(
+    docs_dir: Path,
+    software: str,
+    corpus_dir: Path,
+    retriever_method: str = "bm25",
+    chunk_size: int = 800,
+) -> int:
+    """Build RAG corpus from markdown documentation files.
+
+    Reads all .md files from docs_dir, chunks with markdown-aware method,
+    and saves to corpus_dir/{software}/.
+
+    Args:
+        docs_dir: Directory containing .md files
+        software: Software name for tagging chunks (e.g., "deepmd", "dpgen_docs")
+        corpus_dir: Base directory for per-package output
+        retriever_method: Retriever backend ("bm25" or "gemini")
+        chunk_size: Token size for chunks
+
+    Returns:
+        Number of chunks indexed.
+    """
+    md_files = sorted(docs_dir.glob("*.md"))
+    if not md_files:
+        print(f"No .md files found in {docs_dir}")
+        return 0
+
+    print(f"Found {len(md_files)} markdown files in {docs_dir}")
+
+    all_chunks = []
+    for md_file in md_files:
+        content = md_file.read_text(encoding="utf-8", errors="replace")
+        if not content.strip():
+            continue
+        chunks = chunk_markdown_aware(
+            content=content,
+            file_path=md_file.name,
+            software=software,
+            max_tokens=chunk_size,
+            overlap_lines=3,
+        )
+        all_chunks.extend(chunks)
+
+    if not all_chunks:
+        print("WARNING: No chunks created from documentation files.")
+        return 0
+
+    print(f"Created {len(all_chunks)} chunks (method=markdown, size={chunk_size})")
+
+    pkg_dir = corpus_dir / software
+    retriever = get_retriever(retriever_method, use_code_tokenize=False)
+    retriever.add_chunks(all_chunks)
+    retriever.save(pkg_dir)
+    print(f"Saved {len(all_chunks)} chunks -> {pkg_dir}")
+
+    return len(all_chunks)
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Build RAG corpus from installed Python packages",
+        description="Build RAG corpus from installed Python packages or documentation",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Source code packages (code-chunk method)
   python scripts/build_corpus.py
-  python scripts/build_corpus.py --retriever gemini
   python scripts/build_corpus.py --packages pymatgen atomate2
+  python scripts/build_corpus.py --packages dpdata dpgen
+
+  # Documentation (markdown method)
+  python scripts/build_corpus.py --docs-dir data/docs/deepmd-kit --software deepmd
+  python scripts/build_corpus.py --docs-dir data/docs/dpgen --software dpgen_docs
+
+  # Options
+  python scripts/build_corpus.py --retriever gemini
   python scripts/build_corpus.py --method ast --chunk-size 600
-  python scripts/build_corpus.py --method code-chunk --chunk-size 800
   python scripts/build_corpus.py --skip-copy  # reindex existing sources
 
 For code-chunk method, first run: cd scripts && npm install
@@ -251,12 +317,48 @@ For code-chunk method, first run: cd scripts && npm install
         action="store_true",
         help="Enable code-aware tokenization (split snake_case, CamelCase). Default uses bm25s tokenizer.",
     )
+    parser.add_argument(
+        "--docs-dir",
+        type=Path,
+        help="Directory containing .md documentation files (uses markdown chunking method)",
+    )
+    parser.add_argument(
+        "--software",
+        type=str,
+        help="Software name for documentation corpus (required with --docs-dir, e.g., 'deepmd')",
+    )
 
     args = parser.parse_args()
 
     use_code_tokenize = args.code_tokenize
 
-    print("RAG Corpus Builder")
+    # Documentation mode: --docs-dir
+    if args.docs_dir:
+        if not args.software:
+            parser.error("--software is required when using --docs-dir")
+        if not args.docs_dir.exists():
+            parser.error(f"Directory not found: {args.docs_dir}")
+
+        print("RAG Corpus Builder (documentation mode)")
+        print(f"  Docs dir:  {args.docs_dir}")
+        print(f"  Software:  {args.software}")
+        print(f"  Corpus:    {args.corpus_dir}")
+        print(f"  Retriever: {args.retriever}")
+        print(f"  Chunk size: {args.chunk_size}")
+        print()
+
+        total = build_docs_corpus(
+            docs_dir=args.docs_dir,
+            software=args.software,
+            corpus_dir=args.corpus_dir,
+            retriever_method=args.retriever,
+            chunk_size=args.chunk_size,
+        )
+        print(f"\nDone. Total chunks indexed: {total}")
+        return
+
+    # Source code mode (default)
+    print("RAG Corpus Builder (source code mode)")
     print(f"  Retriever: {args.retriever}")
     print(f"  Packages: {args.packages}")
     print(f"  Sources:  {args.sources_dir}")
