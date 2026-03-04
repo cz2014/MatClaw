@@ -279,6 +279,66 @@ def _load_chunks_from_paths(paths: list[Path]) -> list:
     return all_chunks
 
 
+def _build_rag_description(
+    corpus: list[str] | None = None,
+    corpus_path: Path | None = None,
+) -> tuple[str, str]:
+    """Build dynamic rag_search description from rag_config.yaml.
+
+    Returns (tool_description, software_input_description).
+    """
+    config = _load_rag_config()
+    corpus_registry = config.get("corpus", {})
+
+    # Determine which packages are available
+    if corpus_path:
+        # Legacy mode: single corpus directory, can't enumerate packages
+        packages = {}
+    elif corpus:
+        packages = {k: corpus_registry.get(k, {}) for k in corpus}
+    else:
+        packages = corpus_registry
+
+    # Build corpus list for description
+    if packages:
+        corpus_lines = "\n".join(
+            f"  - {name}: {cfg.get('description', name)}"
+            for name, cfg in packages.items()
+        )
+        corpus_section = f"\nAvailable corpora (use in `software` filter):\n{corpus_lines}"
+        pkg_names = list(packages.keys())
+        software_desc = f"Filter by package names: {pkg_names}. None for all."
+        example_pkg = pkg_names[0]
+    else:
+        corpus_section = ""
+        software_desc = "Filter by package names. None for all."
+        example_pkg = "vasp"
+
+    description = (
+        "Search for code documentation, API signatures, and examples.\n"
+        "\n"
+        "Provide 1-3 search queries in the `queries` list. Multiple paraphrases improve recall.\n"
+        "Keep technical terms (ALL_CAPS tags, filenames, exact values) in all queries.\n"
+        "\n"
+        "Use this tool when:\n"
+        "- You need to discover where a symbol lives (module/class/function) across packages.\n"
+        "- You need a verbatim code snippet/example to copy a correct usage pattern.\n"
+        "- You want to verify behavior by reading surrounding implementation context.\n"
+        '- You encounter AttributeError, TypeError, or "has no attribute" and want source evidence.\n'
+        "\n"
+        'Returns {"results": [{"source": "path/file.py:10-50", "snippet": "code..."}, ...]}.\n'
+        f"{corpus_section}\n"
+        "Example:\n"
+        "rag_search(queries=[\n"
+        '    "ALGO blocked-Davidson-iteration scheme",\n'
+        '    "ALGO Normal IALGO 38 blocked Davidson",\n'
+        '    "blocked Davidson algorithm ALGO setting"\n'
+        f'], software=["{example_pkg}"])'
+    )
+
+    return description, software_desc
+
+
 class RagSearchTool(Tool):
     """Tool for searching code documentation and examples via RAG.
 
@@ -287,26 +347,7 @@ class RagSearchTool(Tool):
     """
 
     name = "rag_search"
-    description = """Search for code documentation, API signatures, and examples.
-
-Provide 1-3 search queries in the `queries` list. Multiple paraphrases improve recall.
-Keep technical terms (ALL_CAPS tags, filenames, exact values) in all queries.
-
-Use this tool when:
-- You need to discover where a symbol lives (module/class/function) across packages.
-- You need a verbatim code snippet/example to copy a correct usage pattern.
-- You want to verify behavior by reading surrounding implementation context.
-- You encounter AttributeError, TypeError, or "has no attribute" and want source evidence.
-
-Returns {"results": [{"source": "path/file.py:10-50", "snippet": "code..."}, ...]}.
-
-Example:
-rag_search(queries=[
-    "ALGO blocked-Davidson-iteration scheme",
-    "ALGO Normal IALGO 38 blocked Davidson",
-    "blocked Davidson algorithm ALGO setting"
-], software=["vasp"])
-"""
+    description = "Search for code documentation, API signatures, and examples."
     inputs = {
         "queries": {
             "type": "array",
@@ -315,7 +356,7 @@ rag_search(queries=[
         },
         "software": {
             "type": "array",
-            "description": "Filter by package names, e.g. ['pymatgen', 'atomate2']. None for all.",
+            "description": "Filter by package names. None for all.",
             "nullable": True,
         },
     }
@@ -347,6 +388,14 @@ rag_search(queries=[
         self._retriever_method = retriever_method
         self._index = None
         self._top_k = 5  # default, overridden in _load_index
+
+        # Build dynamic description from rag_config.yaml
+        desc, software_desc = _build_rag_description(corpus, corpus_path)
+        self.description = desc
+        self.inputs = {
+            **self.inputs,
+            "software": {**self.inputs["software"], "description": software_desc},
+        }
 
     def _load_index(self) -> None:
         """Lazy-load the RAG retriever."""
