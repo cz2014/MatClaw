@@ -256,14 +256,14 @@ def train_deepmd_impl(
 
     # Run dp train / freeze / test
     with _cd(run_dir):
-        subprocess.run(["dp", "train", "input.json"], check=True)
+        subprocess.run(["dp", "--pt", "train", "input.json"], check=True)
 
-        model_path = run_dir / f"{model_name}.pb"
-        subprocess.run(["dp", "freeze", "-o", str(model_path)], check=True)
+        model_path = run_dir / f"{model_name}.pth"
+        subprocess.run(["dp", "--pt", "freeze", "-o", str(model_path)], check=True)
 
         # Test on validation set
         cp = subprocess.run(
-            ["dp", "test", "-m", str(model_path), "-s", "data_valid", "-n", "0"],
+            ["dp", "--pt", "test", "-m", str(model_path), "-s", "data_valid", "-n", "0"],
             check=True,
             text=True,
             capture_output=True,
