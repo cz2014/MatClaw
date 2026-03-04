@@ -362,7 +362,6 @@ def create_agent(
     # Disable smolagents' 30s code execution timeout. It's broken in v1.24.0:
     # ThreadPoolExecutor.shutdown(wait=True) blocks until the thread finishes,
     # making the timeout useless. Our wait_for_jobflow has its own timeout.
-    # See debug.md for full analysis.
     executor = LocalPythonExecutor(
         additional_imports,
         additional_functions=sandbox_funcs,

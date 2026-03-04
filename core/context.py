@@ -4,7 +4,7 @@ Two-layer defense against context overflow:
   Layer 1: OpenClaw-style pruning (char-based soft-trim + hard-clear)
   Layer 2: Hard token cap using litellm.token_counter() for accuracy
 
-See plan_e.md for design rationale and OpenClaw verification.
+Design based on OpenClaw's two-layer context management.
 """
 
 from __future__ import annotations
