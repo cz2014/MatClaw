@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -76,6 +78,15 @@ def wait_for_jobflow(
     flow_uuid = flow_info["uuid"] if isinstance(flow_info, dict) else flow_info.uuid
     print(f"  Tracking flow: {flow_uuid}", flush=True)
 
+    # Write sentinel for checkpoint/resume
+    _sentinel = Path.cwd() / ".pending_job.json"
+    _sentinel.write_text(json.dumps({
+        "project_name": project_name,
+        "job_uuid": job_uuid,
+        "flow_uuid": str(flow_uuid),
+        "started_at": datetime.now(timezone.utc).isoformat(),
+    }) + "\n")
+
     # Helper to access job attributes (handles both dict and object)
     def _get(obj, key):
         if isinstance(obj, dict):
@@ -103,6 +114,7 @@ def wait_for_jobflow(
             state = _get(job, "state")
             state_val = _state_val(state)
             if state_val in TERMINAL_ERROR_VALUES:
+                _sentinel.unlink(missing_ok=True)
                 raise RuntimeError(
                     f"Job '{_get(job, 'name')}' ({_get(job, 'uuid')}) failed: "
                     f"state={state_val}, error={_get(job, 'error') if isinstance(job, dict) else getattr(job, 'error', None)}"
@@ -127,6 +139,7 @@ def wait_for_jobflow(
                 )
                 status = "all jobs COMPLETED" if all_done else "target job COMPLETED"
                 print(f"  {status} after {int(elapsed)}s", flush=True)
+                _sentinel.unlink(missing_ok=True)
                 return jc.get_job_output(job_id=job_uuid, load=True)
 
         # Timeout check -- return status dict instead of raising
@@ -135,6 +148,7 @@ def wait_for_jobflow(
                 _get(j, "name"): _state_val(_get(j, "state")) for j in jobs
             }
             print(f"  Timeout after {int(elapsed)}s. Job states: {job_states}", flush=True)
+            _sentinel.unlink(missing_ok=True)
             return {
                 "status": "timeout",
                 "flow_uuid": flow_uuid,
