@@ -6,6 +6,8 @@ import json
 import logging
 import os
 import re
+import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -422,3 +424,77 @@ def create_agent(
     kwargs["step_callbacks"] = callbacks
 
     return CodeAgent(**kwargs)
+
+
+# --- Pause/resume support ---
+
+
+class PauseController:
+    """In-process pause/resume via threading.Event.
+
+    Event SET = running (wait_if_paused returns immediately).
+    Event CLEAR = paused (wait_if_paused blocks).
+    Thread-safe: threading.Event + CPython GIL for bool access.
+    """
+
+    def __init__(self):
+        self._event = threading.Event()
+        self._event.set()  # start running
+
+    @property
+    def is_paused(self) -> bool:
+        return not self._event.is_set()
+
+    def request_pause(self):
+        self._event.clear()
+        print("[PAUSED] Press 'r' to resume", flush=True)
+
+    def resume(self):
+        self._event.set()
+        print("[RESUMED]", flush=True)
+
+    def wait_if_paused(self, context: str = ""):
+        if self._event.is_set():
+            return
+        if context:
+            print(f"[PAUSED] {context}", flush=True)
+        self._event.wait()
+
+
+def start_keyboard_listener(controller: PauseController):
+    """Daemon thread: 'p' to pause, 'r' to resume. Uses tty.setcbreak
+    for single-char input. Returns None if stdin is not a TTY."""
+    if not sys.stdin.isatty():
+        return None
+
+    def _listener():
+        import tty
+        import termios
+
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setcbreak(fd)
+            while True:
+                ch = sys.stdin.read(1)
+                if ch == "p" and not controller.is_paused:
+                    controller.request_pause()
+                elif ch == "r" and controller.is_paused:
+                    controller.resume()
+        except (EOFError, OSError):
+            pass
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+    thread = threading.Thread(target=_listener, daemon=True, name="pause-listener")
+    thread.start()
+    return thread
+
+
+def _make_pause_callback(controller: PauseController):
+    """Step callback that blocks when paused. Register LAST (after JSONL logger)."""
+    def cb(step, agent):
+        controller.wait_if_paused(
+            context=f"After step {getattr(step, 'step_number', '?')}"
+        )
+    return cb

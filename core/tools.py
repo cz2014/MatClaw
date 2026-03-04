@@ -9,6 +9,16 @@ from typing import Any
 
 from smolagents import Tool, tool
 
+# Pause controller for wait_for_jobflow polling
+_pause_controller = None
+
+
+def set_pause_controller(controller):
+    """Set the pause controller for wait_for_jobflow polling."""
+    global _pause_controller
+    _pause_controller = controller
+
+
 # Project paths for RAG
 _PROJECT_ROOT = Path(__file__).parent.parent
 _DEFAULT_CORPUS_DIR = _PROJECT_ROOT / "data" / "corpus"
@@ -147,6 +157,10 @@ def wait_for_jobflow(
             }
 
         time.sleep(POLL_S)
+        if _pause_controller is not None:
+            _pause_controller.wait_if_paused(
+                context=f"During jobflow polling (flow={flow_uuid}, elapsed={int(elapsed)}s)"
+            )
 
 
 class TrainDeePMDTool(Tool):
