@@ -3,9 +3,9 @@
 
 Runs periodic health checks alongside a long-running agent process:
   - Agent process alive (pgrep)
-  - jobflow-remote runner alive (jf runner status)
+  - jobflow-remote runner alive (foreground or daemon mode)
   - MongoDB accessible (pymongo ping)
-  - SSH to Anvil (ssh echo)
+  - SSH to HPC cluster (project-aware)
   - Agent error rate (parse recent steps)
 
 On failure: sends macOS notification and logs to <workspace>/monitor.log.
@@ -14,6 +14,7 @@ Claude Code skill to read.
 
 Usage:
   python scripts/monitor.py --workspace workspace --interval 30
+  python scripts/monitor.py --workspace workspace --interval 10 --project perlmutter
   python scripts/monitor.py --workspace workspace --interval 10 --agent-pattern "python main.py"
 """
 
@@ -76,22 +77,51 @@ def check_agent_alive(pattern: str) -> dict:
         return _result("agent_alive", "FAIL", str(e))
 
 
-def check_runner_alive() -> dict:
-    """Check if the jobflow-remote runner daemon is running."""
+def check_runner_alive(project: str = "anvil") -> dict:
+    """Check if the jobflow-remote runner is alive (foreground or daemon).
+
+    1. Check for foreground runner process (jf runner run)
+    2. Fallback: jf runner status (daemon mode)
+    """
+    # Check foreground process: look for 'jf' commands containing 'runner run'
+    # and the project name
     try:
-        env = {**os.environ, "JFREMOTE_PROJECT": "anvil"}
+        proc = subprocess.run(
+            ["bash", "-c",
+             f"ps ax -o pid,command | grep -F 'runner' | grep -F '{project}' | grep -v grep"],
+            capture_output=True, text=True, timeout=5,
+        )
+        lines = [ln.strip() for ln in proc.stdout.strip().split("\n") if ln.strip()]
+        # Look for 'runner run' or 'runner start' in matched lines
+        for ln in lines:
+            if "runner run" in ln or "runner start" in ln:
+                pid = ln.split()[0]
+                return _result(
+                    "runner_alive", "OK",
+                    f"runner alive (foreground, project={project}, pid={pid})",
+                )
+    except Exception:
+        pass
+
+    # Fallback: daemon mode via jf runner status
+    try:
+        env = {**os.environ, "JFREMOTE_PROJECT": project}
         proc = subprocess.run(
             ["jf", "runner", "status"],
             capture_output=True, text=True, timeout=15, env=env,
         )
         output = proc.stdout.strip().lower() + proc.stderr.strip().lower()
         if "running" in output and "not running" not in output:
-            return _result("runner_alive", "OK", "runner is running")
-        return _result("runner_alive", "FAIL", proc.stdout.strip() or proc.stderr.strip())
+            return _result(
+                "runner_alive", "OK",
+                f"runner alive (daemon, project={project})",
+            )
     except FileNotFoundError:
         return _result("runner_alive", "FAIL", "jf command not found")
-    except Exception as e:
-        return _result("runner_alive", "FAIL", str(e))
+    except Exception:
+        pass
+
+    return _result("runner_alive", "FAIL", f"runner not detected (project={project})")
 
 
 def check_mongodb() -> dict:
@@ -112,20 +142,32 @@ def check_mongodb() -> dict:
         return _result("mongodb", "FAIL", str(e))
 
 
-def check_ssh_anvil() -> dict:
-    """Test SSH connectivity to Anvil using the same credentials as jfremote."""
+_SSH_HOSTS = {
+    "anvil": "anvil.rcac.purdue.edu",
+    "perlmutter": "perlmutter.nersc.gov",
+}
+
+
+def check_ssh(project: str = "anvil") -> dict:
+    """Test SSH connectivity to the project's HPC cluster."""
+    host = _SSH_HOSTS.get(project)
+    if not host:
+        return _result("ssh", "SKIP", f"no SSH host configured for project={project}")
+
     try:
         proc = subprocess.run(
             ["ssh", "-o", "ConnectTimeout=10", "-o", "BatchMode=yes",
-             "-i", os.path.expanduser("~/.ssh/id_ed25519_anvil"),
-             "x-cz2014@anvil.rcac.purdue.edu", "echo", "ok"],
+             host, "echo", "ok"],
             capture_output=True, text=True, timeout=20,
         )
         if proc.returncode == 0 and "ok" in proc.stdout:
-            return _result("ssh_anvil", "OK", "connected")
-        return _result("ssh_anvil", "FAIL", proc.stderr.strip() or f"exit code {proc.returncode}")
+            return _result("ssh", "OK", f"SSH to {host} ok")
+        return _result(
+            "ssh", "FAIL",
+            f"SSH to {host} failed: {proc.stderr.strip() or f'exit code {proc.returncode}'}",
+        )
     except Exception as e:
-        return _result("ssh_anvil", "FAIL", str(e))
+        return _result("ssh", "FAIL", f"SSH to {host} error: {e}")
 
 
 def check_error_rate(workspace: Path) -> dict:
@@ -173,13 +215,13 @@ def send_notification(title: str, message: str) -> None:
 # Daemon loop
 # ---------------------------------------------------------------------------
 
-def _run_all_checks(agent_pattern: str, workspace: Path) -> list[dict]:
+def _run_all_checks(agent_pattern: str, workspace: Path, project: str = "anvil") -> list[dict]:
     """Run all health checks and return results."""
     return [
         check_agent_alive(agent_pattern),
-        check_runner_alive(),
+        check_runner_alive(project),
         check_mongodb(),
-        check_ssh_anvil(),
+        check_ssh(project),
         check_error_rate(workspace),
     ]
 
@@ -210,7 +252,7 @@ def _update_state(state: dict, results: list[dict]) -> dict:
     return state
 
 
-def main_loop(workspace: Path, interval: int, agent_pattern: str) -> None:
+def main_loop(workspace: Path, interval: int, agent_pattern: str, project: str = "anvil") -> None:
     """Main daemon loop."""
     workspace.mkdir(parents=True, exist_ok=True)
 
@@ -230,8 +272,9 @@ def main_loop(workspace: Path, interval: int, agent_pattern: str) -> None:
     logger.addHandler(sh)
 
     # Startup log
-    logger.info("monitor started: workspace=%s initial_interval=%ds agent_pattern='%s'", workspace, interval, agent_pattern)
-    logger.info("checks: agent_alive, runner_alive, mongodb, ssh_anvil, error_rate")
+    logger.info("monitor started: workspace=%s initial_interval=%ds agent_pattern='%s' project='%s'",
+                workspace, interval, agent_pattern, project)
+    logger.info("checks: agent_alive, runner_alive, mongodb, ssh, error_rate")
     logger.info("backoff: %ds -> %ds (2x, reset on new FAIL)", interval, _MAX_INTERVAL)
 
     # Load previous state
@@ -253,7 +296,7 @@ def main_loop(workspace: Path, interval: int, agent_pattern: str) -> None:
     current_interval = interval  # exponential backoff state
 
     while running:
-        results = _run_all_checks(agent_pattern, workspace)
+        results = _run_all_checks(agent_pattern, workspace, project)
 
         # Log and check for transitions
         has_new_fail = False
@@ -330,9 +373,13 @@ def main():
         "--agent-pattern", type=str, default="python main.py",
         help="Process pattern for pgrep to check agent liveness (default: 'python main.py')",
     )
+    parser.add_argument(
+        "--project", type=str, default="anvil",
+        help="jobflow-remote project name for runner/SSH checks (default: 'anvil')",
+    )
 
     args = parser.parse_args()
-    main_loop(args.workspace, args.interval, args.agent_pattern)
+    main_loop(args.workspace, args.interval, args.agent_pattern, args.project)
 
 
 if __name__ == "__main__":

@@ -203,16 +203,39 @@ def _build_prompt_templates(prompts_cfg: dict[str, Any]) -> PromptTemplates | No
 
 
 class RetryingLiteLLMModel(LiteLLMModel):
-    """LiteLLMModel that retries when the API returns empty content.
+    """LiteLLMModel that retries on empty content and auto-pauses on connection errors.
 
-    Gemini intermittently returns content=None with completion_tokens=0.
-    LiteLLM treats this as success (HTTP 200), so its built-in retries
-    don't trigger. This subclass retries up to EMPTY_RETRIES times
-    before returning the empty response to smolagents.
+    Empty-content retry: Gemini intermittently returns content=None with
+    completion_tokens=0. LiteLLM treats this as success (HTTP 200), so its
+    built-in retries don't trigger. This subclass retries up to EMPTY_RETRIES
+    times before returning the empty response to smolagents.
+
+    Connection error pause: When a transient connection/server error is detected,
+    the agent is paused (via PauseController) instead of crashing. The user can
+    fix the issue and resume to retry the LLM call.
     """
 
     EMPTY_RETRIES = 3
     EMPTY_RETRY_WAIT = 1.0  # seconds, doubles each retry
+
+    _CONNECTION_ERROR_PATTERNS = [
+        "connection", "timeout", "timed out", "refused",
+        "reset by peer", "broken pipe", "eof", "ssl",
+        "service unavailable", "503", "502", "500",
+        "internal server error", "bad gateway",
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._pause_controller = None
+
+    def set_pause_controller(self, pc):
+        self._pause_controller = pc
+
+    def _is_connection_error(self, exc: Exception) -> bool:
+        """Check if exception is a transient connection/server error."""
+        msg = str(exc).lower()
+        return any(p in msg for p in self._CONNECTION_ERROR_PATTERNS)
 
     def _inject_cache_control(self, messages):
         """Add cache_control breakpoints for Anthropic prompt caching.
@@ -249,7 +272,8 @@ class RetryingLiteLLMModel(LiteLLMModel):
                 else:
                     last["content"] = new_content
 
-    def generate(self, messages, stop_sequences=None, **kwargs):
+    def _generate_with_empty_retry(self, messages, stop_sequences=None, **kwargs):
+        """Generate with retries for empty responses (Gemini content=None)."""
         self._inject_cache_control(messages)
         last_response = None
         for attempt in range(self.EMPTY_RETRIES + 1):
@@ -270,6 +294,26 @@ class RetryingLiteLLMModel(LiteLLMModel):
             self.model_id, self.EMPTY_RETRIES,
         )
         return last_response
+
+    def generate(self, messages, stop_sequences=None, **kwargs):
+        """Generate with auto-pause on connection errors."""
+        while True:
+            try:
+                return self._generate_with_empty_retry(
+                    messages, stop_sequences=stop_sequences, **kwargs
+                )
+            except Exception as exc:
+                if not self._is_connection_error(exc) or self._pause_controller is None:
+                    raise
+                logger.warning(
+                    "LLM connection error: %s. Pausing agent -- "
+                    "fix the issue and resume to retry.", exc,
+                )
+                self._pause_controller.request_pause(
+                    reason=f"LLM connection error: {exc}"
+                )
+                self._pause_controller.wait_if_paused()
+                logger.info("Resumed after connection error, retrying LLM call")
 
 
 def create_agent(
@@ -439,14 +483,20 @@ class PauseController:
     def __init__(self):
         self._event = threading.Event()
         self._event.set()  # start running
+        self._reason = None
 
     @property
     def is_paused(self) -> bool:
         return not self._event.is_set()
 
-    def request_pause(self):
+    def request_pause(self, reason: str = ""):
+        """Pause the agent. Called by keyboard listener or auto-pause on errors."""
+        self._reason = reason
         self._event.clear()
-        print("[PAUSED] Press 'r' to resume", flush=True)
+        if reason:
+            print(f"[PAUSED] {reason} -- Press 'r' to resume", flush=True)
+        else:
+            print("[PAUSED] Press 'r' to resume", flush=True)
 
     def resume(self):
         self._event.set()
