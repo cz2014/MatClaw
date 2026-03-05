@@ -1,11 +1,11 @@
 # LLM configuration for MLFF agent
 # API keys use ${ENV_VAR} syntax - expanded at runtime
 
-default_provider: gemini
+default_provider: openai
 
 providers:
   openai:
-    model_id: gpt-4o
+    model_id: gpt-5.2
     api_key: ${OPENAI_API_KEY}
     context_window: 200000     # GPT-5.2: near-perfect at 256K (MRCR v2)
 

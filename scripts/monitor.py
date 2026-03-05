@@ -5,7 +5,6 @@ Runs periodic health checks alongside a long-running agent process:
   - Agent process alive (pgrep)
   - jobflow-remote runner alive (foreground or daemon mode)
   - MongoDB accessible (pymongo ping)
-  - SSH to HPC cluster (project-aware)
   - Agent error rate (parse recent steps)
 
 On failure: sends macOS notification and logs to <workspace>/monitor.log.
@@ -142,33 +141,6 @@ def check_mongodb() -> dict:
         return _result("mongodb", "FAIL", str(e))
 
 
-_SSH_HOSTS = {
-    "anvil": "anvil.rcac.purdue.edu",
-    "perlmutter": "perlmutter.nersc.gov",
-}
-
-
-def check_ssh(project: str = "anvil") -> dict:
-    """Test SSH connectivity to the project's HPC cluster."""
-    host = _SSH_HOSTS.get(project)
-    if not host:
-        return _result("ssh", "SKIP", f"no SSH host configured for project={project}")
-
-    try:
-        proc = subprocess.run(
-            ["ssh", "-o", "ConnectTimeout=10", "-o", "BatchMode=yes",
-             host, "echo", "ok"],
-            capture_output=True, text=True, timeout=20,
-        )
-        if proc.returncode == 0 and "ok" in proc.stdout:
-            return _result("ssh", "OK", f"SSH to {host} ok")
-        return _result(
-            "ssh", "FAIL",
-            f"SSH to {host} failed: {proc.stderr.strip() or f'exit code {proc.returncode}'}",
-        )
-    except Exception as e:
-        return _result("ssh", "FAIL", f"SSH to {host} error: {e}")
-
 
 def check_error_rate(workspace: Path) -> dict:
     """Check error rate over last 10 steps."""
@@ -221,7 +193,6 @@ def _run_all_checks(agent_pattern: str, workspace: Path, project: str = "anvil")
         check_agent_alive(agent_pattern),
         check_runner_alive(project),
         check_mongodb(),
-        check_ssh(project),
         check_error_rate(workspace),
     ]
 
@@ -274,7 +245,7 @@ def main_loop(workspace: Path, interval: int, agent_pattern: str, project: str =
     # Startup log
     logger.info("monitor started: workspace=%s initial_interval=%ds agent_pattern='%s' project='%s'",
                 workspace, interval, agent_pattern, project)
-    logger.info("checks: agent_alive, runner_alive, mongodb, ssh, error_rate")
+    logger.info("checks: agent_alive, runner_alive, mongodb, error_rate")
     logger.info("backoff: %ds -> %ds (2x, reset on new FAIL)", interval, _MAX_INTERVAL)
 
     # Load previous state

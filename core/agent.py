@@ -218,12 +218,18 @@ def _build_prompt_templates(prompts_cfg: dict[str, Any]) -> PromptTemplates | No
 
 
 class RetryingLiteLLMModel(LiteLLMModel):
-    """LiteLLMModel that retries on empty content and auto-pauses on connection errors.
+    """LiteLLMModel that retries on empty content, transient API errors, and
+    auto-pauses on connection errors.
 
     Empty-content retry: Gemini intermittently returns content=None with
     completion_tokens=0. LiteLLM treats this as success (HTTP 200), so its
     built-in retries don't trigger. This subclass retries up to EMPTY_RETRIES
     times before returning the empty response to smolagents.
+
+    Transient API error retry: Some LLM errors (e.g. OpenAI content policy
+    false positives) are transient -- the same prompt succeeds on retry.
+    These are retried up to TRANSIENT_RETRIES times with exponential backoff,
+    then auto-paused if a PauseController is set.
 
     Connection error pause: When a transient connection/server error is detected,
     the agent is paused (via PauseController) instead of crashing. The user can
@@ -233,11 +239,19 @@ class RetryingLiteLLMModel(LiteLLMModel):
     EMPTY_RETRIES = 3
     EMPTY_RETRY_WAIT = 1.0  # seconds, doubles each retry
 
+    TRANSIENT_RETRIES = 3
+    TRANSIENT_RETRY_WAIT = 5.0  # seconds, doubles each retry
+
     _CONNECTION_ERROR_PATTERNS = [
         "connection", "timeout", "timed out", "refused",
         "reset by peer", "broken pipe", "eof", "ssl",
         "service unavailable", "503", "502", "500",
         "internal server error", "bad gateway",
+    ]
+
+    _TRANSIENT_API_ERROR_PATTERNS = [
+        "content policy", "usage policy",
+        "overloaded", "temporarily unavailable",
     ]
 
     def __init__(self, *args, **kwargs):
@@ -251,6 +265,11 @@ class RetryingLiteLLMModel(LiteLLMModel):
         """Check if exception is a transient connection/server error."""
         msg = str(exc).lower()
         return any(p in msg for p in self._CONNECTION_ERROR_PATTERNS)
+
+    def _is_transient_api_error(self, exc: Exception) -> bool:
+        """Check if exception is a transient API error worth retrying."""
+        msg = str(exc).lower()
+        return any(p in msg for p in self._TRANSIENT_API_ERROR_PATTERNS)
 
     def _inject_cache_control(self, messages):
         """Add cache_control breakpoints for Anthropic prompt caching.
@@ -311,24 +330,57 @@ class RetryingLiteLLMModel(LiteLLMModel):
         return last_response
 
     def generate(self, messages, stop_sequences=None, **kwargs):
-        """Generate with auto-pause on connection errors."""
+        """Generate with retry for transient API errors and auto-pause on connection errors."""
+        transient_attempt = 0
         while True:
             try:
                 return self._generate_with_empty_retry(
                     messages, stop_sequences=stop_sequences, **kwargs
                 )
             except Exception as exc:
-                if not self._is_connection_error(exc) or self._pause_controller is None:
-                    raise
-                logger.warning(
-                    "LLM connection error: %s. Pausing agent -- "
-                    "fix the issue and resume to retry.", exc,
-                )
-                self._pause_controller.request_pause(
-                    reason=f"LLM connection error: {exc}"
-                )
-                self._pause_controller.wait_if_paused()
-                logger.info("Resumed after connection error, retrying LLM call")
+                # Connection errors: auto-pause immediately (user must resume)
+                if self._is_connection_error(exc):
+                    if self._pause_controller is None:
+                        raise
+                    logger.warning(
+                        "LLM connection error: %s. Pausing agent -- "
+                        "fix the issue and resume to retry.", exc,
+                    )
+                    self._pause_controller.request_pause(
+                        reason=f"LLM connection error: {exc}"
+                    )
+                    self._pause_controller.wait_if_paused()
+                    logger.info("Resumed after connection error, retrying LLM call")
+                    continue
+
+                # Transient API errors: retry with backoff, then auto-pause
+                if self._is_transient_api_error(exc):
+                    transient_attempt += 1
+                    if transient_attempt <= self.TRANSIENT_RETRIES:
+                        wait = self.TRANSIENT_RETRY_WAIT * (2 ** (transient_attempt - 1))
+                        logger.warning(
+                            "Transient API error (attempt %d/%d): %s. "
+                            "Retrying in %.1fs...",
+                            transient_attempt, self.TRANSIENT_RETRIES, exc, wait,
+                        )
+                        time.sleep(wait)
+                        continue
+                    # Retries exhausted: auto-pause if possible
+                    if self._pause_controller is not None:
+                        logger.warning(
+                            "Transient API error persisted after %d retries: %s. "
+                            "Pausing agent.", self.TRANSIENT_RETRIES, exc,
+                        )
+                        self._pause_controller.request_pause(
+                            reason=f"API error after {self.TRANSIENT_RETRIES} retries: {exc}"
+                        )
+                        self._pause_controller.wait_if_paused()
+                        transient_attempt = 0
+                        logger.info("Resumed after transient API error, retrying LLM call")
+                        continue
+
+                # All other errors: raise immediately
+                raise
 
 
 def create_agent(
