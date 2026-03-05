@@ -147,6 +147,21 @@ def _create_sandbox_functions(workspace: Path) -> dict[str, callable]:
     return {"write_text": write_text, "read_text": read_text}
 
 
+def _save_config_snapshot(config_dir: Path, workspace_dir: Path, prompts_file: str) -> None:
+    """Copy config files as hidden files into workspace for reproducibility."""
+    import shutil
+
+    files_to_copy = [
+        ("llm_config.yaml", ".llm_config.yaml"),
+        (prompts_file, ".prompts.yaml"),
+        ("rag_config.yaml", ".rag_config.yaml"),
+    ]
+    for src_name, dst_name in files_to_copy:
+        src = config_dir / src_name
+        if src.exists():
+            shutil.copy2(src, workspace_dir / dst_name)
+
+
 def _build_prompt_templates(prompts_cfg: dict[str, Any]) -> PromptTemplates | None:
     """Build PromptTemplates only if user actually set any prompt content.
 
@@ -349,6 +364,9 @@ def create_agent(
 
     prompts_path = config_dir / prompts_file
     prompts_cfg = _read_yaml(prompts_path) if prompts_path.exists() else {}
+
+    # Snapshot config files into workspace for reproducibility
+    _save_config_snapshot(config_dir, workspace_dir, prompts_file)
 
     provider_name = provider_name or llm_cfg["default_provider"]
     provider_cfg = llm_cfg["providers"][provider_name]
