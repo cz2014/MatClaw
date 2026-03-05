@@ -312,7 +312,7 @@ def create_agent(
     # Forward any extra provider config keys (e.g. timeout, api_base) to LiteLLM
     model_kwargs = {
         k: v for k, v in provider_cfg.items()
-        if k not in ("model_id", "api_key")
+        if k not in ("model_id", "api_key", "context_window")
     }
     api_key = _expand_env_strict(provider_cfg["api_key"])
     model = RetryingLiteLLMModel(
@@ -323,7 +323,7 @@ def create_agent(
 
     agent_cfg = llm_cfg.get("agent", {})
 
-    # Context window management (Layer 1: pruning + Layer 2: token cap)
+    # Context window management (unified zone-based pruning + caching)
     if agent_cfg.get("context_pruning", True):
         from core.context import wrap_model_with_context_management
 
@@ -338,8 +338,8 @@ def create_agent(
                 "Unknown model %s, using default context_window=128000", model_id
             )
 
-        # Config cap: only lowers, never raises
-        config_cap = agent_cfg.get("context_window")
+        # Per-provider context_window takes priority over global agent.context_window
+        config_cap = provider_cfg.get("context_window") or agent_cfg.get("context_window")
         if config_cap and config_cap < detected_tokens:
             context_tokens = config_cap
             logger.info(

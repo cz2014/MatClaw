@@ -1,17 +1,20 @@
-"""Context window management for long-running agent workflows.
+"""Unified zone-based context window management for long-running agent workflows.
 
-Two-layer defense against context overflow:
-  Layer 1: OpenClaw-style pruning (char-based soft-trim + hard-clear)
-  Layer 2: Hard token cap using litellm.token_counter() for accuracy
+Single mechanism that fires when total tokens exceed context_window (1.0x trigger).
+Four zones measured from END (newest to oldest):
+  Zone 1 (newest 30%):  Protected -- no modification
+  Zone 2 (next 20%):    Soft-trim -- tool-responses trimmed to head+tail
+  Zone 3 (next 25%):    Hard-clear -- tool-responses replaced with placeholder
+  Zone 4 (oldest 25%):  Truncate -- all messages removed, single marker
 
-Design based on OpenClaw's two-layer context management.
+Pruned-result caching in the wrapper provides hysteresis: ~8 stable turns
+between triggers, preserving LLM provider cache hits.
 """
 
 from __future__ import annotations
 
 import logging
 from copy import deepcopy
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -19,28 +22,28 @@ logger = logging.getLogger(__name__)
 
 _CHARS_PER_TOKEN = 4  # standard approximation for English/code text
 
-# OpenClaw default settings (from settings.ts)
-_SOFT_TRIM_RATIO = 0.30
-_HARD_CLEAR_RATIO = 0.50
-_MIN_PRUNABLE_TOOL_CHARS = 50_000
-_KEEP_LAST_ASSISTANTS = 3
 _SOFT_TRIM_MAX_CHARS = 4_000
 _SOFT_TRIM_HEAD_CHARS = 1_500
 _SOFT_TRIM_TAIL_CHARS = 1_500
 _HARD_CLEAR_PLACEHOLDER = "[Old tool result content cleared]"
 
-# Layer 2 headroom (match OpenClaw CONTEXT_INPUT_HEADROOM_RATIO)
-_HEADROOM_RATIO = 0.75
+# Zone boundaries (fraction of non-bootstrap message count, measured from END)
+_ZONE_PROTECT = 0.30       # newest 30%: fully protected
+_ZONE_SOFT_TRIM = 0.50     # next 20%: soft-trim tool-responses
+_ZONE_HARD_CLEAR = 0.75    # next 25%: hard-clear tool-responses
+# oldest 25%: removed entirely (truncation zone)
+
+_TRUNCATION_MARKER = (
+    "[Context truncated: {n} messages from earlier steps were removed "
+    "to fit within the context window. Continue with the current task "
+    "using the remaining context.]"
+)
 
 
 # --- Helpers ---
 
 def _get_content_str(message) -> str:
-    """Extract content as string from a ChatMessage or dict.
-
-    ChatMessage.content can be str, list[dict], or None.
-    For list content (multimodal), concatenate text elements.
-    """
+    """Extract content as string from a ChatMessage or dict."""
     if isinstance(message, dict):
         content = message.get("content")
     else:
@@ -50,7 +53,6 @@ def _get_content_str(message) -> str:
         return ""
     if isinstance(content, str):
         return content
-    # list of dicts (multimodal content blocks)
     if isinstance(content, list):
         return "".join(
             block.get("text", "") for block in content if isinstance(block, dict)
@@ -59,20 +61,15 @@ def _get_content_str(message) -> str:
 
 
 def _set_content_str(message, new_content: str):
-    """Set content string on a ChatMessage or dict.
-
-    For ChatMessage with list content, replaces the first text block.
-    """
+    """Set content string on a ChatMessage or dict."""
     if isinstance(message, dict):
         message["content"] = new_content
     elif hasattr(message, "content"):
         if isinstance(message.content, list):
-            # Replace text in first text block, keep other blocks
             for block in message.content:
                 if isinstance(block, dict) and block.get("type") == "text":
                     block["text"] = new_content
                     return
-            # No text block found, replace entire content
             message.content = new_content
         else:
             message.content = new_content
@@ -83,7 +80,6 @@ def _get_role(message) -> str:
     if isinstance(message, dict):
         return message.get("role", "")
     role = getattr(message, "role", "")
-    # MessageRole enum has .value
     return role.value if hasattr(role, "value") else str(role)
 
 
@@ -100,227 +96,145 @@ def _find_first_user_idx(messages) -> int:
     return 0
 
 
-def _find_protect_from(messages) -> int:
-    """Find the index from which messages are protected (last N assistants).
+def _make_marker(n: int) -> dict:
+    """Create a truncation marker message compatible with smolagents.
 
-    Returns the index of the (N-th from last) assistant message.
-    Messages at this index and beyond are protected from pruning.
+    Uses list-format content so smolagents' get_clean_message_list() can merge
+    it with adjacent same-role messages without assertion errors.
     """
-    assistant_indices = [
-        i for i, m in enumerate(messages) if _get_role(m) == "assistant"
-    ]
-    if len(assistant_indices) >= _KEEP_LAST_ASSISTANTS:
-        return assistant_indices[-_KEEP_LAST_ASSISTANTS]
-    return len(messages)
+    text = _TRUNCATION_MARKER.format(n=n)
+    return {
+        "role": "user",
+        "content": [{"type": "text", "text": text}],
+    }
 
 
-def _find_prunable_tool_indices(
-    messages, first_user_idx: int, protect_from: int
-) -> list[int]:
-    """Return indices of tool result messages in the prunable zone.
-
-    Prunable zone: after first user message, before the protected tail.
-    Only tool-response / tool role messages are prunable.
-    """
-    tool_roles = {"tool", "tool-response"}
-    return [
-        i
-        for i in range(first_user_idx + 1, min(protect_from, len(messages)))
-        if _get_role(messages[i]) in tool_roles
-    ]
-
-
-# --- Layer 1: OpenClaw-style pruning ---
-
-def _soft_trim(messages, prunable_indices: list[int]) -> list[int]:
-    """Soft-trim oversized tool results to head+tail.
-
-    Modifies messages in place. Returns list of indices that were trimmed.
-    """
-    trimmed = []
-    for i in prunable_indices:
-        content = _get_content_str(messages[i])
-        if len(content) <= _SOFT_TRIM_MAX_CHARS:
-            continue
-        head = content[:_SOFT_TRIM_HEAD_CHARS]
-        tail = content[-_SOFT_TRIM_TAIL_CHARS:]
-        new_content = head + "\n...[trimmed]...\n" + tail
-        _set_content_str(messages[i], new_content)
-        trimmed.append(i)
-    return trimmed
-
-
-def _hard_clear(
-    messages, prunable_indices: list[int], char_window: int
-) -> list[int]:
-    """Hard-clear oldest tool results one by one until ratio < hard_clear_ratio.
-
-    Greedy: stops immediately when ratio drops below threshold.
-    Precondition: at least _MIN_PRUNABLE_TOOL_CHARS of prunable content.
-    """
-    # Check precondition: enough prunable content
-    prunable_chars = sum(
-        len(_get_content_str(messages[i])) for i in prunable_indices
-    )
-    if prunable_chars < _MIN_PRUNABLE_TOOL_CHARS:
-        return []
-
-    cleared = []
-    total = _total_chars(messages)
-
-    # Iterate oldest to newest
-    for i in prunable_indices:
-        ratio = total / char_window if char_window > 0 else 0
-        if ratio < _HARD_CLEAR_RATIO:
-            break
-
-        content = _get_content_str(messages[i])
-        # Skip already-cleared messages
-        if content == _HARD_CLEAR_PLACEHOLDER:
-            continue
-
-        old_len = len(content)
-        _set_content_str(messages[i], _HARD_CLEAR_PLACEHOLDER)
-        total -= old_len - len(_HARD_CLEAR_PLACEHOLDER)
-        cleared.append(i)
-
-    return cleared
-
-
-def prune_messages(messages: list, char_window: int) -> list:
-    """Prune old tool results based on context pressure (Layer 1).
-
-    Follows OpenClaw's two-stage approach:
-    1. Soft-trim (ratio >= 0.30): trim oversized tool results to head+tail
-    2. Hard-clear (ratio >= 0.50 after soft-trim): replace oldest one by one
-
-    Protected: last 3 assistant messages, messages before first user message.
-    Only modifies tool result messages.
-
-    Args:
-        messages: List of ChatMessage objects or dicts.
-        char_window: Context window size in characters.
-
-    Returns:
-        Modified copy of messages list.
-    """
-    if not messages or char_window <= 0:
-        return messages
-
-    # Work on a deep copy to avoid mutating the original
-    messages = deepcopy(messages)
-
-    total = _total_chars(messages)
-    ratio = total / char_window
-
-    if ratio < _SOFT_TRIM_RATIO:
-        return messages
-
-    # Determine protection boundaries
-    first_user_idx = _find_first_user_idx(messages)
-    protect_from = _find_protect_from(messages)
-    prunable = _find_prunable_tool_indices(messages, first_user_idx, protect_from)
-
-    if not prunable:
-        return messages
-
-    # Stage 1: Soft-trim
-    trimmed = _soft_trim(messages, prunable)
-    if trimmed:
-        logger.debug(
-            "Context pruning: soft-trimmed %d tool results (ratio was %.2f)",
-            len(trimmed), ratio,
-        )
-
-    # Recalculate ratio after soft-trim
-    total = _total_chars(messages)
-    ratio = total / char_window
-
-    if ratio < _HARD_CLEAR_RATIO:
-        return messages
-
-    # Stage 2: Hard-clear
-    cleared = _hard_clear(messages, prunable, char_window)
-    if cleared:
-        logger.debug(
-            "Context pruning: hard-cleared %d tool results (ratio was %.2f)",
-            len(cleared), ratio,
-        )
-
-    return messages
-
-
-# --- Layer 2: Hard token cap ---
-
-def _enforce_token_cap(
-    messages: list, max_input_tokens: int, model_id: str
-) -> list:
-    """Drop oldest unprotected tool results if total tokens exceed cap.
-
-    Uses litellm.token_counter() for accurate model-specific counting.
-    Falls back to char/4 estimate if token counting fails.
-
-    Args:
-        messages: List of ChatMessage objects or dicts.
-        max_input_tokens: Maximum allowed input tokens.
-        model_id: LiteLLM model ID for accurate token counting.
-
-    Returns:
-        Modified copy of messages (only copies if changes needed).
-    """
-    # Count tokens
+def _count_tokens(messages: list, model_id: str) -> int:
+    """Count tokens using litellm, with char/4 fallback."""
     try:
         import litellm
-        # token_counter expects dicts with "role" and "content" keys
         msg_dicts = []
         for m in messages:
             role = _get_role(m)
-            # Map tool-response to user for token counting (matches LiteLLM convention)
             if role == "tool-response":
                 role = "user"
             elif role == "tool-call":
                 role = "assistant"
             msg_dicts.append({"role": role, "content": _get_content_str(m)})
-        total_tokens = litellm.token_counter(model=model_id, messages=msg_dicts)
+        return litellm.token_counter(model=model_id, messages=msg_dicts)
     except Exception:
-        # Fallback: char-based estimate
         total_chars = sum(len(_get_content_str(m)) for m in messages)
-        total_tokens = total_chars // _CHARS_PER_TOKEN
+        return total_chars // _CHARS_PER_TOKEN
 
-    if total_tokens <= max_input_tokens:
+
+# --- Zone-based context management ---
+
+def _enforce_token_cap(
+    messages: list, context_tokens: int, model_id: str
+) -> list:
+    """Zone-based context truncation.
+
+    Trigger: total_tokens > context_tokens (1.0x).
+
+    Returns input unchanged (same reference) when under window.
+    Returns deepcopy-based result when pruning fires.
+    """
+    total_tokens = _count_tokens(messages, model_id)
+    if total_tokens <= context_tokens:
         return messages
 
-    logger.debug(
-        "Token cap: %d tokens exceeds cap %d, dropping old tool results",
-        total_tokens, max_input_tokens,
+    logger.info(
+        "Context pruning: %d tokens exceeds window %d, applying zone-based pruning",
+        total_tokens, context_tokens,
     )
 
-    # Work on a deep copy
     messages = deepcopy(messages)
 
-    # Protection boundaries (same rules as Layer 1)
     first_user_idx = _find_first_user_idx(messages)
-    protect_from = _find_protect_from(messages)
-    prunable = _find_prunable_tool_indices(messages, first_user_idx, protect_from)
+    bootstrap_end = first_user_idx + 1
 
-    # Drop oldest tool results until under cap
-    for i in prunable:
-        if total_tokens <= max_input_tokens:
-            break
+    n_prunable = len(messages) - bootstrap_end
+    if n_prunable <= 0:
+        return messages
 
-        content = _get_content_str(messages[i])
-        placeholder = "[dropped: context cap exceeded]"
-        if content == placeholder:
-            continue
+    zone4_end = bootstrap_end + max(int(n_prunable * (1.0 - _ZONE_HARD_CLEAR)), 1)
+    zone3_end = bootstrap_end + max(int(n_prunable * (1.0 - _ZONE_SOFT_TRIM)), 1)
+    zone2_end = bootstrap_end + max(int(n_prunable * (1.0 - _ZONE_PROTECT)), 1)
 
-        # Estimate tokens saved (char-based, since re-counting is expensive)
-        saved_chars = len(content) - len(placeholder)
-        saved_tokens = max(saved_chars // _CHARS_PER_TOKEN, 0)
+    tool_roles = {"tool", "tool-response"}
 
-        _set_content_str(messages[i], placeholder)
-        total_tokens -= saved_tokens
+    # Zone 3: hard-clear tool-responses
+    for i in range(zone4_end, zone3_end):
+        if _get_role(messages[i]) in tool_roles:
+            content = _get_content_str(messages[i])
+            if content != _HARD_CLEAR_PLACEHOLDER:
+                _set_content_str(messages[i], _HARD_CLEAR_PLACEHOLDER)
 
-    return messages
+    # Zone 2: soft-trim tool-responses
+    for i in range(zone3_end, zone2_end):
+        if _get_role(messages[i]) in tool_roles:
+            content = _get_content_str(messages[i])
+            if len(content) > _SOFT_TRIM_MAX_CHARS:
+                head = content[:_SOFT_TRIM_HEAD_CHARS]
+                tail = content[-_SOFT_TRIM_TAIL_CHARS:]
+                _set_content_str(
+                    messages[i], head + "\n...[trimmed]...\n" + tail
+                )
+
+    # Zone 4: truncate oldest messages
+    removed_count = zone4_end - bootstrap_end
+    if removed_count > 0:
+        result = messages[:bootstrap_end] + [_make_marker(removed_count)] + messages[zone4_end:]
+    else:
+        result = messages
+
+    result_tokens = _count_tokens(result, model_id)
+
+    if result_tokens <= context_tokens:
+        logger.info(
+            "Context pruning: zone-based complete (%d -> %d tokens, "
+            "removed %d messages, headroom %d tokens)",
+            total_tokens, result_tokens, removed_count,
+            context_tokens - result_tokens,
+        )
+        return result
+
+    # Fallback: expand truncation zone progressively
+    logger.warning(
+        "Context pruning: zone-based insufficient (%d tokens > %d), "
+        "expanding truncation zone",
+        result_tokens, context_tokens,
+    )
+
+    remaining = messages[zone4_end:]
+    assistant_indices = [
+        i for i, m in enumerate(remaining) if _get_role(m) == "assistant"
+    ]
+
+    for keep_count in range(len(assistant_indices) - 1, 0, -1):
+        tail_start_in_remaining = assistant_indices[-keep_count]
+        expanded_removed = zone4_end - bootstrap_end + tail_start_in_remaining
+        candidate = (
+            messages[:bootstrap_end]
+            + [_make_marker(expanded_removed)]
+            + remaining[tail_start_in_remaining:]
+        )
+        candidate_tokens = _count_tokens(candidate, model_id)
+        if candidate_tokens <= context_tokens:
+            logger.info(
+                "Context pruning: expanded truncation (%d -> %d tokens, "
+                "keeping last %d turns)",
+                total_tokens, candidate_tokens, keep_count,
+            )
+            return candidate
+
+    # Last resort: bootstrap + marker only
+    removed_count = len(messages) - bootstrap_end
+    candidate = messages[:bootstrap_end] + [_make_marker(removed_count)]
+    logger.warning(
+        "Context pruning: removed all %d non-bootstrap messages", removed_count
+    )
+    return candidate
 
 
 # --- Public API ---
@@ -328,55 +242,52 @@ def _enforce_token_cap(
 def manage_context(
     messages: list, context_tokens: int, model_id: str
 ) -> list:
-    """Two-layer context management.
+    """Zone-based context management.
 
-    Layer 1: OpenClaw-style pruning (char-based ratios, soft-trim + hard-clear).
-    Layer 2: Hard token cap using litellm.token_counter() for accuracy.
-
-    Args:
-        messages: List of ChatMessage objects or dicts.
-        context_tokens: Effective context window in tokens (may be < model limit).
-        model_id: LiteLLM model ID for accurate token counting.
-
-    Returns:
-        Pruned/capped copy of messages.
+    Single unified mechanism: fires when total tokens exceed context_window.
+    No-op when total tokens <= context_window, preserving cache hits.
     """
-    char_window = context_tokens * _CHARS_PER_TOKEN
-
-    # Layer 1: char-based pruning (soft-trim + hard-clear)
-    messages = prune_messages(messages, char_window)
-
-    # Layer 2: accurate token cap
-    max_input_tokens = int(context_tokens * _HEADROOM_RATIO)
-    messages = _enforce_token_cap(messages, max_input_tokens, model_id)
-
-    return messages
+    return _enforce_token_cap(messages, context_tokens, model_id)
 
 
 def wrap_model_with_context_management(model, context_tokens: int, model_id: str):
-    """Wrap model.generate with two-layer context management.
+    """Wrap model.generate with zone-based context management + caching.
 
-    Args:
-        model: smolagents Model instance (LiteLLMModel or subclass).
-        context_tokens: Effective context window in tokens.
-        model_id: LiteLLM model ID for token counting.
-
-    Returns:
-        The same model instance with generate() monkey-patched.
+    Caching ensures hysteresis: after pruning creates ~40% headroom,
+    subsequent calls build from the cached pruned result + new messages,
+    staying under the window for ~8 turns without re-pruning.
     """
     original_generate = model.generate
+    _state: dict = {"snapshot": None, "seen_count": 0}
 
     def managed_generate(messages, **kwargs):
-        managed = manage_context(messages, context_tokens, model_id)
-        return original_generate(managed, **kwargs)
+        snapshot = _state["snapshot"]
+        seen = _state["seen_count"]
+
+        if snapshot is not None and len(messages) >= seen:
+            candidate = snapshot + list(messages[seen:])
+        else:
+            candidate = messages
+
+        result = manage_context(candidate, context_tokens, model_id)
+
+        if result is not candidate:
+            _state["snapshot"] = result
+            _state["seen_count"] = len(messages)
+        elif snapshot is not None:
+            _state["snapshot"] = candidate
+            _state["seen_count"] = len(messages)
+
+        return original_generate(result, **kwargs)
 
     model.generate = managed_generate
     logger.info(
         "Context management enabled: context_window=%d tokens, "
-        "pruning char_window=%d chars, token cap=%d tokens (%.0f%% headroom)",
+        "zones=[protect=%.0f%%, soft-trim=%.0f%%, hard-clear=%.0f%%, truncate=%.0f%%]",
         context_tokens,
-        context_tokens * _CHARS_PER_TOKEN,
-        int(context_tokens * _HEADROOM_RATIO),
-        _HEADROOM_RATIO * 100,
+        _ZONE_PROTECT * 100,
+        (_ZONE_SOFT_TRIM - _ZONE_PROTECT) * 100,
+        (_ZONE_HARD_CLEAR - _ZONE_SOFT_TRIM) * 100,
+        (1.0 - _ZONE_HARD_CLEAR) * 100,
     )
     return model

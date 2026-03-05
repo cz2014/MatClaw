@@ -183,7 +183,7 @@ Output structure (atomate2-compatible, same pattern as RelaxMaker/MDMaker):
     out["output"]["rmse_e"]     # Energy RMSE (eV/atom), float or None
     out["output"]["mae_f"]      # Force MAE (eV/Angstrom), float or None
     out["output"]["rmse_f"]     # Force RMSE (eV/Angstrom), float or None
-    out["output"]["model_path"] # Absolute path to frozen model (.pb)
+    out["output"]["model_path"] # Absolute path to frozen model (.pth)
 
 Network presets:
 - 'sanity_check': Pipeline validation only (fast, low accuracy)

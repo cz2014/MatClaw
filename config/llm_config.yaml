@@ -7,20 +7,22 @@ providers:
   openai:
     model_id: gpt-4o
     api_key: ${OPENAI_API_KEY}
+    context_window: 200000     # GPT-5.2: near-perfect at 256K (MRCR v2)
 
   gemini:
     model_id: gemini/gemini-3-flash-preview
     api_key: ${EMBEDDING_API_KEY}
+    context_window: 100000     # Gemini: steep decay above 128K (MRCR v2)
 
   deepseek:
     model_id: deepseek/deepseek-chat
     api_key: ${DEEPSEEK_API_KEY}
+    context_window: 100000     # conservative default (no MRCR data)
 
 # Agent execution settings
 agent:
   max_steps: 100
-  context_pruning: true         # enable two-layer context management (default: true)
-  # context_window: 100000      # optional cap in tokens; omit to use model's actual limit
+  context_pruning: true         # enable zone-based context management (default: true)
   additional_authorized_imports:
     - math
     - numpy
