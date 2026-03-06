@@ -5,7 +5,7 @@ default_provider: openai
 
 providers:
   openai:
-    model_id: gpt-5.2
+    model_id: gpt-5.4
     api_key: ${OPENAI_API_KEY}
     context_window: 200000     # GPT-5.2: near-perfect at 256K (MRCR v2)
 
@@ -49,5 +49,5 @@ agent:
     - Use Project name = "anvil" unless the user specifies otherwise
     - Use Worker = "anvil_cpu" for VASP calculations
     - Prefer to use atomate2 Makers (e.g., RelaxMaker) to create jobs if possible, otherwise define custom jobs
-    - Use submit_flow() to submit, then wait_for_job() to block until completion
+    - Use submit_flow() to submit, then wait_for_jobflow() to block until completion
     - Output is a dict: e.g., output["output"]["energy"], output["output"]["structure"]

@@ -29,9 +29,23 @@ logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).parent.parent
 
-# Extend structured output schema with summary field.
-# Placed last so the LLM generates thought and code first, then summarizes.
+# Monkey-patch structured output schema:
+# 1. Rename "thought" -> "plan" to avoid GPT-5.2 ContentPolicyViolationError
+#    (OpenAI's input filter rejects "thought process" / chain-of-thought framing)
+# 2. Add "summary" field (placed last so LLM generates plan and code first)
 _so_schema = CODEAGENT_RESPONSE_FORMAT["json_schema"]["schema"]
+_so_schema["properties"]["plan"] = {
+    "description": "Explain what this step does and how it contributes to next steps.",
+    "title": "Plan",
+    "type": "string",
+}
+del _so_schema["properties"]["thought"]
+_so_schema["properties"]["code"]["description"] = (
+    "Valid Python code snippet implementing the plan."
+)
+_so_schema["required"] = ["plan", "code"]
+_so_schema["title"] = "PlanAndCodeAnswer"
+CODEAGENT_RESPONSE_FORMAT["json_schema"]["name"] = "PlanAndCodeAnswer"
 _so_schema["properties"]["summary"] = {
     "description": (
         "One-line summary of what this step does "
@@ -171,6 +185,12 @@ def _build_prompt_templates(prompts_cfg: dict[str, Any]) -> PromptTemplates | No
         return None
 
     system_prompt = prompts_cfg.get("system_prompt")
+    if system_prompt is None:
+        raise ValueError(
+            "system_prompt must not be null -- smolagents default prompt contains "
+            "GPT-5.2-incompatible 'thought' framing. "
+            "Provide an explicit system_prompt in your prompts YAML."
+        )
     planning_cfg = prompts_cfg.get("planning") or {}
     managed_cfg = prompts_cfg.get("managed_agent") or {}
     final_cfg = prompts_cfg.get("final_answer") or {}

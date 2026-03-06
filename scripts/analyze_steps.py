@@ -9,11 +9,11 @@ This tool provides 6 views into the run data:
   --summary     Quick overview: step counts, duration, tokens, errors, final answer
   --timeline    One line per step with number, duration, tokens, and summary
   --errors      Error steps with the code that caused the error and recovery status
-  --step N      Full detail for step N: thought, code, summary, observations, tokens
+  --step N      Full detail for step N: plan, code, summary, observations, tokens
   --message N:M Extract message M from step N's model_input_messages (0=system prompt)
   --tokens      Per-step and cumulative token usage with context growth rate
 
-The structured output format ({thought, code, summary}) from Phase 0b means
+The structured output format ({plan, code, summary}) from Phase 0b means
 each step has a one-line summary field, making --timeline especially useful
 for understanding what the agent did at a glance.
 
@@ -60,7 +60,7 @@ class StepRecord:
     code_action: str | None
     observations: str | None
     model_output: str | None  # raw model_output string (JSON)
-    thought: str | None  # extracted from structured output
+    plan: str | None  # extracted from structured output
     summary: str | None  # extracted from structured output
     error: str | None
     is_final_answer: bool
@@ -73,7 +73,7 @@ def parse_steps(path: Path) -> list[StepRecord]:
 
     Reads line-by-line, extracts fields from dict-format steps.
     Skips malformed records (non-dict step field) with a warning to stderr.
-    Parses model_output as JSON to extract thought/summary from structured output.
+    Parses model_output as JSON to extract plan/summary from structured output.
     """
     records = []
     with path.open("r", encoding="utf-8") as f:
@@ -103,12 +103,12 @@ def parse_steps(path: Path) -> list[StepRecord]:
 
             # Parse model_output as JSON for structured output fields
             model_output = step.get("model_output")
-            thought = None
+            plan = None
             summary = None
             if model_output:
                 try:
                     parsed_mo = json.loads(model_output)
-                    thought = parsed_mo.get("thought")
+                    plan = parsed_mo.get("plan") or parsed_mo.get("thought")
                     summary = parsed_mo.get("summary")
                 except (json.JSONDecodeError, TypeError):
                     pass
@@ -128,7 +128,7 @@ def parse_steps(path: Path) -> list[StepRecord]:
                     code_action=code_action,
                     observations=step.get("observations"),
                     model_output=model_output,
-                    thought=thought,
+                    plan=plan,
                     summary=summary,
                     error=step.get("error"),
                     is_final_answer=is_final,
@@ -262,9 +262,9 @@ def cmd_step(steps: list[StepRecord], step_num: int) -> None:
     print(f"Tokens:    {intok} in / {outtok} out")
     print()
 
-    # Thought
-    print("--- Thought ---")
-    print(s.thought if s.thought else "(none)")
+    # Plan
+    print("--- Plan ---")
+    print(s.plan if s.plan else "(none)")
     print()
 
     # Code
