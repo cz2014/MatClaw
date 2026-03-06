@@ -111,8 +111,99 @@ def _deep_merge(base: dict, overrides: dict) -> dict:
     return base
 
 
+def _extract_from_ionic_steps(
+    ionic_steps: list[dict], type_map: tuple[str, ...]
+) -> Any:
+    """Convert ForceFieldMDMaker ionic_steps to dpdata LabeledSystem.
+
+    Each ionic step has: structure (pymatgen dict), energy (float),
+    forces (list of [fx, fy, fz]).
+    Units: eV for energy, eV/A for forces (matches deepmd/npy convention).
+    """
+    import dpdata
+    import numpy as np
+    from pymatgen.core import Structure
+
+    first_step = ionic_steps[0]
+    struct_dict = first_step.get("structure") or first_step.get("mol_or_struct")
+    first_struct = Structure.from_dict(struct_dict)
+
+    species_list = [str(s) for s in first_struct.species]
+    atom_types = np.array([list(type_map).index(s) for s in species_list])
+    atom_numbs = [species_list.count(elem) for elem in type_map]
+    n_atoms = len(species_list)
+
+    coords_all, cells_all, energies, forces_all = [], [], [], []
+    for step in ionic_steps:
+        sd = step.get("structure") or step.get("mol_or_struct")
+        struct = Structure.from_dict(sd)
+        coords_all.append(struct.cart_coords)
+        cells_all.append(struct.lattice.matrix)
+        energies.append(step["energy"])
+        forces_all.append(np.array(step["forces"]))
+
+    n_frames = len(energies)
+    ls = dpdata.LabeledSystem()
+    ls.data = {
+        "atom_names": list(type_map),
+        "atom_numbs": atom_numbs,
+        "atom_types": atom_types,
+        "cells": np.array(cells_all).reshape(n_frames, 3, 3),
+        "coords": np.array(coords_all).reshape(n_frames, n_atoms, 3),
+        "energies": np.array(energies),
+        "forces": np.array(forces_all).reshape(n_frames, n_atoms, 3),
+        "orig": np.zeros(3),
+        "nopbc": False,
+    }
+    return ls
+
+
+def _load_labeled_data(data_source: Any, type_map: tuple[str, ...], run_dir: Path) -> Any:
+    """Load training data from various sources.
+
+    Dispatches on input type:
+    1. deepmd/npy directory path (has type_map.raw + set.*/) -> load directly
+    2. List of deepmd/npy paths -> load each + concatenate
+    3. ForcefieldTaskDocument dict (has output.ionic_steps) -> extract inline data
+    4. VASP TaskDoc / OUTCAR path -> existing behavior (resolve OUTCAR, parse)
+    """
+    import dpdata
+
+    # Case 1: deepmd/npy directory
+    if isinstance(data_source, str):
+        p = Path(data_source)
+        if p.is_dir() and (p / "type_map.raw").exists():
+            return dpdata.LabeledSystem(str(p), fmt="deepmd/npy")
+
+    # Case 2: list of deepmd/npy paths
+    if isinstance(data_source, (list, tuple)):
+        dirs = [Path(x) for x in data_source if isinstance(x, str)]
+        if len(dirs) == len(data_source) and all(
+            d.is_dir() and (d / "type_map.raw").exists() for d in dirs
+        ):
+            systems = [dpdata.LabeledSystem(str(d), fmt="deepmd/npy") for d in dirs]
+            merged = systems[0]
+            for s in systems[1:]:
+                merged += s
+            return merged
+
+    # Case 3: ForcefieldTaskDocument (from ForceFieldMDMaker)
+    if isinstance(data_source, dict):
+        output = data_source.get("output")
+        if isinstance(output, dict):
+            ionic_steps = output.get("ionic_steps")
+            if ionic_steps and isinstance(ionic_steps, list):
+                return _extract_from_ionic_steps(ionic_steps, type_map)
+
+    # Case 4: VASP OUTCAR (existing behavior)
+    outcar_src = _resolve_outcar_path(data_source)
+    outcar_local = run_dir / "OUTCAR"
+    _maybe_decompress_to(outcar_src, outcar_local)
+    return dpdata.LabeledSystem(str(outcar_local))
+
+
 def train_deepmd_impl(
-    vasp_source: Any,
+    data_source: Any,
     *,
     seed: int = 2026,
     type_map: tuple[str, ...] = ("C",),
@@ -120,12 +211,16 @@ def train_deepmd_impl(
     net_size_preset: str = "balanced",
     overrides: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Train a DeePMD model from a VASP OUTCAR.
+    """Train a DeePMD model from MD output or pre-prepared training data.
 
     This is the core implementation without any decorators.
 
     Args:
-        vasp_source: TaskDoc output from MDMaker, or path to VASP run directory.
+        data_source: Training data. Accepts:
+            - VASP TaskDoc (from MDMaker) -- resolves OUTCAR from dir_name
+            - ForcefieldTaskDoc (from ForceFieldMDMaker) -- extracts from ionic_steps
+            - Path string to deepmd/npy directory on remote filesystem
+            - List of deepmd/npy path strings (merged automatically)
         seed: Random seed for shuffling and DP training.
         type_map: Element symbols in order of DeePMD types.
         numb_steps: Number of training steps.
@@ -168,15 +263,10 @@ def train_deepmd_impl(
     rcut_smth = 0.5  # Smoothing distance
     sel = 80         # Max neighbors per atom
 
-    # Resolve and copy OUTCAR
-    outcar_src = _resolve_outcar_path(vasp_source)
+    # Load training data (dispatches on source type)
     run_dir = Path.cwd() / "deepmd_run"
     run_dir.mkdir(parents=True, exist_ok=True)
-    outcar_local = run_dir / "OUTCAR"
-    _maybe_decompress_to(outcar_src, outcar_local)
-
-    # Load all frames with dpdata
-    dsys = dpdata.LabeledSystem(str(outcar_local))
+    dsys = _load_labeled_data(data_source, type_map, run_dir)
 
     n_total = len(dsys)
     if n_total < 2:

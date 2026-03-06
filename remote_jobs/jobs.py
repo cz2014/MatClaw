@@ -18,7 +18,7 @@ def hello_anvil():
 
 @job
 def train_deepmd(
-    vasp_source: Any,
+    data_source: Any,
     *,
     seed: int = 2026,
     type_map: tuple[str, ...] = ("C",),
@@ -26,13 +26,24 @@ def train_deepmd(
     net_size_preset: str = "balanced",
     overrides: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Train a DeePMD model from a VASP OUTCAR.
+    """Train a DeePMD model from MD output or pre-prepared training data.
 
-    Reads VASP MD trajectory (all frames), prepares training/validation data (80/20 split),
-    trains the model, and returns accuracy metrics.
+    Prepares training/validation data (80/20 split), trains the model,
+    and returns accuracy metrics.
 
     Args:
-        vasp_source: TaskDoc output from MDMaker, or path to VASP run directory.
+        data_source: Training data. Accepts:
+            - VASP TaskDoc (from MDMaker) -- resolves OUTCAR from dir_name
+            - ForcefieldTaskDoc (from ForceFieldMDMaker) -- extracts from ionic_steps
+            - Path string to deepmd/npy directory on remote filesystem
+            - List of deepmd/npy path strings (merged automatically)
+
+            Chain with an MD job in a Flow for automatic data passing:
+                md_job = MDMaker(...).make(struct)           # VASP
+                md_job = ForceFieldMDMaker(...).make(struct)  # or MLFF
+                dp_job = train_deepmd(md_job.output, type_map=["Cu","In","P","S"])
+                flow = Flow([md_job, dp_job])
+                submit_flow(flow, ...)
         seed: Random seed for shuffling and DP training.
         type_map: Element symbols in order of DeePMD types.
         numb_steps: Number of training steps.
@@ -40,20 +51,13 @@ def train_deepmd(
             - 'sanity_check': ONLY to verify pipeline runs without errors.
             - 'fast': Rapid iterations, Active Learning loops, or limited compute.
             - 'balanced': Default recommended choice for production-quality force fields.
-
-            Mapping (descriptor_neuron, fitting_neuron):
-            - sanity_check -> ([5, 10, 20], [20, 20, 20])
-            - fast         -> ([10, 20, 40], [40, 40, 40])
-            - balanced     -> ([20, 40, 80], [80, 80, 80])
-
-            Note: Descriptor width impacts accuracy more than fitting width beyond 80.
         overrides: Optional dict to override any DeePMD input.json parameters.
 
     Returns:
         Dict with keys: mae_e, rmse_e, mae_f, rmse_f, model_path.
     """
     return train_deepmd_impl(
-        vasp_source,
+        data_source,
         seed=seed,
         type_map=type_map,
         numb_steps=numb_steps,

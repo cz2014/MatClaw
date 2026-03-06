@@ -170,13 +170,19 @@ class TrainDeePMDTool(Tool):
     """
 
     name = "train_deepmd"
-    description = """Create a DeePMD training job from VASP MD output.
+    description = """Create a DeePMD training job from MD output or pre-prepared training data.
 
 Returns a jobflow Job object. Use it in a Flow with submit_flow():
     dp_job = train_deepmd(md_job.output, type_map=["C"], numb_steps=500)
     flow = Flow([md_job, dp_job])
     submit_flow(flow, worker="anvil_cpu", project="anvil")
     out = wait_for_jobflow("anvil", dp_job.uuid)
+
+data_source accepts:
+- VASP TaskDoc output (from MDMaker) -- resolves OUTCAR from dir_name
+- ForcefieldTaskDoc output (from ForceFieldMDMaker) -- extracts from ionic_steps
+- Path string to deepmd/npy directory on remote filesystem
+- List of deepmd/npy path strings (merged automatically)
 
 Output structure (atomate2-compatible, same pattern as RelaxMaker/MDMaker):
     out["output"]["mae_e"]      # Energy MAE (eV/atom), float or None
@@ -191,9 +197,9 @@ Network presets:
 - 'balanced': Production-quality force fields (default)
 """
     inputs = {
-        "vasp_source": {
+        "data_source": {
             "type": "any",
-            "description": "TaskDoc output from MDMaker (md_job.output), or path to VASP dir with OUTCAR",
+            "description": "Training data: VASP TaskDoc output, ForceFieldMDMaker output, deepmd/npy path, or list of paths",
         },
         "type_map": {
             "type": "array",
@@ -220,7 +226,7 @@ Network presets:
 
     def forward(
         self,
-        vasp_source: Any,
+        data_source: Any,
         type_map: list[str] | None = None,
         numb_steps: int | None = None,
         net_size_preset: str | None = None,
@@ -241,7 +247,7 @@ Network presets:
             kwargs["overrides"] = overrides
 
         # Call @job function - returns a Job object
-        return _train_deepmd_job(vasp_source, **kwargs)
+        return _train_deepmd_job(data_source, **kwargs)
 
 
 def _load_chunks_from_paths(paths: list[Path]) -> list:
