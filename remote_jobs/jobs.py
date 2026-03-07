@@ -36,7 +36,8 @@ def train_deepmd(
             - VASP TaskDoc (from MDMaker) -- resolves OUTCAR from dir_name
             - ForcefieldTaskDoc (from ForceFieldMDMaker) -- extracts from ionic_steps
             - Path string to deepmd/npy directory on remote filesystem
-            - List of deepmd/npy path strings (merged automatically)
+            - Raw dpdata-compatible dict (keys: cells, coords, energies, forces)
+            - List of any of the above (recursively loaded and merged)
 
             Chain with an MD job in a Flow for automatic data passing:
                 md_job = MDMaker(...).make(struct)           # VASP
@@ -54,7 +55,8 @@ def train_deepmd(
         overrides: Optional dict to override any DeePMD input.json parameters.
 
     Returns:
-        Dict with keys: mae_e, rmse_e, mae_f, rmse_f, model_path.
+        Dict with keys: mae_e, rmse_e, mae_f, rmse_f, model_path,
+        data_train_path, n_train_frames, n_valid_frames.
     """
     return train_deepmd_impl(
         data_source,
