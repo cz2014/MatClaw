@@ -111,22 +111,49 @@ def _deep_merge(base: dict, overrides: dict) -> dict:
     return base
 
 
+def _get_step_field(step: Any, *keys: str) -> Any:
+    """Get a field from an ionic step (dict or pydantic model)."""
+    for key in keys:
+        val = step.get(key) if isinstance(step, dict) else getattr(step, key, None)
+        if val is not None:
+            return val
+    return None
+
+
+def _to_structure(val: Any) -> Any:
+    """Convert a structure value to pymatgen Structure.
+
+    Handles: pymatgen Structure (passthrough), dict (from_dict), monty-serialized.
+    """
+    from pymatgen.core import Structure
+
+    if isinstance(val, Structure):
+        return val
+    if isinstance(val, dict):
+        return Structure.from_dict(val)
+    # Pydantic model with .as_dict() or similar
+    if hasattr(val, "as_dict"):
+        return Structure.from_dict(val.as_dict())
+    raise TypeError(f"Cannot convert {type(val).__name__} to Structure")
+
+
 def _extract_from_ionic_steps(
-    ionic_steps: list[dict], type_map: tuple[str, ...]
+    ionic_steps: list, type_map: tuple[str, ...]
 ) -> Any:
     """Convert ForceFieldMDMaker ionic_steps to dpdata LabeledSystem.
 
-    Each ionic step has: structure (pymatgen dict), energy (float),
+    Each ionic step has: structure (pymatgen Structure or dict), energy (float),
     forces (list of [fx, fy, fz]).
     Units: eV for energy, eV/A for forces (matches deepmd/npy convention).
+    Handles both plain dicts and pydantic IonicStep models.
     """
     import dpdata
     import numpy as np
-    from pymatgen.core import Structure
 
     first_step = ionic_steps[0]
-    struct_dict = first_step.get("structure") or first_step.get("mol_or_struct")
-    first_struct = Structure.from_dict(struct_dict)
+    first_struct = _to_structure(
+        _get_step_field(first_step, "structure", "mol_or_struct")
+    )
 
     species_list = [str(s) for s in first_struct.species]
     atom_types = np.array([list(type_map).index(s) for s in species_list])
@@ -135,12 +162,13 @@ def _extract_from_ionic_steps(
 
     coords_all, cells_all, energies, forces_all = [], [], [], []
     for step in ionic_steps:
-        sd = step.get("structure") or step.get("mol_or_struct")
-        struct = Structure.from_dict(sd)
+        struct = _to_structure(
+            _get_step_field(step, "structure", "mol_or_struct")
+        )
         coords_all.append(struct.cart_coords)
         cells_all.append(struct.lattice.matrix)
-        energies.append(step["energy"])
-        forces_all.append(np.array(step["forces"]))
+        energies.append(_get_step_field(step, "energy"))
+        forces_all.append(np.array(_get_step_field(step, "forces")))
 
     n_frames = len(energies)
     ls = dpdata.LabeledSystem()
@@ -163,8 +191,9 @@ def _load_labeled_data(data_source: Any, type_map: tuple[str, ...], run_dir: Pat
 
     Dispatches on input type:
     1. deepmd/npy directory path (has type_map.raw + set.*/) -> load directly
-    2. List of deepmd/npy paths -> load each + concatenate
-    3. ForcefieldTaskDocument dict (has output.ionic_steps) -> extract inline data
+    2. List of any supported type -> recursively load each + merge
+    1.5. Raw dpdata-compatible dict (has "cells" key) -> load directly
+    3. ForcefieldTaskDocument dict/model (has output.ionic_steps) -> extract inline data
     4. VASP TaskDoc / OUTCAR path -> existing behavior (resolve OUTCAR, parse)
     """
     import dpdata
@@ -175,27 +204,73 @@ def _load_labeled_data(data_source: Any, type_map: tuple[str, ...], run_dir: Pat
         if p.is_dir() and (p / "type_map.raw").exists():
             return dpdata.LabeledSystem(str(p), fmt="deepmd/npy")
 
-    # Case 2: list of deepmd/npy paths
-    if isinstance(data_source, (list, tuple)):
-        dirs = [Path(x) for x in data_source if isinstance(x, str)]
-        if len(dirs) == len(data_source) and all(
-            d.is_dir() and (d / "type_map.raw").exists() for d in dirs
-        ):
-            systems = [dpdata.LabeledSystem(str(d), fmt="deepmd/npy") for d in dirs]
-            merged = systems[0]
-            for s in systems[1:]:
-                merged += s
-            return merged
+    # Case 2: list of data sources (recursive dispatch -- supports mixed types)
+    if isinstance(data_source, (list, tuple)) and len(data_source) > 0:
+        systems = []
+        for item in data_source:
+            sub = _load_labeled_data(item, type_map, run_dir)
+            systems.append(sub)
+        merged = systems[0]
+        for s in systems[1:]:
+            merged += s
+        return merged
+
+    # Case 1.5: raw dpdata-compatible dict (cells, coords, energies, forces)
+    # MongoDB serializes numpy arrays to lists, so convert back before loading.
+    if isinstance(data_source, dict) and "cells" in data_source:
+        import numpy as np
+
+        data = dict(data_source)
+        for key in ("cells", "coords", "energies", "forces", "atom_types", "orig"):
+            if key in data and not isinstance(data[key], np.ndarray):
+                data[key] = np.array(data[key])
+        ls = dpdata.LabeledSystem()
+        ls.data = data
+        return ls
 
     # Case 3: ForcefieldTaskDocument (from ForceFieldMDMaker)
+    # Handles both plain dicts (JSON-deserialized) and pydantic models (monty-deserialized)
     if isinstance(data_source, dict):
         output = data_source.get("output")
-        if isinstance(output, dict):
-            ionic_steps = output.get("ionic_steps")
-            if ionic_steps and isinstance(ionic_steps, list):
+    elif hasattr(data_source, "output"):
+        output = data_source.output
+    else:
+        output = None
+
+    if output is not None:
+        ionic_steps = (
+            output.get("ionic_steps") if isinstance(output, dict)
+            else getattr(output, "ionic_steps", None)
+        )
+        # ionic_steps can be: list (normal), Trajectory object, or None (blob unresolved)
+        if ionic_steps is not None:
+            # Convert non-list iterables (e.g. Trajectory) to list
+            if not isinstance(ionic_steps, list):
+                try:
+                    ionic_steps = list(ionic_steps)
+                except (TypeError, ValueError):
+                    ionic_steps = None
+            if ionic_steps:
                 return _extract_from_ionic_steps(ionic_steps, type_map)
 
-    # Case 4: VASP OUTCAR (existing behavior)
+    # Case 4: VASP OUTCAR -- only if path actually exists on this machine
+    if isinstance(data_source, str) and not Path(data_source).exists():
+        raise FileNotFoundError(
+            f"Path '{data_source}' not found on the remote HPC cluster. "
+            "Note: train_deepmd runs on the remote HPC, not on your local machine. "
+            "Local paths (e.g., /Users/...) do not exist here. "
+            "Accepted data_source formats: "
+            "(1) Chain with MD job in a Flow: dp_job = train_deepmd(md_job.output, ...); "
+            "(2) Pass a raw dict with keys: cells, coords, energies, forces, atom_types, atom_names; "
+            "(3) Path to a deepmd/npy directory on the remote HPC (e.g., /scratch/...)."
+        )
+    if not isinstance(data_source, str):
+        raise TypeError(
+            f"_load_labeled_data: unsupported data_source type "
+            f"{type(data_source).__name__}. If passing ForceFieldMDMaker output, "
+            "ensure ionic_step_data=('energy', 'forces', 'mol_or_struct') is set "
+            "on the ForceFieldMDMaker (default is None, producing empty ionic_steps)."
+        )
     outcar_src = _resolve_outcar_path(data_source)
     outcar_local = run_dir / "OUTCAR"
     _maybe_decompress_to(outcar_src, outcar_local)
@@ -220,7 +295,8 @@ def train_deepmd_impl(
             - VASP TaskDoc (from MDMaker) -- resolves OUTCAR from dir_name
             - ForcefieldTaskDoc (from ForceFieldMDMaker) -- extracts from ionic_steps
             - Path string to deepmd/npy directory on remote filesystem
-            - List of deepmd/npy path strings (merged automatically)
+            - Raw dpdata-compatible dict with cells, coords, energies, forces keys
+            - List of any of the above (recursively loaded and merged)
         seed: Random seed for shuffling and DP training.
         type_map: Element symbols in order of DeePMD types.
         numb_steps: Number of training steps.
@@ -239,6 +315,9 @@ def train_deepmd_impl(
                     "mae_f": float or None,      # Force MAE (eV/Angstrom)
                     "rmse_f": float or None,     # Force RMSE (eV/Angstrom)
                     "model_path": str,           # Absolute path to frozen model
+                    "data_train_path": str,      # Absolute path to training data (deepmd/npy)
+                    "n_train_frames": int,       # Number of training frames
+                    "n_valid_frames": int,       # Number of validation frames
                 }
             }
     """
@@ -369,5 +448,8 @@ def train_deepmd_impl(
             "mae_f": metrics.get("mae_f"),
             "rmse_f": metrics.get("rmse_f"),
             "model_path": str(model_path.resolve()),
+            "data_train_path": str(data_train.resolve()),
+            "n_train_frames": n_train,
+            "n_valid_frames": n_total - n_train,
         }
     }

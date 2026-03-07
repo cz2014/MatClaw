@@ -181,15 +181,24 @@ Returns a jobflow Job object. Use it in a Flow with submit_flow():
 data_source accepts:
 - VASP TaskDoc output (from MDMaker) -- resolves OUTCAR from dir_name
 - ForcefieldTaskDoc output (from ForceFieldMDMaker) -- extracts from ionic_steps
+  IMPORTANT: ForceFieldMDMaker defaults ionic_step_data=None, which produces EMPTY
+  ionic_steps. You MUST set ionic_step_data=("energy", "forces", "mol_or_struct")
+  when creating the ForceFieldMDMaker for the data to be available to train_deepmd.
+- Raw dpdata-compatible dict with keys: cells, coords, energies, forces, atom_types, atom_names
 - Path string to deepmd/npy directory on remote filesystem
-- List of deepmd/npy path strings (merged automatically)
+- List of ANY of the above (merged automatically). Use this for multi-iteration
+  training: combine remote paths from previous iterations with new inline data.
+  Example: train_deepmd([prev_data_path, new_inline_dict], type_map=["Cu","In","P","S"])
 
 Output structure (atomate2-compatible, same pattern as RelaxMaker/MDMaker):
-    out["output"]["mae_e"]      # Energy MAE (eV/atom), float or None
-    out["output"]["rmse_e"]     # Energy RMSE (eV/atom), float or None
-    out["output"]["mae_f"]      # Force MAE (eV/Angstrom), float or None
-    out["output"]["rmse_f"]     # Force RMSE (eV/Angstrom), float or None
-    out["output"]["model_path"] # Absolute path to frozen model (.pth)
+    out["output"]["mae_e"]           # Energy MAE (eV/atom), float or None
+    out["output"]["rmse_e"]          # Energy RMSE (eV/atom), float or None
+    out["output"]["mae_f"]           # Force MAE (eV/Angstrom), float or None
+    out["output"]["rmse_f"]          # Force RMSE (eV/Angstrom), float or None
+    out["output"]["model_path"]      # Absolute path to frozen model (.pth)
+    out["output"]["data_train_path"] # Absolute path to training data (deepmd/npy)
+    out["output"]["n_train_frames"]  # Number of training frames
+    out["output"]["n_valid_frames"]  # Number of validation frames
 
 Network presets:
 - 'sanity_check': Pipeline validation only (fast, low accuracy)
@@ -199,7 +208,8 @@ Network presets:
     inputs = {
         "data_source": {
             "type": "any",
-            "description": "Training data: VASP TaskDoc output, ForceFieldMDMaker output, deepmd/npy path, or list of paths",
+            "description": "Training data: VASP TaskDoc output, ForceFieldMDMaker output, deepmd/npy path, inline dict, or list of any of these (merged)",
+            "nullable": True,
         },
         "type_map": {
             "type": "array",
@@ -221,17 +231,56 @@ Network presets:
             "description": "Optional dict to override DeePMD input.json parameters",
             "nullable": True,
         },
+        "show_source": {
+            "type": "boolean",
+            "description": (
+                "If True, return the source code of the training implementation "
+                "instead of creating a job. Useful for understanding accepted "
+                "data formats and internal logic."
+            ),
+            "nullable": True,
+        },
     }
     output_type = "object"
 
     def forward(
         self,
-        data_source: Any,
+        data_source: Any = None,
         type_map: list[str] | None = None,
         numb_steps: int | None = None,
         net_size_preset: str | None = None,
         overrides: dict | None = None,
+        show_source: bool | None = None,
     ):
+        # Show source mode: return implementation source code
+        if show_source:
+            import inspect
+
+            from remote_jobs._deepmd import _load_labeled_data, train_deepmd_impl
+
+            return (
+                "# _load_labeled_data (data dispatch logic)\n"
+                + inspect.getsource(_load_labeled_data)
+                + "\n\n# train_deepmd_impl (main training function)\n"
+                + inspect.getsource(train_deepmd_impl)
+            )
+
+        # Size guard for inline dict data
+        if isinstance(data_source, dict) and "cells" in data_source:
+            import numpy as np
+
+            estimated_bytes = sum(
+                v.nbytes if isinstance(v, np.ndarray) else 0
+                for v in data_source.values()
+            )
+            if estimated_bytes > 10 * 1024 * 1024:  # 10 MB
+                raise ValueError(
+                    f"Inline data dict is too large ({estimated_bytes / 1e6:.1f} MB). "
+                    "MongoDB has a 16 MB document size limit. "
+                    "Use Flow chaining instead: dp_job = train_deepmd(md_job.output, ...); "
+                    "flow = Flow([md_job, dp_job])"
+                )
+
         # Import here to avoid circular imports at module load time
         from remote_jobs.jobs import train_deepmd as _train_deepmd_job
 
