@@ -60,6 +60,31 @@ agent:
     as remote jobs. For data merging, pass a list of sources to train_deepmd's
     data_source parameter.
 
+    WORKER SELECTION: When multiple workers are available, choose the right one
+    for each submit_flow() call based on the flow structure:
+
+    - Use the BATCH worker (e.g., "perlmutter_batch") when your Flow contains
+      multiple independent jobs: parallel MD explorations at different
+      temperatures, multiple static/single-point evaluations, batch force
+      calculations for active learning, etc. The batch worker packs all jobs
+      into a SINGLE SLURM submission and runs them in parallel (up to 4 at a
+      time on one node). This is critical because:
+      (1) The HPC debug queue limits total submissions (5 queued, 2 running).
+          Submitting N jobs individually burns through this quota instantly,
+          causing jobs to queue-block each other for minutes or hours.
+      (2) SLURM scheduling overhead: each individual submission waits in the
+          queue independently (30-120s each). One batch submission waits once.
+      (3) The batch worker handles per-job isolation automatically -- each job
+          gets its own working directory, so there are no file conflicts.
+
+    - Use the STANDARD worker (e.g., "perlmutter_gpu") only for flows with a
+      single long-running job: one DeePMD training run, one long MD trajectory,
+      or a flow where jobs depend on each other sequentially (job B needs job
+      A's output). These need dedicated SLURM allocations.
+
+    Rule of thumb: if your Flow has 2+ independent jobs, use the batch worker.
+    If it has 1 job or a sequential chain, use the standard worker.
+
 # Worker descriptions injected into agent instructions when project is specified.
 # Keys are "{project}.{worker}" identifiers.
 # description: Human-written text explaining when to use this worker.
