@@ -39,6 +39,7 @@ agent:
     - atomate2.*
     - dpdata
     - dpdata.*
+    - inspect
   instructions: |
     You have access to these file I/O functions:
     - write_text(path, content) -> str  (writes file under workspace, returns absolute path)
