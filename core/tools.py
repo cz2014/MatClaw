@@ -184,7 +184,10 @@ data_source accepts:
   IMPORTANT: ForceFieldMDMaker defaults ionic_step_data=None, which produces EMPTY
   ionic_steps. You MUST set ionic_step_data=("energy", "forces", "mol_or_struct")
   when creating the ForceFieldMDMaker for the data to be available to train_deepmd.
-- Raw dpdata-compatible dict with keys: cells, coords, energies, forces, atom_types, atom_names
+- Raw dpdata-compatible dict (fields matching dpdata.LabeledSystem.DTYPES).
+  Must include: cells, coords, energies, forces, atom_types, atom_names.
+  Also needs: atom_numbs (list[int], count per type), orig (np.zeros(3)),
+  nopbc (bool). If atom_numbs/orig/nopbc are omitted, they are auto-populated.
 - Path string to deepmd/npy directory on remote filesystem
 - List of ANY of the above (merged automatically). Use this for multi-iteration
   training: combine remote paths from previous iterations with new inline data.

@@ -47,8 +47,39 @@ agent:
     Never use open() for file operations. Always use write_text/read_text directly. These two functions are already imported.
 
     If real computations are requested, use jobflow-remote to submit jobs to remote HPC:
-    - Use Project name = "anvil" unless the user specifies otherwise
-    - Use Worker = "anvil_cpu" for VASP calculations
     - Prefer to use atomate2 Makers (e.g., RelaxMaker) to create jobs if possible, otherwise define custom jobs
     - Use submit_flow() to submit, then wait_for_jobflow() to block until completion
     - Output is a dict: e.g., output["output"]["energy"], output["output"]["structure"]
+
+    IMPORTANT: Do NOT define custom @job-decorated functions in the sandbox.
+    The @job decorator transforms a function into a jobflow Job factory --
+    calling it returns an OutputReference placeholder, not a computed result.
+    The function body never executes locally; it would only run on the remote
+    worker, where sandbox-defined functions don't exist. Instead, use the
+    provided tools (train_deepmd, wait_for_jobflow) which are pre-registered
+    as remote jobs. For data merging, pass a list of sources to train_deepmd's
+    data_source parameter.
+
+# Worker descriptions injected into agent instructions when project is specified.
+# Keys are "{project}.{worker}" identifiers.
+# description: Human-written text explaining when to use this worker.
+# The raw jfremote worker config is also injected automatically.
+
+workers:
+  perlmutter.perlmutter_gpu:
+    description: >
+      Standard worker (one SLURM job per Job). A100 GPU, debug queue,
+      27 min walltime, max 2 concurrent jobs. Use for MD, DeePMD training,
+      and other long-running single jobs.
+
+  perlmutter.perlmutter_batch:
+    description: >
+      Batch worker. Packs up to 200 Jobs into one SLURM submission
+      (4 parallel). A100 GPU, debug queue, 27 min walltime.
+      Use for flows with many short jobs (static evaluations, single-point
+      calculations). Each Job gets its own working directory.
+
+  anvil.anvil_cpu:
+    description: >
+      Standard worker (one SLURM job per Job). 128-core CPU wholenode,
+      max 2 concurrent jobs. Use for VASP calculations and CPU-only tasks.

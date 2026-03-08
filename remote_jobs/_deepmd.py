@@ -224,6 +224,19 @@ def _load_labeled_data(data_source: Any, type_map: tuple[str, ...], run_dir: Pat
         for key in ("cells", "coords", "energies", "forces", "atom_types", "orig"):
             if key in data and not isinstance(data[key], np.ndarray):
                 data[key] = np.array(data[key])
+
+        # Auto-populate derivable fields that dpdata requires but the agent
+        # may omit (atom_numbs, orig, nopbc).
+        if "atom_numbs" not in data and "atom_types" in data and "atom_names" in data:
+            data["atom_numbs"] = [
+                int(np.sum(data["atom_types"] == i))
+                for i in range(len(data["atom_names"]))
+            ]
+        if "orig" not in data:
+            data["orig"] = np.zeros(3)
+        if "nopbc" not in data:
+            data["nopbc"] = False
+
         ls = dpdata.LabeledSystem()
         ls.data = data
         return ls

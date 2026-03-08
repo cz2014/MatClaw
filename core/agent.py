@@ -403,6 +403,57 @@ class RetryingLiteLLMModel(LiteLLMModel):
                 raise
 
 
+def _resolve_worker_instructions(project_name: str, llm_cfg: dict[str, Any]) -> str:
+    """Build worker instructions from llm_config + jfremote project YAML.
+
+    For each worker in this project:
+    1. Injects the human-written description from llm_config.yaml
+    2. Injects the raw jfremote worker YAML source for full technical details
+    """
+    workers_cfg = llm_cfg.get("workers", {})
+
+    prefix = f"{project_name}."
+    project_workers = {
+        k[len(prefix):]: v
+        for k, v in workers_cfg.items()
+        if k.startswith(prefix)
+    }
+    if not project_workers:
+        return ""
+
+    jfremote_dir = Path.home() / ".jfremote"
+    config_path = jfremote_dir / f"{project_name}.yaml"
+    jfremote_workers: dict[str, Any] = {}
+    if config_path.exists():
+        jfremote_cfg = _read_yaml(config_path)
+        jfremote_workers = jfremote_cfg.get("workers", {})
+
+    lines = [
+        "Remote HPC configuration:",
+        f'- Project: "{project_name}"',
+        "",
+        "Available workers (use worker= kwarg in submit_flow):",
+    ]
+
+    for worker_name, wcfg in project_workers.items():
+        desc = wcfg.get("description", "").strip()
+        lines.append(f'- "{worker_name}": {desc}' if desc else f'- "{worker_name}"')
+
+        if worker_name in jfremote_workers:
+            raw_cfg = yaml.dump(
+                {worker_name: jfremote_workers[worker_name]},
+                default_flow_style=False,
+                sort_keys=False,
+            ).strip()
+            lines.append("")
+            lines.append(f"  Worker config ({project_name}.yaml):")
+            for raw_line in raw_cfg.splitlines():
+                lines.append(f"  {raw_line}")
+            lines.append("")
+
+    return "\n".join(lines)
+
+
 def create_agent(
     config_dir: Path,
     workspace_dir: Path,
@@ -412,6 +463,7 @@ def create_agent(
     planning_interval: int | None = None,
     final_answer_checks: list | None = None,
     prompts_file: str = "prompts.yaml",
+    project: str | None = None,
     instructions_extra: str | None = None,
 ) -> CodeAgent:
     """Create a CodeAgent with config from YAML files.
@@ -425,8 +477,10 @@ def create_agent(
         planning_interval: Steps between planning updates. None disables planning.
         final_answer_checks: List of check functions passed to CodeAgent.
         prompts_file: Prompts YAML filename in config_dir. Defaults to "prompts.yaml".
+        project: HPC project name for auto-resolving worker config. When set,
+            worker descriptions and raw jfremote YAML are injected into instructions.
         instructions_extra: Extra instructions appended to config instructions
-            (e.g. project/worker override from --project CLI flag).
+            (for non-project overrides like task-specific constraints).
 
     Returns:
         Configured CodeAgent instance.
@@ -524,20 +578,15 @@ def create_agent(
         kwargs["prompt_templates"] = prompt_templates
 
     instructions = agent_cfg.get("instructions", "")
+
+    if project:
+        worker_info = _resolve_worker_instructions(project, llm_cfg)
+        if worker_info:
+            instructions = instructions.rstrip() + "\n\n" + worker_info
+
     if instructions_extra:
-        # Remove conflicting project/worker lines from base instructions
-        # when override is provided (LLMs follow the first instruction they see,
-        # so appending an override alone isn't reliable)
-        for line in instructions_extra.strip().splitlines():
-            if "Project name" in line:
-                instructions = re.sub(
-                    r"^.*Use Project name = .*$\n?", "", instructions, flags=re.MULTILINE
-                )
-            elif "Worker" in line:
-                instructions = re.sub(
-                    r"^.*Use Worker = .*$\n?", "", instructions, flags=re.MULTILINE
-                )
         instructions = instructions.rstrip() + "\n" + instructions_extra
+
     if instructions:
         kwargs["instructions"] = instructions
 
