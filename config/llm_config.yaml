@@ -8,6 +8,7 @@ providers:
     model_id: gpt-5.4
     api_key: ${OPENAI_API_KEY}
     context_window: 200000     # GPT-5.2: near-perfect at 256K (MRCR v2)
+    reasoning_effort: high
 
   gemini:
     model_id: gemini/gemini-3-flash-preview
