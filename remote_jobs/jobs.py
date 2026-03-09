@@ -55,8 +55,23 @@ def train_deepmd(
         overrides: Optional dict to override any DeePMD input.json parameters.
 
     Returns:
-        Dict with keys: mae_e, rmse_e, mae_f, rmse_f, model_path,
-        data_train_path, n_train_frames, n_valid_frames.
+        Dict with output structure:
+            out["output"]["model_path"]      # Absolute path to frozen model (.pth)
+            out["output"]["data_total_path"] # All input frames (deepmd/npy), pre-split
+            out["output"]["data_train_path"] # 80% training split (deepmd/npy)
+            out["output"]["data_valid_path"] # 20% validation split (deepmd/npy)
+            out["output"]["n_total_frames"]  # Total frames before split
+            out["output"]["n_train_frames"]  # Frames in training split (80%)
+            out["output"]["n_valid_frames"]  # Frames in validation split (20%)
+            out["output"]["mae_e"]           # Energy MAE (eV/atom) on validation set
+            out["output"]["rmse_e"]          # Energy RMSE (eV/atom) on validation set
+            out["output"]["mae_f"]           # Force MAE (eV/Angstrom) on validation set
+            out["output"]["rmse_f"]          # Force RMSE (eV/Angstrom) on validation set
+
+        For multi-iteration active learning: pass `data_total_path` (not
+        `data_train_path`) as input to the next iteration to preserve all
+        frames. `data_train_path` contains only the 80% training split and
+        will cause cumulative data loss if reused as the sole data source.
     """
     return train_deepmd_impl(
         data_source,

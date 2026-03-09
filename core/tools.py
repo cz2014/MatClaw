@@ -194,14 +194,22 @@ data_source accepts:
   Example: train_deepmd([prev_data_path, new_inline_dict], type_map=["Cu","In","P","S"])
 
 Output structure (atomate2-compatible, same pattern as RelaxMaker/MDMaker):
+    out["output"]["model_path"]      # Absolute path to frozen model (.pth)
+    out["output"]["data_total_path"] # All input frames (deepmd/npy), pre-split
+    out["output"]["data_train_path"] # 80% training split (deepmd/npy)
+    out["output"]["data_valid_path"] # 20% validation split (deepmd/npy)
+    out["output"]["n_total_frames"]  # Total frames before split
+    out["output"]["n_train_frames"]  # Frames in training split (80%)
+    out["output"]["n_valid_frames"]  # Frames in validation split (20%)
     out["output"]["mae_e"]           # Energy MAE (eV/atom), float or None
     out["output"]["rmse_e"]          # Energy RMSE (eV/atom), float or None
     out["output"]["mae_f"]           # Force MAE (eV/Angstrom), float or None
     out["output"]["rmse_f"]          # Force RMSE (eV/Angstrom), float or None
-    out["output"]["model_path"]      # Absolute path to frozen model (.pth)
-    out["output"]["data_train_path"] # Absolute path to training data (deepmd/npy)
-    out["output"]["n_train_frames"]  # Number of training frames
-    out["output"]["n_valid_frames"]  # Number of validation frames
+
+For multi-iteration active learning: pass `data_total_path` (not
+`data_train_path`) as input to the next iteration to preserve all
+frames. `data_train_path` contains only the 80% training split and
+will cause cumulative data loss if reused as the sole data source.
 
 Network presets:
 - 'sanity_check': Pipeline validation only (fast, low accuracy)

@@ -323,16 +323,24 @@ def train_deepmd_impl(
         Dict with atomate2-compatible structure:
             {
                 "output": {
+                    "model_path": str,           # Absolute path to frozen model (.pth)
+                    "data_total_path": str,      # All input frames (deepmd/npy), pre-split
+                    "data_train_path": str,      # 80% training split (deepmd/npy)
+                    "data_valid_path": str,      # 20% validation split (deepmd/npy)
+                    "n_total_frames": int,       # Total frames before split
+                    "n_train_frames": int,       # Frames in training split (80%)
+                    "n_valid_frames": int,       # Frames in validation split (20%)
                     "mae_e": float or None,      # Energy MAE (eV/atom)
                     "rmse_e": float or None,     # Energy RMSE (eV/atom)
                     "mae_f": float or None,      # Force MAE (eV/Angstrom)
                     "rmse_f": float or None,     # Force RMSE (eV/Angstrom)
-                    "model_path": str,           # Absolute path to frozen model
-                    "data_train_path": str,      # Absolute path to training data (deepmd/npy)
-                    "n_train_frames": int,       # Number of training frames
-                    "n_valid_frames": int,       # Number of validation frames
                 }
             }
+
+        For multi-iteration active learning: pass `data_total_path` (not
+        `data_train_path`) as input to the next iteration to preserve all
+        frames. `data_train_path` contains only the 80% training split and
+        will cause cumulative data loss if reused as the sole data source.
     """
     import dpdata
     import numpy as np
@@ -368,6 +376,10 @@ def train_deepmd_impl(
     rng = np.random.default_rng(seed)
     order = rng.permutation(n_total)
     dsys = dsys[order]
+
+    # Save full dataset (pre-split) for multi-iteration accumulation
+    data_total = run_dir / "data_total"
+    dsys.to("deepmd/npy", str(data_total), set_size=min(2000, n_total))
 
     n_train = int(round(train_frac * n_total))
     n_train = max(1, min(n_total - 1, n_train))
@@ -461,7 +473,10 @@ def train_deepmd_impl(
             "mae_f": metrics.get("mae_f"),
             "rmse_f": metrics.get("rmse_f"),
             "model_path": str(model_path.resolve()),
+            "data_total_path": str(data_total.resolve()),
             "data_train_path": str(data_train.resolve()),
+            "data_valid_path": str(data_valid.resolve()),
+            "n_total_frames": n_total,
             "n_train_frames": n_train,
             "n_valid_frames": n_total - n_train,
         }
