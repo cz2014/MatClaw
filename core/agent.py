@@ -61,6 +61,7 @@ _API_ERROR_PATTERN = re.compile(
     r"(AttributeError|TypeError|ImportError|ModuleNotFoundError|has no attribute|unexpected keyword)",
     re.IGNORECASE,
 )
+_MAX_ERROR_CHARS = 20_000  # cap error messages to match smolagents' MAX_LENGTH_TRUNCATE_CONTENT
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:
@@ -104,7 +105,7 @@ def _step_jsonl_logger(log_file: Path):
 
 
 def _on_step_error(step, agent) -> None:
-    """Add hints to step errors to help agent self-correct."""
+    """Truncate oversized errors + add RAG hints to help agent self-correct."""
     from smolagents import ActionStep
 
     if not isinstance(step, ActionStep):
@@ -112,12 +113,30 @@ def _on_step_error(step, agent) -> None:
     if not step.error:
         return
 
-    # Only add hints if rag_search is available
+    # --- Truncate oversized error messages ---
+    # smolagents injects full str(error) into conversation with no size limit.
+    # A BulkWriteError with a 19.9MB document dump produced a 28MB message that
+    # destroyed all context in run 7. Cap to head + tail.
+    err_msg = str(step.error)
+    if len(err_msg) > _MAX_ERROR_CHARS:
+        half = _MAX_ERROR_CHARS // 2
+        truncated = (
+            err_msg[:half]
+            + f"\n\n...[truncated {len(err_msg) - _MAX_ERROR_CHARS:,} chars]...\n\n"
+            + err_msg[-half:]
+        )
+        if hasattr(step.error, "message"):
+            step.error.message = truncated
+        step.error.args = (truncated,)
+        print(f"[step_error] Truncated error at step {step.step_number} "
+              f"from {len(err_msg):,} to {len(truncated):,} chars")
+        err_msg = truncated  # use truncated version for hint check below
+
+    # --- RAG hint for API errors ---
     if "rag_search" not in agent.tools:
         return
     tool_hint = "rag_search"
 
-    err_msg = str(step.error)
     if not _API_ERROR_PATTERN.search(err_msg):
         return
 

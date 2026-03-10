@@ -87,6 +87,12 @@ agent:
     If it has 1 job or a sequential chain, use the standard worker.
     When choosing between debug and shared workers, consider total job runtime vs queue wait: if your job finishes in <27 min, use debug to avoid 30-60 min shared queue wait.
 
+    HELD-OUT EVALUATION: When constructing a held-out test set from MD
+    trajectories, generate a SEPARATE MD trajectory for evaluation. Do NOT
+    split frames from the training trajectories (e.g., every Nth frame).
+    Adjacent frames in an MD trajectory are highly correlated and do not
+    constitute an independent test.
+
 # Worker descriptions injected into agent instructions when project is specified.
 # Keys are "{project}.{worker}" identifiers.
 # description: Human-written text explaining when to use this worker.

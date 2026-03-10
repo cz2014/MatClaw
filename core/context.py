@@ -33,6 +33,8 @@ _ZONE_SOFT_TRIM = 0.50     # next 20%: soft-trim tool-responses
 _ZONE_HARD_CLEAR = 0.75    # next 25%: hard-clear tool-responses
 # oldest 25%: removed entirely (truncation zone)
 
+_MSG_SIZE_CAP_FRACTION = 0.20  # cap any single message exceeding 20% of context window
+
 _TRUNCATION_MARKER = (
     "[Context truncated: {n} messages from earlier steps were removed "
     "to fit within the context window. Continue with the current task "
@@ -129,6 +131,32 @@ def _count_tokens(messages: list, model_id: str) -> int:
 
 # --- Zone-based context management ---
 
+def _cap_oversized_messages(messages: list, context_tokens: int, bootstrap_end: int) -> bool:
+    """Truncate any single message exceeding 20% of context window.
+
+    Skips bootstrap messages (system + first user). Returns True if any
+    message was capped.
+    """
+    max_chars = int(context_tokens * _CHARS_PER_TOKEN * _MSG_SIZE_CAP_FRACTION)
+    capped = False
+    for i in range(bootstrap_end, len(messages)):
+        content = _get_content_str(messages[i])
+        if len(content) > max_chars:
+            half = max_chars // 2
+            new_content = (
+                content[:half]
+                + f"\n...[capped: {len(content):,} chars exceeded per-message limit]...\n"
+                + content[-half:]
+            )
+            _set_content_str(messages[i], new_content)
+            logger.info(
+                "Context pruning: capped message %d from %d to %d chars",
+                i, len(content), len(new_content),
+            )
+            capped = True
+    return capped
+
+
 def _enforce_token_cap(
     messages: list, context_tokens: int, model_id: str
 ) -> list:
@@ -152,6 +180,16 @@ def _enforce_token_cap(
 
     first_user_idx = _find_first_user_idx(messages)
     bootstrap_end = first_user_idx + 1
+
+    # Cap oversized individual messages before zone processing
+    if _cap_oversized_messages(messages, context_tokens, bootstrap_end):
+        total_tokens = _count_tokens(messages, model_id)
+        if total_tokens <= context_tokens:
+            logger.info(
+                "Context pruning: message capping sufficient (%d tokens), "
+                "skipping zone pruning", total_tokens,
+            )
+            return messages
 
     n_prunable = len(messages) - bootstrap_end
     if n_prunable <= 0:
