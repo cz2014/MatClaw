@@ -70,7 +70,7 @@ agent:
       calculations for active learning, etc. The batch worker packs all jobs
       into a SINGLE SLURM submission and runs them in parallel (up to 4 at a
       time on one node). This is critical because:
-      (1) The HPC debug queue limits total submissions (5 queued, 2 running).
+      (1) The HPC shared queue limits concurrent submissions.
           Submitting N jobs individually burns through this quota instantly,
           causing jobs to queue-block each other for minutes or hours.
       (2) SLURM scheduling overhead: each individual submission waits in the
@@ -85,6 +85,7 @@ agent:
 
     Rule of thumb: if your Flow has 2+ independent jobs, use the batch worker.
     If it has 1 job or a sequential chain, use the standard worker.
+    When choosing between debug and shared workers, consider total job runtime vs queue wait: if your job finishes in <27 min, use debug to avoid 30-60 min shared queue wait.
 
 # Worker descriptions injected into agent instructions when project is specified.
 # Keys are "{project}.{worker}" identifiers.
@@ -94,14 +95,21 @@ agent:
 workers:
   perlmutter.perlmutter_gpu:
     description: >
-      Standard worker (one SLURM job per Job). A100 GPU, debug queue,
-      27 min walltime, max 2 concurrent jobs. Use for MD, DeePMD training,
-      and other long-running single jobs.
+      Standard worker (one SLURM job per Job). A100 GPU, shared queue,
+      14h walltime, max 10 concurrent jobs. Typical queue wait: 30-60+ min.
+      Use for long-running single jobs (DeePMD training, long MD trajectories).
+
+  perlmutter.perlmutter_debug:
+    description: >
+      Debug worker (one SLURM job per Job). A100 GPU, debug queue,
+      27 min walltime, max 2 concurrent jobs. Typical queue wait: <10 min.
+      Use for quick validation runs and short jobs that need fast scheduling.
 
   perlmutter.perlmutter_batch:
     description: >
-      Batch worker. Packs up to 200 Jobs into one SLURM submission
-      (4 parallel). A100 GPU, debug queue, 27 min walltime.
+      Batch worker. Packs up to 5000 Jobs into one SLURM submission
+      (4 parallel). A100 GPU, shared queue, 14h walltime.
+      Typical queue wait: 30-60+ min, but amortized across all jobs.
       Use for flows with many short jobs (static evaluations, single-point
       calculations). Each Job gets its own working directory.
 
