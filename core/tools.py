@@ -579,6 +579,106 @@ class RagSearchTool(Tool):
         }
 
 
+class BatchStaticEvalTool(Tool):
+    """Tool that creates a batch static evaluation job for use in jobflow.
+
+    Returns a jobflow Job object (not execution result), to be used in Flow with submit_flow().
+    """
+
+    name = "batch_static_eval"
+    description = """Run N force-field static evaluations in a single SLURM job.
+
+Returns a jobflow Job object. Use it in a Flow with submit_flow():
+    job = batch_static_eval(
+        structures=[s.as_dict() for s in struct_list],
+        force_field_name="DeepMD",
+        calculator_kwargs={"model": "/path/to/model.pth"},
+        type_map=["Cu", "In", "P", "S"],
+    )
+    flow = Flow([job])
+    submit_flow(flow, worker="perlmutter_debug", project="perlmutter")
+    out = wait_for_jobflow("perlmutter", job.uuid)
+
+structures accepts:
+- List of pymatgen Structure dicts (via struct.as_dict()) for inline mode
+- Remote path string to a trajectory file (.traj, .xyz, .extxyz) for large sets
+
+force_field_name matches atomate2 convention (currently "DeepMD" only).
+calculator_kwargs: e.g. {"model": "/path/to/frozen_model.pth"} for DeePMD.
+
+Output structure:
+    out["energies"]  # list of float (eV), one per structure
+    out["forces"]    # list of arrays (eV/A), shape [n_atoms, 3] each
+    out["n_frames"]  # int, number of structures evaluated
+"""
+    inputs = {
+        "structures": {
+            "type": "any",
+            "description": (
+                "Structures to evaluate. Either a list of pymatgen Structure dicts "
+                "(via struct.as_dict()), or a remote path to a trajectory file "
+                "(.traj, .xyz, .extxyz). Use path for large sets (>1000 structures) "
+                "to bypass MongoDB's 16 MB input limit."
+            ),
+        },
+        "force_field_name": {
+            "type": "string",
+            "description": "Calculator name, e.g. 'DeepMD' (matches atomate2 convention)",
+            "nullable": True,
+        },
+        "calculator_kwargs": {
+            "type": "object",
+            "description": "Kwargs for calculator, e.g. {'model': '/path/to/model.pth'}",
+        },
+        "type_map": {
+            "type": "array",
+            "description": "Element symbols in DeePMD type order, e.g. ['Cu','In','P','S']",
+        },
+        "show_source": {
+            "type": "boolean",
+            "description": "If True, return source code instead of creating a job",
+            "nullable": True,
+        },
+    }
+    output_type = "object"
+
+    def forward(
+        self,
+        structures: list[dict] | str,
+        calculator_kwargs: dict[str, Any],
+        type_map: list[str],
+        force_field_name: str | None = None,
+        show_source: bool | None = None,
+    ):
+        if show_source:
+            import inspect
+
+            from remote_jobs._batch_eval import batch_static_eval_impl
+
+            return inspect.getsource(batch_static_eval_impl)
+
+        # Size guard for inline dicts
+        if isinstance(structures, list):
+            estimated_bytes = len(structures) * 3000
+            if estimated_bytes > 10 * 1024 * 1024:
+                raise ValueError(
+                    f"Inline structures too large (~{estimated_bytes / 1e6:.1f} MB, "
+                    f"{len(structures)} structures). MongoDB has a 16 MB document size "
+                    "limit. Write structures to an .extxyz file locally, use remote_put "
+                    "to upload, and pass the remote path string instead."
+                )
+
+        from remote_jobs.jobs import batch_static_eval as _batch_static_eval_job
+
+        return _batch_static_eval_job(
+            structures=structures,
+            force_field_name=force_field_name or "DeepMD",
+            calculator_kwargs=calculator_kwargs,
+            type_map=tuple(type_map) if isinstance(type_map, list) else type_map,
+        )
+
+
 # Instantiate tools for use in agent
 train_deepmd = TrainDeePMDTool()
+batch_static_eval = BatchStaticEvalTool()
 rag_search = RagSearchTool()

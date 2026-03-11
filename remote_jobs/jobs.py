@@ -6,6 +6,7 @@ from typing import Any
 
 from jobflow import job
 
+from remote_jobs._batch_eval import batch_static_eval_impl
 from remote_jobs._deepmd import train_deepmd_impl
 
 
@@ -80,4 +81,29 @@ def train_deepmd(
         numb_steps=numb_steps,
         net_size_preset=net_size_preset,
         overrides=overrides,
+    )
+
+
+@job(data=["energies", "forces"])
+def batch_static_eval(
+    structures: list[dict] | str,
+    force_field_name: str = "DeepMD",
+    calculator_kwargs: dict[str, Any] | None = None,
+    type_map: tuple[str, ...] = ("C",),
+) -> dict[str, Any]:
+    """Run N static evaluations in one SLURM job.
+
+    Args:
+        structures: List of pymatgen Structure dicts (via struct.as_dict()),
+            or a remote path to a trajectory file (.traj, .xyz, .extxyz).
+        force_field_name: Calculator name, e.g. "DeepMD" (atomate2 convention).
+        calculator_kwargs: Kwargs for calculator, e.g. {"model": "/path/model.pth"}.
+        type_map: Element symbols in DeePMD type order.
+
+    Returns:
+        {"energies": [float, ...], "forces": [[[float]]], "n_frames": int}
+        energies and forces are offloaded to GridFS (no 16 MB limit).
+    """
+    return batch_static_eval_impl(
+        structures, force_field_name, calculator_kwargs or {}, type_map
     )

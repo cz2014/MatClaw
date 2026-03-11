@@ -16,7 +16,7 @@ from typing import Any
 import yaml
 from smolagents import CodeAgent, LiteLLMModel, LocalPythonExecutor
 
-from core.tools import rag_search, train_deepmd, wait_for_jobflow
+from core.tools import batch_static_eval, rag_search, train_deepmd, wait_for_jobflow
 from smolagents.agents import (
     FinalAnswerPromptTemplate,
     ManagedAgentPromptTemplate,
@@ -177,7 +177,144 @@ def _create_sandbox_functions(workspace: Path) -> dict[str, callable]:
         p = _safe_path(rel_path)
         return p.read_text(encoding="utf-8")
 
-    return {"write_text": write_text, "read_text": read_text}
+    def _get_ssh_host(project_name: str, worker_name: str):
+        """Get SSH host connection from jobflow-remote config."""
+        from jobflow_remote.config.manager import ConfigManager
+
+        cm = ConfigManager()
+        project = cm.get_project(project_name)
+        worker = project.workers[worker_name]
+        host_config = worker.get_host()
+        host_config.connect()
+        return host_config
+
+    def remote_put(
+        local_rel_path: str,
+        remote_dir: str,
+        project_name: str,
+        worker_name: str,
+    ) -> str:
+        """Upload a file or directory from workspace to remote HPC.
+
+        Args:
+            local_rel_path: Path relative to workspace (enforced boundary).
+            remote_dir: Remote directory to upload into.
+            project_name: jobflow-remote project name.
+            worker_name: jobflow-remote worker name.
+
+        Returns:
+            Remote path of uploaded file/directory.
+        """
+        local_abs = _safe_path(local_rel_path)
+        if not local_abs.exists():
+            raise FileNotFoundError(f"Local path not found: {local_abs}")
+
+        host = _get_ssh_host(project_name, worker_name)
+        remote_target = f"{remote_dir}/{local_abs.name}"
+
+        if local_abs.is_file():
+            host.mkdir(remote_dir)
+            host.put(str(local_abs), remote_target)
+        elif local_abs.is_dir():
+            import tarfile
+            import tempfile
+
+            with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
+                tmp_path = tmp.name
+            try:
+                with tarfile.open(tmp_path, "w:gz") as tar:
+                    tar.add(str(local_abs), arcname=local_abs.name)
+                remote_tar = f"/tmp/_agent_upload_{local_abs.name}.tar.gz"
+                host.mkdir(remote_dir)
+                host.put(tmp_path, remote_tar)
+                host.execute(
+                    f"tar -xzf {remote_tar} -C {remote_dir} && rm {remote_tar}"
+                )
+            finally:
+                Path(tmp_path).unlink(missing_ok=True)
+        else:
+            raise ValueError(f"Not a file or directory: {local_abs}")
+
+        print(f"[remote_put] {local_abs} -> {remote_target}", flush=True)
+        return remote_target
+
+    def remote_get(
+        remote_path: str,
+        local_rel_path: str,
+        project_name: str,
+        worker_name: str,
+    ) -> str:
+        """Download a file or directory from remote HPC to workspace.
+
+        Args:
+            remote_path: Absolute path on remote.
+            local_rel_path: Destination path relative to workspace.
+            project_name: jobflow-remote project name.
+            worker_name: jobflow-remote worker name.
+
+        Returns:
+            Absolute local path of downloaded file/directory.
+        """
+        local_abs = _safe_path(local_rel_path)
+        host = _get_ssh_host(project_name, worker_name)
+
+        is_dir_result = host.execute(f"test -d {remote_path} && echo DIR || echo FILE")
+        is_dir = is_dir_result.stdout.strip() == "DIR"
+
+        if is_dir:
+            import tarfile
+            import tempfile
+
+            remote_name = Path(remote_path).name
+            remote_tar = f"/tmp/_agent_download_{remote_name}.tar.gz"
+            remote_parent = str(Path(remote_path).parent)
+            host.execute(
+                f"tar -czf {remote_tar} -C {remote_parent} {remote_name}"
+            )
+            with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
+                tmp_path = tmp.name
+            try:
+                host.get(remote_tar, tmp_path)
+                host.execute(f"rm {remote_tar}")
+                local_abs.parent.mkdir(parents=True, exist_ok=True)
+                with tarfile.open(tmp_path, "r:gz") as tar:
+                    tar.extractall(str(local_abs.parent))
+            finally:
+                Path(tmp_path).unlink(missing_ok=True)
+        else:
+            local_abs.parent.mkdir(parents=True, exist_ok=True)
+            host.get(remote_path, str(local_abs))
+
+        print(f"[remote_get] {remote_path} -> {local_abs}", flush=True)
+        return str(local_abs)
+
+    def remote_ls(
+        remote_path: str,
+        project_name: str,
+        worker_name: str,
+    ) -> list[str]:
+        """List files in a remote directory.
+
+        Args:
+            remote_path: Absolute path on remote.
+            project_name: jobflow-remote project name.
+            worker_name: jobflow-remote worker name.
+
+        Returns:
+            List of filenames in the directory.
+        """
+        host = _get_ssh_host(project_name, worker_name)
+        result = host.execute(f"ls -1 {remote_path}")
+        entries = [e for e in result.stdout.strip().split("\n") if e]
+        return entries
+
+    return {
+        "write_text": write_text,
+        "read_text": read_text,
+        "remote_put": remote_put,
+        "remote_get": remote_get,
+        "remote_ls": remote_ls,
+    }
 
 
 def _save_config_snapshot(config_dir: Path, workspace_dir: Path, prompts_file: str) -> None:
@@ -577,7 +714,7 @@ def create_agent(
 
     # Tools: use custom list or default (includes rag_search for main agent)
     if tools is None:
-        tools = [wait_for_jobflow, train_deepmd, rag_search]
+        tools = [wait_for_jobflow, train_deepmd, batch_static_eval, rag_search]
 
     # Max steps from config
     max_steps = agent_cfg.get("max_steps", 10)

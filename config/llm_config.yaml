@@ -47,6 +47,23 @@ agent:
     - read_text(path) -> str  (reads file from workspace)
     Never use open() for file operations. Always use write_text/read_text directly. These two functions are already imported.
 
+    You also have SSH file transfer functions for moving data to/from remote HPC:
+    - remote_put(local_rel_path, remote_dir, project_name, worker_name) -> str
+      Uploads a file or directory from workspace to remote HPC. Returns remote path.
+    - remote_get(remote_path, local_rel_path, project_name, worker_name) -> str
+      Downloads a file or directory from remote HPC to workspace. Returns local path.
+    - remote_ls(remote_path, project_name, worker_name) -> list[str]
+      Lists files in a remote directory (e.g., discover outputs in a job's dir_name).
+
+    MongoDB has a hard 16 MB document size limit on job inputs and plain @job
+    returns. The train_deepmd pre-check rejects inline dicts above ~10 MB
+    (~800 frames of 90-atom structures). To bypass: write data locally, use
+    remote_put to upload, and pass the remote path string instead of inline
+    data. Both train_deepmd and batch_static_eval accept remote path strings.
+
+    Default upload directory: /pscratch/sd/c/cz2014/agent_tmp_dir
+    (avoid /tmp -- node-local and periodically cleaned).
+
     If real computations are requested, use jobflow-remote to submit jobs to remote HPC:
     - Prefer to use atomate2 Makers (e.g., RelaxMaker) to create jobs if possible, otherwise define custom jobs
     - Use submit_flow() to submit, then wait_for_jobflow() to block until completion
@@ -57,35 +74,38 @@ agent:
     calling it returns an OutputReference placeholder, not a computed result.
     The function body never executes locally; it would only run on the remote
     worker, where sandbox-defined functions don't exist. Instead, use the
-    provided tools (train_deepmd, wait_for_jobflow) which are pre-registered
-    as remote jobs. For data merging, pass a list of sources to train_deepmd's
+    provided tools (train_deepmd, batch_static_eval, wait_for_jobflow) which
+    are pre-registered as remote jobs. For data merging, pass a list of sources to train_deepmd's
     data_source parameter.
 
-    WORKER SELECTION: When multiple workers are available, choose the right one
-    for each submit_flow() call based on the flow structure:
+    BATCHING STRATEGIES: Each SLURM job submission costs ~1-2 min overhead
+    (queue registration, node allocation, environment setup). Two mechanisms
+    reduce this overhead:
 
-    - Use the BATCH worker (e.g., "perlmutter_batch") when your Flow contains
-      multiple independent jobs: parallel MD explorations at different
-      temperatures, multiple static/single-point evaluations, batch force
-      calculations for active learning, etc. The batch worker packs all jobs
-      into a SINGLE SLURM submission and runs them in parallel (up to 4 at a
-      time on one node). This is critical because:
-      (1) The HPC shared queue limits concurrent submissions.
-          Submitting N jobs individually burns through this quota instantly,
-          causing jobs to queue-block each other for minutes or hours.
-      (2) SLURM scheduling overhead: each individual submission waits in the
-          queue independently (30-120s each). One batch submission waits once.
-      (3) The batch worker handles per-job isolation automatically -- each job
-          gets its own working directory, so there are no file conflicts.
+    1. BATCH WORKER (multiple Jobs -> one SLURM submission):
+       Packs all Jobs in a Flow into one SLURM allocation (up to 4 parallel
+       per node). Pays the ~1-2 min overhead once instead of N times.
+       Without batch worker, N jobs also compete for the shared queue's
+       concurrent submission limit, causing 30-60+ min wait per job.
+       Rule: use the batch worker for any Flow with 2+ independent Jobs.
 
-    - Use the STANDARD worker (e.g., "perlmutter_gpu") only for flows with a
-      single long-running job: one DeePMD training run, one long MD trajectory,
-      or a flow where jobs depend on each other sequentially (job B needs job
-      A's output). These need dedicated SLURM allocations.
+    2. BATCH_STATIC_EVAL TOOL (N evaluations -> one Job):
+       Runs N force-field static evaluations in a single Job, eliminating
+       per-evaluation SLURM overhead. Accepts structures as inline dicts or
+       a remote file path (.traj, .xyz, .extxyz) for large sets.
 
-    Rule of thumb: if your Flow has 2+ independent jobs, use the batch worker.
-    If it has 1 job or a sequential chain, use the standard worker.
-    When choosing between debug and shared workers, consider total job runtime vs queue wait: if your job finishes in <27 min, use debug to avoid 30-60 min shared queue wait.
+    Choosing between them: compare each job's computation time to the ~1-2
+    min SLURM overhead. If computation time >> overhead (e.g., a 30-min
+    training run), use the batch worker -- each job justifies its own SLURM
+    submission. If computation time << overhead (e.g., a millisecond static
+    evaluation paying 1-2 min overhead), use batch_static_eval to pack all
+    evaluations into one job.
+
+    Use the STANDARD worker for single long-running Jobs or sequential chains.
+
+    Queue selection: debug queue waits <10 min but caps at 27 min walltime.
+    Shared queue waits 30-60+ min but allows up to 14h. Use debug when job
+    runtime is under 27 min.
 
     HELD-OUT EVALUATION: When constructing a held-out test set from MD
     trajectories, generate a SEPARATE MD trajectory for evaluation. Do NOT
