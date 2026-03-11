@@ -91,9 +91,9 @@ def check_runner_alive(project: str = "anvil") -> dict:
             capture_output=True, text=True, timeout=5,
         )
         lines = [ln.strip() for ln in proc.stdout.strip().split("\n") if ln.strip()]
-        # Look for 'runner run' or 'runner start' in matched lines
+        # Look for 'runner run' (foreground mode only, not 'runner start' which is daemon)
         for ln in lines:
-            if "runner run" in ln or "runner start" in ln:
+            if "runner run" in ln:
                 pid = ln.split()[0]
                 return _result(
                     "runner_alive", "OK",

@@ -288,8 +288,8 @@ Network presets:
                 raise ValueError(
                     f"Inline data dict is too large ({estimated_bytes / 1e6:.1f} MB). "
                     "MongoDB has a 16 MB document size limit. "
-                    "Use Flow chaining instead: dp_job = train_deepmd(md_job.output, ...); "
-                    "flow = Flow([md_job, dp_job])"
+                    "Write data locally, use remote_put to upload to the remote "
+                    "cluster, and pass the remote path string instead."
                 )
 
         # Import here to avoid circular imports at module load time
@@ -607,9 +607,9 @@ force_field_name matches atomate2 convention (currently "DeepMD" only).
 calculator_kwargs: e.g. {"model": "/path/to/frozen_model.pth"} for DeePMD.
 
 Output structure:
-    out["energies"]  # list of float (eV), one per structure
-    out["forces"]    # list of arrays (eV/A), shape [n_atoms, 3] each
-    out["n_frames"]  # int, number of structures evaluated
+    out["output"]["energies"]  # list of float (eV), one per structure
+    out["output"]["forces"]    # list of arrays (eV/A), shape [n_atoms, 3] each
+    out["output"]["n_frames"]  # int, number of structures evaluated
 """
     inputs = {
         "structures": {

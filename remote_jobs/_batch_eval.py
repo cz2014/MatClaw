@@ -24,7 +24,7 @@ def batch_static_eval_impl(
         type_map: Element symbols in DeePMD type order.
 
     Returns:
-        {"energies": [...], "forces": [...], "n_frames": int}
+        {"output": {"energies": [...], "forces": [...], "n_frames": int}}
         energies: list of float (eV)
         forces: list of list-of-list (eV/A), shape [N][n_atoms][3]
     """
@@ -57,7 +57,9 @@ def batch_static_eval_impl(
         forces.append(atoms.get_forces().tolist())
 
     return {
-        "energies": energies,
-        "forces": forces,
-        "n_frames": len(atoms_list),
+        "output": {
+            "energies": energies,
+            "forces": forces,
+            "n_frames": len(atoms_list),
+        }
     }

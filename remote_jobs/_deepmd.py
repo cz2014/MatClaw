@@ -191,6 +191,7 @@ def _load_labeled_data(data_source: Any, type_map: tuple[str, ...], run_dir: Pat
 
     Dispatches on input type:
     1. deepmd/npy directory path (has type_map.raw + set.*/) -> load directly
+    1.1. Trajectory file path (.traj, .extxyz) -> load via dpdata format readers
     2. List of any supported type -> recursively load each + merge
     1.5. Raw dpdata-compatible dict (has "cells" key) -> load directly
     3. ForcefieldTaskDocument dict/model (has output.ionic_steps) -> extract inline data
@@ -203,6 +204,12 @@ def _load_labeled_data(data_source: Any, type_map: tuple[str, ...], run_dir: Pat
         p = Path(data_source)
         if p.is_dir() and (p / "type_map.raw").exists():
             return dpdata.LabeledSystem(str(p), fmt="deepmd/npy")
+
+        # Case 1.1: trajectory file (.traj or .extxyz) on remote filesystem
+        _TRAJ_FMTS = {".traj": "ase/traj", ".extxyz": "extxyz"}
+        fmt = _TRAJ_FMTS.get(p.suffix.lower())
+        if fmt is not None and p.is_file():
+            return dpdata.LabeledSystem(str(p), fmt=fmt)
 
     # Case 2: list of data sources (recursive dispatch -- supports mixed types)
     if isinstance(data_source, (list, tuple)) and len(data_source) > 0:
@@ -275,7 +282,8 @@ def _load_labeled_data(data_source: Any, type_map: tuple[str, ...], run_dir: Pat
             "Accepted data_source formats: "
             "(1) Chain with MD job in a Flow: dp_job = train_deepmd(md_job.output, ...); "
             "(2) Pass a raw dict with keys: cells, coords, energies, forces, atom_types, atom_names; "
-            "(3) Path to a deepmd/npy directory on the remote HPC (e.g., /scratch/...)."
+            "(3) Path to a deepmd/npy directory on the remote HPC (e.g., /scratch/...); "
+            "(4) Path to a trajectory file (.traj, .extxyz) on the remote HPC."
         )
     if not isinstance(data_source, str):
         raise TypeError(
@@ -308,6 +316,7 @@ def train_deepmd_impl(
             - VASP TaskDoc (from MDMaker) -- resolves OUTCAR from dir_name
             - ForcefieldTaskDoc (from ForceFieldMDMaker) -- extracts from ionic_steps
             - Path string to deepmd/npy directory on remote filesystem
+            - Path string to trajectory file (.traj, .extxyz) on remote filesystem
             - Raw dpdata-compatible dict with cells, coords, energies, forces keys
             - List of any of the above (recursively loaded and merged)
         seed: Random seed for shuffling and DP training.

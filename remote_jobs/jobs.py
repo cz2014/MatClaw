@@ -84,7 +84,7 @@ def train_deepmd(
     )
 
 
-@job(data=["energies", "forces"])
+@job(data=["output"])
 def batch_static_eval(
     structures: list[dict] | str,
     force_field_name: str = "DeepMD",
@@ -101,8 +101,8 @@ def batch_static_eval(
         type_map: Element symbols in DeePMD type order.
 
     Returns:
-        {"energies": [float, ...], "forces": [[[float]]], "n_frames": int}
-        energies and forces are offloaded to GridFS (no 16 MB limit).
+        {"output": {"energies": [float, ...], "forces": [[[float]]], "n_frames": int}}
+        output dict is offloaded to GridFS (no 16 MB limit).
     """
     return batch_static_eval_impl(
         structures, force_field_name, calculator_kwargs or {}, type_map
