@@ -153,6 +153,40 @@ def _on_step_error(step, agent) -> None:
     print(f"[step_error] Added hint to step {step.step_number}")
 
 
+_MAX_IMAGES_PER_STEP = 5
+_MAX_IMAGE_BYTES = 2 * 1024 * 1024  # 2 MB
+
+
+def _inject_workspace_images(workspace: Path):
+    """Step callback: inject new workspace images into observations for LLM vision."""
+    seen: set[str] = set()
+
+    def cb(step, agent):
+        from smolagents import ActionStep
+        if not isinstance(step, ActionStep):
+            return
+        current = set()
+        for ext in ("*.png", "*.jpg", "*.jpeg"):
+            current.update(str(p) for p in workspace.glob(ext))
+        new = sorted(current - seen)
+        seen.update(current)
+        if not new:
+            return
+        import PIL.Image
+        imgs = []
+        for path in new[:_MAX_IMAGES_PER_STEP]:
+            if Path(path).stat().st_size > _MAX_IMAGE_BYTES:
+                continue
+            img = PIL.Image.open(path)
+            img.load()
+            imgs.append(img)
+            print(f"[image_inject] {Path(path).name}", flush=True)
+        if imgs:
+            step.observations_images = (step.observations_images or []) + imgs
+
+    return cb
+
+
 def _create_sandbox_functions(workspace: Path) -> dict[str, callable]:
     """Create sandboxed file I/O functions bound to workspace."""
     workspace = workspace.resolve()
@@ -258,8 +292,8 @@ def _create_sandbox_functions(workspace: Path) -> dict[str, callable]:
         local_abs = _safe_path(local_rel_path)
         host = _get_ssh_host(project_name, worker_name)
 
-        is_dir_result = host.execute(f"test -d {remote_path} && echo DIR || echo FILE")
-        is_dir = is_dir_result.stdout.strip() == "DIR"
+        stdout, _, _ = host.execute(f"test -d {remote_path} && echo DIR || echo FILE")
+        is_dir = stdout.strip() == "DIR"
 
         if is_dir:
             import tarfile
@@ -304,8 +338,8 @@ def _create_sandbox_functions(workspace: Path) -> dict[str, callable]:
             List of filenames in the directory.
         """
         host = _get_ssh_host(project_name, worker_name)
-        result = host.execute(f"ls -1 {remote_path}")
-        entries = [e for e in result.stdout.strip().split("\n") if e]
+        stdout, _, _ = host.execute(f"ls -1 {remote_path}")
+        entries = [e for e in stdout.strip().split("\n") if e]
         return entries
 
     return {
@@ -621,6 +655,7 @@ def create_agent(
     prompts_file: str = "prompts.yaml",
     project: str | None = None,
     instructions_extra: str | None = None,
+    inject_images: bool = False,
 ) -> CodeAgent:
     """Create a CodeAgent with config from YAML files.
 
@@ -754,6 +789,8 @@ def create_agent(
 
     # Error hint callback runs first to modify errors before logging
     callbacks = [_on_step_error]
+    if inject_images:
+        callbacks.append(_inject_workspace_images(workspace_dir))
     if enable_step_logging:
         steps_log = _make_steps_log_path(workspace_dir)
         callbacks.append(_step_jsonl_logger(steps_log))

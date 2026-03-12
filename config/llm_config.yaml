@@ -40,6 +40,10 @@ agent:
     - atomate2.*
     - dpdata
     - dpdata.*
+    - matplotlib
+    - matplotlib.*
+    - ase
+    - ase.*
     - inspect
   instructions: |
     You have access to these file I/O functions:
