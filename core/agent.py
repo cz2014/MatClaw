@@ -299,6 +299,7 @@ _MAX_IMAGE_BYTES = 2 * 1024 * 1024  # 2 MB
 
 def _inject_workspace_images(workspace: Path):
     """Step callback: inject new workspace images into observations for LLM vision."""
+    workspace = workspace.resolve()
     seen: set[str] = set()
 
     def cb(step, agent):
@@ -307,20 +308,25 @@ def _inject_workspace_images(workspace: Path):
             return
         current = set()
         for ext in ("**/*.png", "**/*.jpg", "**/*.jpeg"):
-            current.update(str(p) for p in workspace.glob(ext))
+            current.update(str(p.resolve()) for p in workspace.glob(ext))
         new = sorted(current - seen)
         seen.update(current)
+        logger.debug(
+            "[image_inject] workspace=%s current=%d seen=%d new=%d",
+            workspace, len(current), len(seen), len(new),
+        )
         if not new:
             return
         import PIL.Image
         imgs = []
         for path in new[:_MAX_IMAGES_PER_STEP]:
             if Path(path).stat().st_size > _MAX_IMAGE_BYTES:
+                logger.debug("[image_inject] skipped (too large): %s", path)
                 continue
             img = PIL.Image.open(path)
             img.load()
             imgs.append(img)
-            print(f"[image_inject] {Path(path).name}", flush=True)
+            logger.info("[image_inject] %s", Path(path).name)
         if imgs:
             step.observations_images = (step.observations_images or []) + imgs
 
@@ -895,9 +901,6 @@ def create_agent(
     if instructions_extra:
         instructions = instructions.rstrip() + "\n" + instructions_extra
 
-    if instructions:
-        kwargs["instructions"] = instructions
-
     if planning_interval is not None:
         kwargs["planning_interval"] = planning_interval
 
@@ -914,6 +917,11 @@ def create_agent(
             "at the start of the next step. Only newly created images are shown -- "
             "each image appears once. Use this to verify your figures before finalizing."
         )
+
+    # Store instructions AFTER all modifications (base, worker, extra, image feedback)
+    if instructions:
+        kwargs["instructions"] = instructions
+
     # History writer -- always enabled (primary conversation storage)
     history_file = workspace_dir / "history.jsonl"
     callbacks.append(_history_writer(history_file, workspace_dir))
