@@ -258,12 +258,14 @@ def _create_sandbox_functions(workspace: Path) -> dict[str, callable]:
             try:
                 with tarfile.open(tmp_path, "w:gz") as tar:
                     tar.add(str(local_abs), arcname=local_abs.name)
-                remote_tar = f"/tmp/_agent_upload_{local_abs.name}.tar.gz"
+                remote_tar = f"{remote_dir}/_agent_upload_{local_abs.name}.tar.gz"
                 host.mkdir(remote_dir)
                 host.put(tmp_path, remote_tar)
-                host.execute(
+                _, stderr, rc = host.execute(
                     f"tar -xzf {remote_tar} -C {remote_dir} && rm {remote_tar}"
                 )
+                if rc != 0:
+                    raise RuntimeError(f"remote_put tar extraction failed: {stderr}")
             finally:
                 Path(tmp_path).unlink(missing_ok=True)
         else:
@@ -292,7 +294,9 @@ def _create_sandbox_functions(workspace: Path) -> dict[str, callable]:
         local_abs = _safe_path(local_rel_path)
         host = _get_ssh_host(project_name, worker_name)
 
-        stdout, _, _ = host.execute(f"test -d {remote_path} && echo DIR || echo FILE")
+        stdout, stderr, rc = host.execute(f"test -d {remote_path} && echo DIR || echo FILE")
+        if rc != 0 and "DIR" not in stdout and "FILE" not in stdout:
+            raise RuntimeError(f"Cannot stat remote path {remote_path}: {stderr}")
         is_dir = stdout.strip() == "DIR"
 
         if is_dir:
@@ -300,11 +304,13 @@ def _create_sandbox_functions(workspace: Path) -> dict[str, callable]:
             import tempfile
 
             remote_name = Path(remote_path).name
-            remote_tar = f"/tmp/_agent_download_{remote_name}.tar.gz"
             remote_parent = str(Path(remote_path).parent)
-            host.execute(
+            remote_tar = f"{remote_parent}/_agent_download_{remote_name}.tar.gz"
+            _, stderr, rc = host.execute(
                 f"tar -czf {remote_tar} -C {remote_parent} {remote_name}"
             )
+            if rc != 0:
+                raise RuntimeError(f"remote_get tar creation failed: {stderr}")
             with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
                 tmp_path = tmp.name
             try:
@@ -313,6 +319,12 @@ def _create_sandbox_functions(workspace: Path) -> dict[str, callable]:
                 local_abs.parent.mkdir(parents=True, exist_ok=True)
                 with tarfile.open(tmp_path, "r:gz") as tar:
                     tar.extractall(str(local_abs.parent))
+                extracted = local_abs.parent / remote_name
+                if extracted != local_abs and extracted.exists():
+                    if local_abs.exists():
+                        import shutil
+                        shutil.rmtree(local_abs)
+                    extracted.rename(local_abs)
             finally:
                 Path(tmp_path).unlink(missing_ok=True)
         else:
@@ -338,9 +350,7 @@ def _create_sandbox_functions(workspace: Path) -> dict[str, callable]:
             List of filenames in the directory.
         """
         host = _get_ssh_host(project_name, worker_name)
-        stdout, _, _ = host.execute(f"ls -1 {remote_path}")
-        entries = [e for e in stdout.strip().split("\n") if e]
-        return entries
+        return host.listdir(remote_path)
 
     return {
         "write_text": write_text,
@@ -791,6 +801,12 @@ def create_agent(
     callbacks = [_on_step_error]
     if inject_images:
         callbacks.append(_inject_workspace_images(workspace_dir))
+        instructions = instructions.rstrip() + "\n\n" + (
+            "IMAGE FEEDBACK: When you save a .png or .jpg file to the workspace "
+            "(e.g., via plt.savefig()), the image will be shown to you automatically "
+            "at the start of the next step. Only newly created images are shown -- "
+            "each image appears once. Use this to verify your figures before finalizing."
+        )
     if enable_step_logging:
         steps_log = _make_steps_log_path(workspace_dir)
         callbacks.append(_step_jsonl_logger(steps_log))
