@@ -46,18 +46,7 @@ agent:
     - ase.*
     - inspect
   instructions: |
-    You have access to these file I/O functions:
-    - write_text(path, content) -> str  (writes file under workspace, returns absolute path)
-    - read_text(path) -> str  (reads file from workspace)
-    Never use open() for file operations. Always use write_text/read_text directly. These two functions are already imported.
-
-    You also have SSH file transfer functions for moving data to/from remote HPC:
-    - remote_put(local_rel_path, remote_dir, project_name, worker_name) -> str
-      Uploads a file or directory from workspace to remote HPC. Returns remote path.
-    - remote_get(remote_path, local_rel_path, project_name, worker_name) -> str
-      Downloads a file or directory from remote HPC to workspace. Returns local path.
-    - remote_ls(remote_path, project_name, worker_name) -> list[str]
-      Lists files in a remote directory (e.g., discover outputs in a job's dir_name).
+    Never use open() for file operations. Always use write_text/read_text.
 
     MongoDB has a hard 16 MB document size limit on job inputs and plain @job
     returns. The train_deepmd pre-check rejects inline dicts above ~10 MB

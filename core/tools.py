@@ -19,6 +19,29 @@ def set_pause_controller(controller):
     _pause_controller = controller
 
 
+# --- Shared helpers for I/O and remote transfer tools ---
+
+
+def _safe_path(workspace: Path, rel_path: str) -> Path:
+    """Resolve rel_path under workspace, reject traversal escapes."""
+    p = (workspace / rel_path).resolve()
+    if p == workspace or workspace in p.parents:
+        return p
+    raise ValueError(f"Path outside workspace: {rel_path}")
+
+
+def _get_ssh_host(project_name: str, worker_name: str):
+    """Get connected SSH host from jobflow-remote config."""
+    from jobflow_remote.config.manager import ConfigManager
+
+    cm = ConfigManager()
+    project = cm.get_project(project_name)
+    worker = project.workers[worker_name]
+    host = worker.get_host()
+    host.connect()
+    return host
+
+
 # Project paths for RAG
 _PROJECT_ROOT = Path(__file__).parent.parent
 _DEFAULT_CORPUS_DIR = _PROJECT_ROOT / "data" / "corpus"
@@ -676,6 +699,279 @@ Output structure:
             calculator_kwargs=calculator_kwargs,
             type_map=tuple(type_map) if isinstance(type_map, list) else type_map,
         )
+
+
+# --- Workspace I/O tools ---
+
+
+class WriteTextTool(Tool):
+    name = "write_text"
+    description = """Write text content to a file in the workspace directory.
+
+The path is relative to the workspace root. Parent directories are created
+automatically. Paths that escape the workspace (e.g., '../etc/passwd') are
+rejected. Maximum content size is 5 MB per call.
+
+Use this instead of open() for all file writes.
+
+Returns the absolute path of the written file."""
+
+    inputs = {
+        "rel_path": {
+            "type": "string",
+            "description": "File path relative to workspace (e.g., 'output/report.md')",
+        },
+        "content": {
+            "type": "string",
+            "description": "Text content to write",
+        },
+    }
+    output_type = "string"
+
+    def __init__(self, workspace: Path):
+        super().__init__()
+        self._workspace = workspace.resolve()
+
+    def forward(self, rel_path: str, content: str) -> str:
+        p = _safe_path(self._workspace, rel_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        if len(content) > 5_000_000:
+            raise ValueError("Refusing to write >5MB in one call")
+        p.write_text(content, encoding="utf-8")
+        return str(p)
+
+
+class ReadTextTool(Tool):
+    name = "read_text"
+    description = """Read text content from a file in the workspace directory.
+
+The path is relative to the workspace root. Paths that escape the workspace
+are rejected.
+
+Use this instead of open() for all file reads."""
+
+    inputs = {
+        "rel_path": {
+            "type": "string",
+            "description": "File path relative to workspace (e.g., 'data/input.cif')",
+        },
+    }
+    output_type = "string"
+
+    def __init__(self, workspace: Path):
+        super().__init__()
+        self._workspace = workspace.resolve()
+
+    def forward(self, rel_path: str) -> str:
+        p = _safe_path(self._workspace, rel_path)
+        return p.read_text(encoding="utf-8")
+
+
+# --- Remote transfer tools ---
+
+
+class RemotePutTool(Tool):
+    name = "remote_put"
+    description = """Upload a file or directory from workspace to remote HPC via SSH.
+
+Supports both single files and directories. Directories are transferred as
+tar archives (packed locally, uploaded, extracted remotely).
+
+Default upload directory: /pscratch/sd/c/cz2014/agent_tmp_dir
+(avoid /tmp on remote -- it is node-local and periodically cleaned).
+
+Returns the remote path of the uploaded file or directory."""
+
+    inputs = {
+        "local_rel_path": {
+            "type": "string",
+            "description": "Path relative to workspace to upload",
+        },
+        "remote_dir": {
+            "type": "string",
+            "description": "Remote directory to upload into (created if needed)",
+        },
+        "project_name": {
+            "type": "string",
+            "description": "jobflow-remote project name (e.g., 'perlmutter')",
+        },
+        "worker_name": {
+            "type": "string",
+            "description": "jobflow-remote worker name (e.g., 'perlmutter_debug')",
+        },
+    }
+    output_type = "string"
+
+    def __init__(self, workspace: Path):
+        super().__init__()
+        self._workspace = workspace.resolve()
+
+    def forward(
+        self,
+        local_rel_path: str,
+        remote_dir: str,
+        project_name: str,
+        worker_name: str,
+    ) -> str:
+        import tarfile
+        import tempfile
+
+        local_abs = _safe_path(self._workspace, local_rel_path)
+        if not local_abs.exists():
+            raise FileNotFoundError(f"Local path not found: {local_abs}")
+
+        host = _get_ssh_host(project_name, worker_name)
+        remote_target = f"{remote_dir}/{local_abs.name}"
+
+        if local_abs.is_file():
+            host.mkdir(remote_dir)
+            host.put(str(local_abs), remote_target)
+        elif local_abs.is_dir():
+            with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
+                tmp_path = tmp.name
+            try:
+                with tarfile.open(tmp_path, "w:gz") as tar:
+                    tar.add(str(local_abs), arcname=local_abs.name)
+                remote_tar = f"{remote_dir}/_agent_upload_{local_abs.name}.tar.gz"
+                host.mkdir(remote_dir)
+                host.put(tmp_path, remote_tar)
+                _, stderr, rc = host.execute(
+                    f"tar -xzf {remote_tar} -C {remote_dir} && rm {remote_tar}"
+                )
+                if rc != 0:
+                    raise RuntimeError(f"remote_put tar extraction failed: {stderr}")
+            finally:
+                Path(tmp_path).unlink(missing_ok=True)
+        else:
+            raise ValueError(f"Not a file or directory: {local_abs}")
+
+        print(f"[remote_put] {local_abs} -> {remote_target}", flush=True)
+        return remote_target
+
+
+class RemoteGetTool(Tool):
+    name = "remote_get"
+    description = """Download a file or directory from remote HPC to workspace via SSH.
+
+Supports both single files and directories. Directories are transferred as
+tar archives (packed remotely, downloaded, extracted locally).
+
+Use this to retrieve simulation outputs (trajectories, models, logs) from
+the HPC cluster for local analysis.
+
+Returns the absolute local path of the downloaded file or directory."""
+
+    inputs = {
+        "remote_path": {
+            "type": "string",
+            "description": "Absolute path on the remote HPC system",
+        },
+        "local_rel_path": {
+            "type": "string",
+            "description": "Destination path relative to workspace",
+        },
+        "project_name": {
+            "type": "string",
+            "description": "jobflow-remote project name (e.g., 'perlmutter')",
+        },
+        "worker_name": {
+            "type": "string",
+            "description": "jobflow-remote worker name (e.g., 'perlmutter_debug')",
+        },
+    }
+    output_type = "string"
+
+    def __init__(self, workspace: Path):
+        super().__init__()
+        self._workspace = workspace.resolve()
+
+    def forward(
+        self,
+        remote_path: str,
+        local_rel_path: str,
+        project_name: str,
+        worker_name: str,
+    ) -> str:
+        import shutil
+        import tarfile
+        import tempfile
+
+        local_abs = _safe_path(self._workspace, local_rel_path)
+        host = _get_ssh_host(project_name, worker_name)
+
+        stdout, stderr, rc = host.execute(
+            f"test -d {remote_path} && echo DIR || echo FILE"
+        )
+        if rc != 0 and "DIR" not in stdout and "FILE" not in stdout:
+            raise RuntimeError(f"Cannot stat remote path {remote_path}: {stderr}")
+        is_dir = stdout.strip() == "DIR"
+
+        if is_dir:
+            remote_name = Path(remote_path).name
+            remote_parent = str(Path(remote_path).parent)
+            remote_tar = f"{remote_parent}/_agent_download_{remote_name}.tar.gz"
+            _, stderr, rc = host.execute(
+                f"tar -czf {remote_tar} -C {remote_parent} {remote_name}"
+            )
+            if rc != 0:
+                raise RuntimeError(f"remote_get tar creation failed: {stderr}")
+            with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
+                tmp_path = tmp.name
+            try:
+                host.get(remote_tar, tmp_path)
+                host.execute(f"rm {remote_tar}")
+                local_abs.parent.mkdir(parents=True, exist_ok=True)
+                with tarfile.open(tmp_path, "r:gz") as tar:
+                    tar.extractall(str(local_abs.parent))
+                extracted = local_abs.parent / remote_name
+                if extracted != local_abs and extracted.exists():
+                    if local_abs.exists():
+                        shutil.rmtree(local_abs)
+                    extracted.rename(local_abs)
+            finally:
+                Path(tmp_path).unlink(missing_ok=True)
+        else:
+            local_abs.parent.mkdir(parents=True, exist_ok=True)
+            host.get(remote_path, str(local_abs))
+
+        print(f"[remote_get] {remote_path} -> {local_abs}", flush=True)
+        return str(local_abs)
+
+
+class RemoteLsTool(Tool):
+    name = "remote_ls"
+    description = """List files in a remote directory on HPC via SSH.
+
+Returns a list of filenames (not full paths) in the specified remote
+directory. Useful for discovering job outputs in a job's dir_name after
+completion.
+
+Returns an empty list if the directory does not exist."""
+
+    inputs = {
+        "remote_path": {
+            "type": "string",
+            "description": "Absolute path of directory to list on remote HPC",
+        },
+        "project_name": {
+            "type": "string",
+            "description": "jobflow-remote project name (e.g., 'perlmutter')",
+        },
+        "worker_name": {
+            "type": "string",
+            "description": "jobflow-remote worker name (e.g., 'perlmutter_debug')",
+        },
+    }
+    output_type = "array"
+
+    def forward(
+        self,
+        remote_path: str,
+        project_name: str,
+        worker_name: str,
+    ) -> list[str]:
+        host = _get_ssh_host(project_name, worker_name)
+        return host.listdir(remote_path)
 
 
 # Instantiate tools for use in agent
