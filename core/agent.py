@@ -750,6 +750,76 @@ def _resolve_worker_instructions(project_name: str, llm_cfg: dict[str, Any]) -> 
     return "\n".join(lines)
 
 
+def _setup_experience_reloader(agent: CodeAgent, experience_path: Path) -> None:
+    """Set up dynamic experience injection: initial load + step callback + run wrapper.
+
+    Monitors the experience file's mtime and refreshes the system prompt when
+    the file changes. Handles three update scenarios:
+    - Agent writes experience (step N) -> visible at step N+1 (step callback)
+    - Human edits during a run -> visible next step (step callback)
+    - Human edits between run() calls -> visible at run() start (run wrapper)
+    """
+    from smolagents import ActionStep
+    from smolagents.agents import SystemPromptStep
+
+    base_instructions = agent.instructions or ""
+
+    _EXPERIENCE_MAX_TOKENS = 10_000
+    _CHARS_PER_TOKEN = 4
+
+    _cache: dict[str, float] = {"mtime": 0.0}
+
+    def _refresh() -> bool:
+        """Re-read experience file and update agent.instructions if changed."""
+        if not experience_path.exists():
+            return False
+        mtime = experience_path.stat().st_mtime
+        if mtime == _cache["mtime"]:
+            return False
+        _cache["mtime"] = mtime
+        exp_text = experience_path.read_text(encoding="utf-8").strip()
+        if exp_text:
+            est_tokens = len(exp_text) // _CHARS_PER_TOKEN
+            if est_tokens > _EXPERIENCE_MAX_TOKENS:
+                logger.warning(
+                    "Experience file %s is ~%d tokens (limit %d). "
+                    "Consider pruning old notes or implementing experience_search.",
+                    experience_path, est_tokens, _EXPERIENCE_MAX_TOKENS,
+                )
+            agent.instructions = base_instructions.rstrip() + "\n\n" + exp_text
+        else:
+            agent.instructions = base_instructions
+        logger.info("Experience notes reloaded from %s", experience_path)
+        return True
+
+    # 1. Initial load
+    _refresh()
+
+    # 2. Step callback: within-run refresh (updates memory.system_prompt directly)
+    # Signature (step, agent) matches smolagents CallbackRegistry convention:
+    # 2-param callbacks receive (memory_step, agent=agent) via **kwargs.
+    def _step_callback(step, agent=None):
+        if _refresh() and agent is not None:
+            agent.memory.system_prompt = SystemPromptStep(
+                system_prompt=agent.system_prompt
+            )
+
+    # Register with CallbackRegistry if available, else append to list
+    if hasattr(agent.step_callbacks, "register"):
+        agent.step_callbacks.register(ActionStep, _step_callback)
+    else:
+        agent.step_callbacks.append(_step_callback)
+
+    # 3. Run wrapper: between-run refresh
+    _original_run = agent.run
+
+    def _run_with_refresh(*args, **kwargs):
+        _refresh()
+        return _original_run(*args, **kwargs)
+
+    agent.run = _run_with_refresh
+
+
 def create_agent(
     config_dir: Path,
     workspace_dir: Path,
@@ -763,6 +833,7 @@ def create_agent(
     instructions_extra: str | None = None,
     inject_images: bool = False,
     resume: bool = False,
+    experience_file: str | Path | None = None,
 ) -> CodeAgent:
     """Create a CodeAgent with config from YAML files.
 
@@ -808,6 +879,16 @@ def create_agent(
     )
 
     agent_cfg = llm_cfg.get("agent", {})
+
+    # Resolve experience file path (parameter overrides config)
+    exp_cfg = experience_file or agent_cfg.get("experience_file")
+    experience_path = None
+    if exp_cfg:
+        p = Path(exp_cfg)
+        experience_path = p if p.is_absolute() else PROJECT_ROOT / p
+        if not experience_path.exists():
+            logger.warning("experience_file not found: %s", experience_path)
+            experience_path = None
 
     # Context window management (unified zone-based pruning + caching)
     if agent_cfg.get("context_pruning", True):
@@ -863,6 +944,7 @@ def create_agent(
         RemoteLsTool,
         RemotePutTool,
         ReadTextTool,
+        WriteExperienceTool,
         WriteTextTool,
     )
     tools = list(tools) + [
@@ -873,6 +955,10 @@ def create_agent(
         RemoteGetTool(workspace_dir),
         RemoteLsTool(),
     ]
+
+    # Experience tool: only add if experience_file is configured
+    if experience_path:
+        tools.append(WriteExperienceTool(experience_path))
 
     # Max steps from config
     max_steps = agent_cfg.get("max_steps", 10)
@@ -934,6 +1020,10 @@ def create_agent(
     kwargs["step_callbacks"] = callbacks
 
     agent = CodeAgent(**kwargs)
+
+    # Dynamic experience injection (must be before resume to include in system prompt)
+    if experience_path:
+        _setup_experience_reloader(agent, experience_path)
 
     if resume:
         history_file = workspace_dir / "history.jsonl"

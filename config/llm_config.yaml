@@ -24,6 +24,7 @@ providers:
 agent:
   max_steps: 100
   context_pruning: true         # enable zone-based context management (default: true)
+  experience_file: config/experience.md   # cross-session lessons, auto-injected into prompts
   additional_authorized_imports:
     - math
     - numpy
@@ -48,28 +49,10 @@ agent:
   instructions: |
     Never use open() for file operations. Always use write_text/read_text.
 
-    MongoDB has a hard 16 MB document size limit on job inputs and plain @job
-    returns. The train_deepmd pre-check rejects inline dicts above ~10 MB
-    (~800 frames of 90-atom structures). To bypass: write data locally, use
-    remote_put to upload, and pass the remote path string instead of inline
-    data. Both train_deepmd and batch_static_eval accept remote path strings.
-
-    Default upload directory: /pscratch/sd/c/cz2014/agent_tmp_dir
-    (avoid /tmp -- node-local and periodically cleaned).
-
     If real computations are requested, use jobflow-remote to submit jobs to remote HPC:
     - Prefer to use atomate2 Makers (e.g., RelaxMaker) to create jobs if possible, otherwise define custom jobs
     - Use submit_flow() to submit, then wait_for_jobflow() to block until completion
     - Output is a dict: e.g., output["output"]["energy"], output["output"]["structure"]
-
-    IMPORTANT: Do NOT define custom @job-decorated functions in the sandbox.
-    The @job decorator transforms a function into a jobflow Job factory --
-    calling it returns an OutputReference placeholder, not a computed result.
-    The function body never executes locally; it would only run on the remote
-    worker, where sandbox-defined functions don't exist. Instead, use the
-    provided tools (train_deepmd, batch_static_eval, wait_for_jobflow) which
-    are pre-registered as remote jobs. For data merging, pass a list of sources to train_deepmd's
-    data_source parameter.
 
     BATCHING STRATEGIES: Each SLURM job submission costs ~1-2 min overhead
     (queue registration, node allocation, environment setup). Two mechanisms
@@ -99,12 +82,6 @@ agent:
     Queue selection: debug queue waits <10 min but caps at 27 min walltime.
     Shared queue waits 30-60+ min but allows up to 14h. Use debug when job
     runtime is under 27 min.
-
-    HELD-OUT EVALUATION: When constructing a held-out test set from MD
-    trajectories, generate a SEPARATE MD trajectory for evaluation. Do NOT
-    split frames from the training trajectories (e.g., every Nth frame).
-    Adjacent frames in an MD trajectory are highly correlated and do not
-    constitute an independent test.
 
 # Worker descriptions injected into agent instructions when project is specified.
 # Keys are "{project}.{worker}" identifiers.

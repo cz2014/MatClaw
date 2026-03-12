@@ -858,6 +858,58 @@ Recommended workflow:
                     img.save(img_dir / f"step{sn}_{i}.png")
 
 
+# --- Experience log tool ---
+
+
+class WriteExperienceTool(Tool):
+    name = "write_experience"
+    description = """Append a new experience note to the persistent experience log.
+
+Use this when you discover an operational lesson that should be remembered
+across sessions -- e.g., a constraint, a best practice, or a workaround
+that took multiple steps to figure out.
+
+The note is appended to the experience file and will be auto-injected into
+future prompts. Do NOT write notes about task-specific details (file paths,
+material parameters) -- only universal lessons.
+
+Args:
+    summary: One-line description of the lesson (becomes the heading).
+    details: Multi-line explanation with context and recommendations."""
+
+    inputs = {
+        "summary": {
+            "type": "string",
+            "description": "One-line summary of the lesson learned",
+        },
+        "details": {
+            "type": "string",
+            "description": "Detailed explanation with context and recommendations",
+        },
+    }
+    output_type = "string"
+
+    def __init__(self, experience_path: Path):
+        super().__init__()
+        self._path = experience_path.resolve()
+
+    def forward(self, summary: str, details: str) -> str:
+        import re
+
+        next_id = 1
+        if self._path.exists():
+            content = self._path.read_text(encoding="utf-8")
+            ids = [int(m) for m in re.findall(r"^## (\d+)\.", content, re.MULTILINE)]
+            if ids:
+                next_id = max(ids) + 1
+
+        entry = f"\n\n## {next_id}. {summary.strip()}\n\n{details.strip()}\n"
+        with self._path.open("a", encoding="utf-8") as f:
+            f.write(entry)
+
+        return f"Experience note #{next_id} saved: {summary.strip()}"
+
+
 # --- Workspace I/O tools ---
 
 
