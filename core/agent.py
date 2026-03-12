@@ -940,6 +940,7 @@ def create_agent(
     # I/O and remote transfer tools are always added (workspace-bound)
     from core.tools import (
         FetchHistoryTool,
+        QueryJobstoreTool,
         RemoteGetTool,
         RemoteLsTool,
         RemotePutTool,
@@ -954,6 +955,7 @@ def create_agent(
         RemotePutTool(workspace_dir),
         RemoteGetTool(workspace_dir),
         RemoteLsTool(),
+        QueryJobstoreTool(),
     ]
 
     # Experience tool: only add if experience_file is configured

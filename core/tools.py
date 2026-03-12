@@ -910,6 +910,133 @@ Args:
         return f"Experience note #{next_id} saved: {summary.strip()}"
 
 
+# --- MongoDB query tool ---
+
+
+class QueryJobstoreTool(Tool):
+    name = "query_jobstore"
+    description = (
+        "Query jobflow's MongoDB for job/flow status and computation results. "
+        "This is a thin wrapper around jobflow_remote's JobController -- "
+        "call any read-only method by name with its kwargs. "
+        "Use show_source_code=True to see the method signatures. "
+        "Key methods: get_jobs_info(flow_ids=[...]), get_job_doc(job_id=...), "
+        "get_job_output(job_id=..., load=True), count_jobs(states=[...])."
+    )
+
+    inputs = {
+        "project": {
+            "type": "string",
+            "description": "jobflow-remote project name (e.g., 'perlmutter', 'anvil')",
+        },
+        "method": {
+            "type": "string",
+            "description": (
+                "JobController method name. Allowed read-only methods: "
+                "get_jobs_info, get_jobs_doc, get_job_info, get_job_doc, "
+                "get_job_output, get_flows_info, get_flow_info_by_flow_uuid, "
+                "get_flow_info_by_job_uuid, get_job_info_by_job_uuid, "
+                "count_jobs, count_flows"
+            ),
+        },
+        "kwargs": {
+            "type": "object",
+            "description": (
+                "Keyword arguments passed directly to the JobController method. "
+                "See show_source_code=True for method signatures."
+            ),
+            "nullable": True,
+        },
+        "show_source_code": {
+            "type": "boolean",
+            "description": (
+                "If True, return the source code of the specified method "
+                "(or all whitelisted methods if method='all') instead of "
+                "executing a query. Useful for discovering parameters."
+            ),
+            "nullable": True,
+        },
+    }
+    output_type = "string"
+
+    _ALLOWED_METHODS = frozenset({
+        # Job queries
+        "get_jobs_info",
+        "get_jobs_doc",
+        "get_job_info",
+        "get_job_doc",
+        "get_job_output",
+        "get_job_info_by_job_uuid",
+        # Flow queries
+        "get_flows_info",
+        "get_flow_info_by_flow_uuid",
+        "get_flow_info_by_job_uuid",
+        # Counting
+        "count_jobs",
+        "count_flows",
+    })
+
+    _MAX_RESULT_CHARS = 50_000
+
+    def forward(
+        self,
+        project: str,
+        method: str,
+        kwargs: dict | None = None,
+        show_source_code: bool | None = None,
+    ) -> str:
+        if show_source_code:
+            import inspect
+
+            from jobflow_remote.jobs.jobcontroller import JobController as JC
+
+            if method == "all":
+                lines = []
+                for name in sorted(self._ALLOWED_METHODS):
+                    fn = getattr(JC, name)
+                    sig = inspect.signature(fn)
+                    doc = (fn.__doc__ or "").strip().split("\n")[0]
+                    lines.append(f"{name}{sig}\n    {doc}")
+                return "\n\n".join(lines)
+            if method not in self._ALLOWED_METHODS:
+                raise ValueError(
+                    f"Method {method!r} not allowed. "
+                    f"Allowed: {sorted(self._ALLOWED_METHODS)}"
+                )
+            return inspect.getsource(getattr(JC, method))
+
+        if method not in self._ALLOWED_METHODS:
+            raise ValueError(
+                f"Method {method!r} not allowed. "
+                f"Allowed: {sorted(self._ALLOWED_METHODS)}"
+            )
+
+        from jobflow_remote.jobs.jobcontroller import JobController
+
+        jc = JobController.from_project_name(project)
+        result = getattr(jc, method)(**(kwargs or {}))
+        return self._serialize(result)
+
+    def _serialize(self, result) -> str:
+        import json
+
+        if isinstance(result, list):
+            items = [
+                r.model_dump() if hasattr(r, "model_dump") else r for r in result
+            ]
+        elif hasattr(result, "model_dump"):
+            items = result.model_dump()
+        else:
+            items = result
+        text = json.dumps(items, indent=2, default=str)
+        if len(text) > self._MAX_RESULT_CHARS:
+            text = (
+                text[: self._MAX_RESULT_CHARS]
+                + f"\n... [truncated at {self._MAX_RESULT_CHARS} chars]"
+            )
+        return text
+
+
 # --- Workspace I/O tools ---
 
 
