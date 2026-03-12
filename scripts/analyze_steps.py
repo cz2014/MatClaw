@@ -60,12 +60,16 @@ class StepRecord:
     code_action: str | None
     observations: str | None
     model_output: str | None  # raw model_output string (JSON)
+    phase: str | None  # extracted from structured output
     plan: str | None  # extracted from structured output
     summary: str | None  # extracted from structured output
     error: str | None
     is_final_answer: bool
     tool_calls: list[dict] | None
     raw: dict  # full record for --step and --message views
+    timing_start: float | None = None
+    timing_end: float | None = None
+    token_usage_dict: dict | None = None  # raw token_usage dict from history.jsonl
 
 
 def parse_steps(path: Path) -> list[StepRecord]:
@@ -103,11 +107,13 @@ def parse_steps(path: Path) -> list[StepRecord]:
 
             # Parse model_output as JSON for structured output fields
             model_output = step.get("model_output")
+            phase = None
             plan = None
             summary = None
             if model_output:
                 try:
                     parsed_mo = json.loads(model_output)
+                    phase = parsed_mo.get("phase")
                     plan = parsed_mo.get("plan") or parsed_mo.get("thought")
                     summary = parsed_mo.get("summary")
                 except (json.JSONDecodeError, TypeError):
@@ -128,6 +134,7 @@ def parse_steps(path: Path) -> list[StepRecord]:
                     code_action=code_action,
                     observations=step.get("observations"),
                     model_output=model_output,
+                    phase=phase,
                     plan=plan,
                     summary=summary,
                     error=step.get("error"),
@@ -137,6 +144,124 @@ def parse_steps(path: Path) -> list[StepRecord]:
                 )
             )
     return records
+
+
+def _detect_format(path: Path) -> str:
+    """Detect whether file is history.jsonl or steps.jsonl format."""
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            first = json.loads(line)
+            if "role" in first and "step" in first:
+                return "history"
+            return "steps"
+    return "steps"
+
+
+def _parse_history(path: Path) -> list[StepRecord]:
+    """Parse history.jsonl into StepRecord objects."""
+    by_step: dict[int, list[dict]] = {}
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            by_step.setdefault(rec.get("step", 0), []).append(rec)
+
+    records = []
+    for step_num in sorted(by_step):
+        if step_num == 0:
+            continue
+        msgs = by_step[step_num]
+
+        model_output = None
+        observations = None
+        phase = None
+        plan = None
+        summary = None
+        code_action = None
+        error = None
+        timing_start = None
+        timing_end = None
+        token_usage_dict = None
+        is_final = False
+
+        for msg in msgs:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            if role == "assistant":
+                model_output = content
+                phase = msg.get("phase")
+                summary = msg.get("summary")
+                try:
+                    parsed = json.loads(content)
+                    plan = parsed.get("plan")
+                    code_action = parsed.get("code")
+                except (json.JSONDecodeError, TypeError):
+                    pass
+                if "timing" in msg:
+                    t = msg["timing"]
+                    timing_start = t.get("start_time")
+                    timing_end = t.get("end_time")
+                if "error" in msg and msg["error"]:
+                    error = str(msg["error"])
+                if "token_usage" in msg and msg["token_usage"]:
+                    token_usage_dict = msg["token_usage"]
+                if msg.get("code_action") is not None:
+                    code_action = msg["code_action"]
+                if msg.get("is_final_answer"):
+                    is_final = True
+            elif role in ("tool-response", "tool"):
+                observations = content
+
+        duration = None
+        if timing_start is not None and timing_end is not None:
+            duration = timing_end - timing_start
+
+        input_tokens = None
+        output_tokens = None
+        if token_usage_dict:
+            input_tokens = token_usage_dict.get("input_tokens")
+            output_tokens = token_usage_dict.get("output_tokens")
+
+        records.append(
+            StepRecord(
+                ts="",
+                step_type="ActionStep",
+                step_number=step_num,
+                duration=duration,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                code_action=code_action,
+                observations=observations,
+                model_output=model_output,
+                phase=phase,
+                plan=plan,
+                summary=summary,
+                error=error,
+                is_final_answer=is_final,
+                tool_calls=None,
+                raw={},
+                timing_start=timing_start,
+                timing_end=timing_end,
+                token_usage_dict=token_usage_dict,
+            )
+        )
+    return records
+
+
+def parse(path: Path) -> list[StepRecord]:
+    """Unified parse entry point: auto-detects format and dispatches."""
+    fmt = _detect_format(path)
+    if fmt == "history":
+        return _parse_history(path)
+    return parse_steps(path)
 
 
 # ---------------------------------------------------------------------------
@@ -204,8 +329,10 @@ def cmd_timeline(steps: list[StepRecord]) -> None:
         outtok = str(s.output_tokens) if s.output_tokens is not None else "-"
 
         # Summary: prefer structured output summary, fall back to code_action
+        phase_str = f"[{s.phase}] " if s.phase else ""
         if s.summary:
-            desc = s.summary[:70]
+            desc = phase_str + s.summary
+            desc = desc[:70]
         elif s.code_action:
             desc = s.code_action.replace("\n", " ")[:60]
         else:
@@ -261,6 +388,12 @@ def cmd_step(steps: list[StepRecord], step_num: int) -> None:
     outtok = s.output_tokens if s.output_tokens is not None else "?"
     print(f"Tokens:    {intok} in / {outtok} out")
     print()
+
+    # Phase
+    if s.phase:
+        print(f"--- Phase ---")
+        print(s.phase)
+        print()
 
     # Plan
     print("--- Plan ---")
@@ -376,7 +509,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    parser.add_argument("path", type=Path, help="Path to steps.jsonl file")
+    parser.add_argument(
+        "path", type=Path, nargs="?", default=None,
+        help="Path to history.jsonl or steps.jsonl (auto-detected). "
+             "If omitted, tries workspace/history.jsonl then workspace/steps.jsonl.",
+    )
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--summary", action="store_true", help="Quick overview (default)")
@@ -388,11 +525,23 @@ def main():
 
     args = parser.parse_args()
 
-    if not args.path.exists():
-        print(f"File not found: {args.path}", file=sys.stderr)
+    # Resolve input path: explicit > history.jsonl > steps.jsonl
+    path = args.path
+    if path is None:
+        ws = Path("workspace")
+        if (ws / "history.jsonl").exists():
+            path = ws / "history.jsonl"
+        elif (ws / "steps.jsonl").exists():
+            path = ws / "steps.jsonl"
+        else:
+            print("No history.jsonl or steps.jsonl found in workspace/", file=sys.stderr)
+            sys.exit(1)
+
+    if not path.exists():
+        print(f"File not found: {path}", file=sys.stderr)
         sys.exit(1)
 
-    steps = parse_steps(args.path)
+    steps = parse(path)
 
     if args.timeline:
         cmd_timeline(steps)

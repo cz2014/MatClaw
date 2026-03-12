@@ -16,6 +16,7 @@ from typing import Any
 import yaml
 from smolagents import CodeAgent, LiteLLMModel, LocalPythonExecutor
 
+from core.context import _get_content_str, _get_role
 from core.tools import batch_static_eval, rag_search, train_deepmd, wait_for_jobflow
 from smolagents.agents import (
     FinalAnswerPromptTemplate,
@@ -31,9 +32,17 @@ PROJECT_ROOT = Path(__file__).parent.parent
 
 # Monkey-patch structured output schema:
 # 1. Rename "thought" -> "plan" to avoid GPT-5.2 ContentPolicyViolationError
-#    (OpenAI's input filter rejects "thought process" / chain-of-thought framing)
-# 2. Add "summary" field (placed last so LLM generates plan and code first)
+# 2. Add "phase" (first) and "summary" (last) for pipeline continuity
 _so_schema = CODEAGENT_RESPONSE_FORMAT["json_schema"]["schema"]
+_so_schema["properties"]["phase"] = {
+    "description": (
+        "Cross-step topic title locating this step in the overall pipeline "
+        "(e.g. 'Iteration 2, Step 3: Train student ensemble' or "
+        "'Phase 1: Exploring atomate2 APIs')."
+    ),
+    "title": "Phase",
+    "type": "string",
+}
 _so_schema["properties"]["plan"] = {
     "description": "Explain what this step does and how it contributes to next steps.",
     "title": "Plan",
@@ -43,9 +52,9 @@ del _so_schema["properties"]["thought"]
 _so_schema["properties"]["code"]["description"] = (
     "Valid Python code snippet implementing the plan."
 )
-_so_schema["required"] = ["plan", "code"]
-_so_schema["title"] = "PlanAndCodeAnswer"
-CODEAGENT_RESPONSE_FORMAT["json_schema"]["name"] = "PlanAndCodeAnswer"
+_so_schema["required"] = ["phase", "plan", "code"]
+_so_schema["title"] = "PhaseAndPlanAnswer"
+CODEAGENT_RESPONSE_FORMAT["json_schema"]["name"] = "PhaseAndPlanAnswer"
 _so_schema["properties"]["summary"] = {
     "description": (
         "One-line summary of what this step does "
@@ -100,6 +109,137 @@ def _step_jsonl_logger(log_file: Path):
         }
         with log_file.open("a", encoding="utf-8") as f:
             f.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
+
+    return cb
+
+
+def _extract_images_b64(msg) -> list[str]:
+    """Extract PIL images from message content blocks, return as base64 PNG strings."""
+    import base64
+    import io
+
+    images: list[str] = []
+    if isinstance(msg, dict):
+        content = msg.get("content", [])
+    else:
+        content = getattr(msg, "content", [])
+    if not isinstance(content, list):
+        return images
+    for block in content:
+        if isinstance(block, dict) and block.get("type") == "image":
+            pil_img = block.get("image")
+            if pil_img is not None:
+                buf = io.BytesIO()
+                pil_img.save(buf, format="PNG")
+                images.append(base64.b64encode(buf.getvalue()).decode("ascii"))
+    return images
+
+
+def _history_writer(history_file: Path, workspace_dir: Path):
+    """Create a step callback that appends new messages to history.jsonl.
+
+    Each message is stored exactly once. The callback diffs the current
+    model_input_messages against a running count of previously-written
+    messages (bootstrap messages are written on the first step).
+
+    Uses a global step counter (next_step) instead of step.step_number to
+    ensure globally unique step numbers across multiple run() calls.
+    smolagents resets step_number to 1 on every run(), but our counter
+    continues from the max step in existing history.
+
+    On restart (history_file already exists), the first callback skips all
+    reconstructed messages and resumes the counter from max(step) + 1.
+    """
+    _state: dict = {
+        "written": 0,
+        "skip_first": history_file.exists(),
+        "next_step": 1,
+    }
+
+    def cb(step, agent):
+        import dataclasses
+
+        from smolagents import ActionStep
+
+        if not isinstance(step, ActionStep):
+            return
+
+        messages = step.model_input_messages
+        if messages is None:
+            return
+
+        if _state["skip_first"]:
+            _state["written"] = len(messages)
+            _state["skip_first"] = False
+            # Resume step counter from existing history
+            max_step = 0
+            with history_file.open("r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            rec = json.loads(line)
+                            max_step = max(max_step, rec.get("step", 0))
+                        except json.JSONDecodeError:
+                            pass
+            _state["next_step"] = max_step + 1
+            return
+
+        written = _state["written"]
+        if len(messages) <= written:
+            return
+
+        new_messages = messages[written:]
+        step_num = _state["next_step"]
+
+        with history_file.open("a", encoding="utf-8") as f:
+            for msg in new_messages:
+                role = _get_role(msg)
+                content = _get_content_str(msg)
+
+                if written == 0 and role in ("system", "user"):
+                    msg_step = 0
+                else:
+                    msg_step = step_num
+
+                rec: dict = {
+                    "step": msg_step,
+                    "role": role,
+                    "content": content,
+                }
+
+                if role == "assistant":
+                    try:
+                        parsed = json.loads(content)
+                        if isinstance(parsed, dict):
+                            rec["summary"] = parsed.get("summary")
+                            rec["phase"] = parsed.get("phase")
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+
+                    if step.timing:
+                        rec["timing"] = {
+                            "start_time": step.timing.start_time,
+                            "end_time": step.timing.end_time,
+                        }
+                    if step.error:
+                        rec["error"] = step.error.dict()
+                    if step.code_action is not None:
+                        rec["code_action"] = step.code_action
+                    if step.is_final_answer:
+                        rec["is_final_answer"] = True
+                    if step.token_usage:
+                        rec["token_usage"] = dataclasses.asdict(step.token_usage)
+
+                images_b64 = _extract_images_b64(msg)
+                if images_b64:
+                    rec["images_b64"] = images_b64
+
+                f.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
+                written += 1
+
+        _state["written"] = written
+        _state["next_step"] = step_num + 1
 
     return cb
 
@@ -166,7 +306,7 @@ def _inject_workspace_images(workspace: Path):
         if not isinstance(step, ActionStep):
             return
         current = set()
-        for ext in ("*.png", "*.jpg", "*.jpeg"):
+        for ext in ("**/*.png", "**/*.jpg", "**/*.jpeg"):
             current.update(str(p) for p in workspace.glob(ext))
         new = sorted(current - seen)
         seen.update(current)
@@ -185,6 +325,130 @@ def _inject_workspace_images(workspace: Path):
             step.observations_images = (step.observations_images or []) + imgs
 
     return cb
+
+
+def _restart_from_history(agent: CodeAgent, history_file: Path) -> int:
+    """Reconstruct agent memory from history.jsonl for restart.
+
+    Populates agent.memory.steps with ActionStep objects reconstructed
+    from the history file. Returns the next step_number to use.
+
+    Executor variables are NOT restored (Python state is lost on crash).
+    A restart message is injected to inform the agent.
+    """
+    from smolagents import ActionStep
+    from smolagents.memory import Timing
+
+    records: list[dict] = []
+    with history_file.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                records.append(json.loads(line))
+
+    if not records:
+        return 1
+
+    by_step: dict[int, list[dict]] = {}
+    for rec in records:
+        by_step.setdefault(rec["step"], []).append(rec)
+
+    max_step = max(by_step.keys())
+
+    for step_num in sorted(by_step.keys()):
+        if step_num == 0:
+            continue
+
+        step_records = by_step[step_num]
+        model_output = None
+        observations = None
+        code_action = None
+        timing = Timing(start_time=0.0, end_time=0.0)
+        error = None
+        is_final_answer = False
+        token_usage = None
+        images: list = []
+
+        for rec in step_records:
+            role = rec["role"]
+            content = rec.get("content", "")
+            if role == "assistant":
+                model_output = content
+                try:
+                    parsed = json.loads(content)
+                    code_action = parsed.get("code")
+                except (json.JSONDecodeError, TypeError):
+                    pass
+                if "timing" in rec:
+                    t = rec["timing"]
+                    timing = Timing(
+                        start_time=t.get("start_time", 0.0),
+                        end_time=t.get("end_time", 0.0),
+                    )
+                if "error" in rec and rec["error"]:
+                    from smolagents.utils import AgentError
+                    err = rec["error"]
+                    error = AgentError(err.get("message", str(err)) if isinstance(err, dict) else str(err))
+                if rec.get("is_final_answer"):
+                    is_final_answer = True
+                if "token_usage" in rec and rec["token_usage"]:
+                    import dataclasses as _dc
+
+                    from smolagents.monitoring import TokenUsage
+                    init_fields = {f.name for f in _dc.fields(TokenUsage) if f.init}
+                    token_usage = TokenUsage(**{
+                        k: v for k, v in rec["token_usage"].items()
+                        if k in init_fields
+                    })
+                if rec.get("code_action") is not None:
+                    code_action = rec["code_action"]
+            elif role in ("tool-response", "tool"):
+                observations = content
+
+            if "images_b64" in rec:
+                import base64
+                import io
+
+                import PIL.Image
+                for b64 in rec["images_b64"]:
+                    img = PIL.Image.open(io.BytesIO(base64.b64decode(b64)))
+                    img.load()
+                    images.append(img)
+
+        action_step = ActionStep(
+            step_number=step_num,
+            timing=timing,
+            model_output=model_output,
+            code_action=code_action,
+            observations=observations,
+            error=error,
+            is_final_answer=is_final_answer,
+            token_usage=token_usage,
+        )
+        if images:
+            action_step.observations_images = images
+        agent.memory.steps.append(action_step)
+
+    restart_msg = (
+        "\n\nAGENT RESTARTED. All Python executor variables from previous steps "
+        "are lost. Use fetch_history and read_text to recover state. "
+        "Do NOT assume any variable from prior steps exists."
+    )
+    last_actions = [s for s in agent.memory.steps if isinstance(s, ActionStep)]
+    if last_actions:
+        last = last_actions[-1]
+        last.observations = (last.observations or "") + restart_msg
+    else:
+        restart_step = ActionStep(
+            step_number=max_step + 1,
+            timing=Timing(start_time=time.time()),
+            observations=restart_msg.lstrip(),
+        )
+        agent.memory.steps.append(restart_step)
+
+    logger.info(
+        "Agent restarted from history: %d steps recovered", max_step,
+    )
 
 
 def _save_config_snapshot(config_dir: Path, workspace_dir: Path, prompts_file: str) -> None:
@@ -485,13 +749,14 @@ def create_agent(
     workspace_dir: Path,
     provider_name: str | None = None,
     tools: list | None = None,
-    enable_step_logging: bool = True,
+    enable_step_logging: bool = True,  # TODO: default to False once history.jsonl is validated
     planning_interval: int | None = None,
     final_answer_checks: list | None = None,
     prompts_file: str = "prompts.yaml",
     project: str | None = None,
     instructions_extra: str | None = None,
     inject_images: bool = False,
+    resume: bool = False,
 ) -> CodeAgent:
     """Create a CodeAgent with config from YAML files.
 
@@ -587,6 +852,7 @@ def create_agent(
 
     # I/O and remote transfer tools are always added (workspace-bound)
     from core.tools import (
+        FetchHistoryTool,
         RemoteGetTool,
         RemoteLsTool,
         RemotePutTool,
@@ -596,6 +862,7 @@ def create_agent(
     tools = list(tools) + [
         WriteTextTool(workspace_dir),
         ReadTextTool(workspace_dir),
+        FetchHistoryTool(workspace_dir),
         RemotePutTool(workspace_dir),
         RemoteGetTool(workspace_dir),
         RemoteLsTool(),
@@ -647,6 +914,10 @@ def create_agent(
             "at the start of the next step. Only newly created images are shown -- "
             "each image appears once. Use this to verify your figures before finalizing."
         )
+    # History writer -- always enabled (primary conversation storage)
+    history_file = workspace_dir / "history.jsonl"
+    callbacks.append(_history_writer(history_file, workspace_dir))
+
     if enable_step_logging:
         steps_log = _make_steps_log_path(workspace_dir)
         callbacks.append(_step_jsonl_logger(steps_log))
@@ -654,7 +925,16 @@ def create_agent(
 
     kwargs["step_callbacks"] = callbacks
 
-    return CodeAgent(**kwargs)
+    agent = CodeAgent(**kwargs)
+
+    if resume:
+        history_file = workspace_dir / "history.jsonl"
+        if history_file.exists():
+            _restart_from_history(agent, history_file)
+        else:
+            logger.warning("resume=True but no history.jsonl found in %s", workspace_dir)
+
+    return agent
 
 
 # --- Pause/resume support ---

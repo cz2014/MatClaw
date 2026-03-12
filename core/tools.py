@@ -701,6 +701,163 @@ Output structure:
         )
 
 
+# --- History fetch tool ---
+
+
+class FetchHistoryTool(Tool):
+    name = "fetch_history"
+    description = """Retrieve past conversation history that may have been pruned from context.
+
+Two modes:
+- mode="index": Returns step number + summary for steps in [start, end] range.
+  Use this to scan what happened (like a table of contents).
+  Example: fetch_history(mode="index", start=1, end=20)
+
+- mode="detail": Returns full messages for specific step numbers.
+  Use this after index mode to retrieve exact content.
+  Example: fetch_history(mode="detail", steps=[3, 15])
+
+Recommended workflow:
+1. Call with mode="index" to get summaries of pruned steps
+2. Identify which steps have the information you need
+3. Call with mode="detail" for those specific steps"""
+
+    inputs = {
+        "mode": {
+            "type": "string",
+            "description": "Either 'index' (step summaries) or 'detail' (full messages)",
+        },
+        "start": {
+            "type": "integer",
+            "description": "Start step number for index mode (inclusive)",
+            "nullable": True,
+        },
+        "end": {
+            "type": "integer",
+            "description": "End step number for index mode (inclusive)",
+            "nullable": True,
+        },
+        "steps": {
+            "type": "array",
+            "items": {"type": "integer"},
+            "description": "List of step numbers for detail mode",
+            "nullable": True,
+        },
+    }
+    output_type = "string"
+
+    def __init__(self, workspace: Path):
+        super().__init__()
+        self._history_path = workspace.resolve() / "history.jsonl"
+
+    def _load_history(self) -> list[dict]:
+        if not self._history_path.exists():
+            return []
+        records = []
+        with self._history_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    records.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+        return records
+
+    def forward(
+        self,
+        mode: str,
+        start: int | None = None,
+        end: int | None = None,
+        steps: list[int] | None = None,
+    ) -> str:
+        records = self._load_history()
+        if not records:
+            return "No conversation history found."
+
+        if mode == "index":
+            return self._index_mode(records, start, end)
+        elif mode == "detail":
+            if not steps:
+                return "Error: 'steps' parameter required for detail mode."
+            return self._detail_mode(records, steps)
+        else:
+            return f"Error: unknown mode '{mode}'. Use 'index' or 'detail'."
+
+    def _index_mode(self, records: list[dict], start: int | None, end: int | None) -> str:
+        assistant_recs = [r for r in records if r.get("role") == "assistant"]
+
+        step_summaries: dict[int, dict] = {}
+        for rec in assistant_recs:
+            sn = rec.get("step", 0)
+            if sn not in step_summaries:
+                step_summaries[sn] = rec
+
+        if start is not None:
+            step_summaries = {k: v for k, v in step_summaries.items() if k >= start}
+        if end is not None:
+            step_summaries = {k: v for k, v in step_summaries.items() if k <= end}
+
+        if not step_summaries:
+            return f"No steps found in range [{start}, {end}]."
+
+        lines = []
+        for sn in sorted(step_summaries.keys()):
+            rec = step_summaries[sn]
+            phase = rec.get("phase", "")
+            summary = rec.get("summary", "(no summary)")
+            phase_str = f" [{phase}]" if phase else ""
+            lines.append(f"Step {sn}{phase_str}: {summary}")
+
+        return "\n".join(lines)
+
+    def _detail_mode(self, records: list[dict], steps: list[int]) -> str:
+        step_set = set(steps)
+        grouped: dict[int, list[dict]] = {}
+        for rec in records:
+            sn = rec.get("step", 0)
+            if sn in step_set:
+                grouped.setdefault(sn, []).append(rec)
+
+        if not grouped:
+            return f"No messages found for steps {steps}."
+
+        self._save_history_images(grouped)
+
+        parts = []
+        for sn in sorted(grouped.keys()):
+            parts.append(f"=== Step {sn} ===")
+            for rec in grouped[sn]:
+                role = rec.get("role", "unknown")
+                content = rec.get("content", "")
+                n_images = len(rec.get("images_b64", []))
+                if n_images:
+                    content += f"\n[{n_images} image(s) saved to workspace -- visible next step]"
+                parts.append(f"[{role}]\n{content}")
+            parts.append("")
+
+        return "\n".join(parts)
+
+    def _save_history_images(self, grouped: dict[int, list[dict]]):
+        import base64
+        import io
+
+        import PIL.Image
+
+        img_dir = self._history_path.parent / "_history_images"
+        if img_dir.exists():
+            for f in img_dir.glob("*.png"):
+                f.unlink()
+        img_dir.mkdir(exist_ok=True)
+
+        for sn, recs in grouped.items():
+            for rec in recs:
+                for i, b64 in enumerate(rec.get("images_b64", [])):
+                    img = PIL.Image.open(io.BytesIO(base64.b64decode(b64)))
+                    img.save(img_dir / f"step{sn}_{i}.png")
+
+
 # --- Workspace I/O tools ---
 
 
