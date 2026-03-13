@@ -920,7 +920,8 @@ class QueryJobstoreTool(Tool):
         "This is a thin wrapper around jobflow_remote's JobController -- "
         "call any read-only method by name with its kwargs. "
         "Use show_source_code=True to see the method signatures. "
-        "Key methods: get_jobs_info(flow_ids=[...]), get_job_doc(job_id=...), "
+        "Key methods: get_jobs_info(flow_ids=[...]), "
+        "get_job_doc(job_id=<UUID string>, db_id=<numeric string>) — use db_id (not job_id) when you have the numeric ID from get_jobs_info, "
         "get_job_output(job_id=..., load=True), count_jobs(states=[...])."
     )
 

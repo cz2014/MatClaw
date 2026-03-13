@@ -1,0 +1,57 @@
+units           metal
+atom_style      atomic
+boundary        p p p
+
+# Define topology/IDs from a minimal data file (ensures matching IDs/types)
+read_data       ../input/tmp.data
+
+# Load frame 0 coordinates/box (replace existing atoms)
+read_dump       interp_1d.lammpstrj 0 x y z box yes replace yes
+
+# External electric field applied to upper layer with effective charges:
+# Cu = 0.765, In = -0.085, P = -0.085, S = -0.085
+variable        zthr equal zlo+0.65*lz
+region          mobile block INF INF INF INF v_zthr INF units box
+group           mobile region mobile
+variable        Efield equal -0.10
+variable        z0     equal 16.7443
+variable        ZCu    equal 0.765
+variable        ZIn    equal -0.085
+variable        ZP     equal -0.085
+variable        ZS     equal -0.085
+variable        qeff   atom "(type==1)*v_ZCu + (type==2)*v_ZIn + (type==3)*v_ZP + (type==4)*v_ZS"
+variable        fz     atom "v_qeff*v_Efield"
+variable        Ufield atom "v_qeff*v_Efield*(v_z0 - z)"
+fix             fE mobile addforce 0.0 0.0 v_fz energy v_Ufield
+fix_modify      fE energy yes
+compute         UfieldSum mobile reduce sum v_Ufield
+variable        Eext equal c_UfieldSum
+
+# Thermo for visibility (after box is defined)
+thermo_style    custom step pe v_Eext
+thermo          1
+
+# Masses (DeepMD type order: 1=Cu, 2=In, 3=P, 4=S)
+mass            1 63.546
+mass            2 114.818
+mass            3 30.974
+mass            4 32.065
+
+# DeepMD potential (path consistent with relax.in)
+pair_style      deepmd ../../frozen_model.pb
+pair_coeff      * *  Cu In P S
+
+# Evaluate and write energy for frame 0 (overwrite file)
+run             0
+variable        e equal pe
+print           "0 ${e}" file ../output/energy_curve_1d.dat
+
+# Process remaining frames
+variable        f loop 500
+label           loop_frames
+    read_dump   interp_1d.lammpstrj ${f} x y z box yes replace yes
+    run         0
+    variable    e equal pe
+    print       "${f} ${e}" append ../output/energy_curve_1d.dat
+    next        f
+    jump        SELF loop_frames
