@@ -1311,7 +1311,111 @@ Returns an empty list if the directory does not exist."""
         return host.listdir(remote_path)
 
 
+class EFieldMDTool(Tool):
+    """Tool that creates an E-field MD job for use in jobflow."""
+
+    name = "efield_md"
+    description = """Create an E-field MD job: ForceFieldMDMaker + external electric field.
+
+Identical to ForceFieldMDMaker with two extra parameters (efield, efield_charges).
+Internally uses SumCalculator([DeePMD, UniformElectricForce]) so the total force
+on atom i is F_DP(i) + q_i * E and the total energy includes -sum(q_i * r_i . E).
+
+Returns a jobflow Job. Use in a Flow with submit_flow() + wait_for_jobflow():
+    job = efield_md(structure, efield=(0,0,-0.05),
+                    efield_charges={"Cu": 0.765, "In": -0.085, ...},
+                    calculator_kwargs={"model": "/path/to/model.pb"},
+                    n_steps=19000, temperature=230, time_step=2.0)
+    flow = Flow([job], name="efield_md")
+    submit_flow(flow, project="perlmutter", worker="perlmutter_debug")
+    out = wait_for_jobflow("perlmutter", job.uuid)
+
+E-field specific args:
+    structure: pymatgen Structure (input geometry)
+    efield: Electric field vector in eV/A/e, e.g. (0, 0, -0.05) for -z field
+    efield_charges: Element symbol -> Born effective charge (e), e.g. {"Cu": 0.765, ...}
+
+ForceFieldMDMaker args (passed through):
+    calculator_kwargs: Dict for DeePMD calculator, e.g. {"model": "/path/to/model.pb"}
+    n_steps: Number of MD steps
+    temperature: Temperature in K
+    time_step: Timestep in fs (default 2.0)
+    traj_file: Trajectory filename (e.g. "trajectory.traj")
+    traj_interval: Save trajectory every N steps
+    ionic_step_data: Tuple of data to record per step, e.g. ("energy", "forces", "mol_or_struct")
+    name: Job name (optional)
+
+Introspection:
+    show_source: If True, return the source code of UniformElectricForce and
+                 EFieldMDMaker instead of creating a job. Useful for understanding
+                 the force/energy formulas and SumCalculator composition.
+"""
+    inputs = {
+        "structure": {"type": "object", "description": "pymatgen Structure", "nullable": True},
+        "efield": {"type": "object", "description": "E-field vector (3-tuple, eV/A/e)", "nullable": True},
+        "efield_charges": {"type": "object", "description": "Element -> Born effective charge dict", "nullable": True},
+        "calculator_kwargs": {"type": "object", "description": "DeePMD calculator kwargs, e.g. {'model': '...'}", "nullable": True},
+        "name": {"type": "string", "description": "Job name (optional)", "nullable": True},
+        "n_steps": {"type": "integer", "description": "Number of MD steps", "nullable": True},
+        "temperature": {"type": "number", "description": "Temperature in K", "nullable": True},
+        "time_step": {"type": "number", "description": "Timestep in fs (default 2.0)", "nullable": True},
+        "traj_file": {"type": "string", "description": "Trajectory filename, e.g. 'traj.traj'", "nullable": True},
+        "traj_interval": {"type": "integer", "description": "Save trajectory every N steps", "nullable": True},
+        "ionic_step_data": {"type": "object", "description": "Tuple of data per step, e.g. ('energy', 'forces', 'mol_or_struct')", "nullable": True},
+        "show_source": {"type": "boolean", "description": "If True, return source code instead of creating a job", "nullable": True},
+    }
+    output_type = "object"
+
+    def forward(
+        self,
+        structure=None,
+        efield=None,
+        efield_charges=None,
+        calculator_kwargs=None,
+        name=None,
+        n_steps=None,
+        temperature=None,
+        time_step=None,
+        traj_file=None,
+        traj_interval=None,
+        ionic_step_data=None,
+        show_source=None,
+    ):
+        if show_source:
+            import inspect
+
+            from remote_jobs._efield_calculator import EFieldMDMaker, UniformElectricForce
+
+            return (
+                "# UniformElectricForce (E-field ASE calculator)\n"
+                + inspect.getsource(UniformElectricForce)
+                + "\n\n# EFieldMDMaker (ForceFieldMDMaker subclass)\n"
+                + inspect.getsource(EFieldMDMaker)
+            )
+
+        from remote_jobs._efield_calculator import EFieldMDMaker
+
+        passthrough = {
+            "name": name,
+            "n_steps": n_steps,
+            "temperature": temperature,
+            "time_step": time_step,
+            "traj_file": traj_file,
+            "traj_interval": traj_interval,
+            "ionic_step_data": ionic_step_data,
+        }
+        maker = EFieldMDMaker(
+            force_field_name="DeepMD",
+            efield=tuple(efield) if efield is not None else (0, 0, 0),
+            efield_charges=efield_charges,
+            calculator_kwargs=calculator_kwargs,
+            **{k: v for k, v in passthrough.items() if v is not None},
+        )
+        return maker.make(structure)
+
+
 # Instantiate tools for use in agent
 train_deepmd = TrainDeePMDTool()
 batch_static_eval = BatchStaticEvalTool()
+efield_md = EFieldMDTool()
 rag_search = RagSearchTool()

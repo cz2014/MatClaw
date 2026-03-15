@@ -17,7 +17,7 @@ import yaml
 from smolagents import CodeAgent, LiteLLMModel, LocalPythonExecutor
 
 from core.context import _get_content_str, _get_role
-from core.tools import batch_static_eval, rag_search, train_deepmd, wait_for_jobflow
+from core.tools import batch_static_eval, efield_md, rag_search, train_deepmd, wait_for_jobflow
 from smolagents.agents import (
     FinalAnswerPromptTemplate,
     ManagedAgentPromptTemplate,
@@ -273,24 +273,23 @@ def _on_step_error(step, agent) -> None:
         err_msg = truncated  # use truncated version for hint check below
 
     # --- RAG hint for API errors ---
-    if "rag_search" not in agent.tools:
-        return
-    tool_hint = "rag_search"
+    if ("rag_search" in agent.tools
+            and _API_ERROR_PATTERN.search(err_msg)):
+        err_msg += (
+            "\n\nHint: If you are not 100% certain about an API path or kwarg, "
+            f"call rag_search before trying variants."
+        )
 
-    if not _API_ERROR_PATTERN.search(err_msg):
-        return
-
-    # Soft nudge - append hint to error message
-    hint = (
-        "\n\nHint: If you are not 100% certain about an API path or kwarg, "
-        f"call {tool_hint} before trying variants."
+    # --- Experience hint (unconditional) ---
+    err_msg += (
+        "\n\nHint: If this error reflects a reusable lesson, "
+        "call write_experience to record it for future runs."
     )
-    new_msg = err_msg + hint
+
     # Update both .message attr and Exception.args for str() compatibility
     if hasattr(step.error, "message"):
-        step.error.message = new_msg
-    step.error.args = (new_msg,)
-    print(f"[step_error] Added hint to step {step.step_number}")
+        step.error.message = err_msg
+    step.error.args = (err_msg,)
 
 
 _MAX_IMAGES_PER_STEP = 5
@@ -935,7 +934,7 @@ def create_agent(
 
     # Tools: use custom list or default (includes rag_search for main agent)
     if tools is None:
-        tools = [wait_for_jobflow, train_deepmd, batch_static_eval, rag_search]
+        tools = [wait_for_jobflow, train_deepmd, batch_static_eval, efield_md, rag_search]
 
     # I/O and remote transfer tools are always added (workspace-bound)
     from core.tools import (

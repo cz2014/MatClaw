@@ -29,3 +29,13 @@ When constructing a held-out test set from MD trajectories, generate a SEPARATE
 MD trajectory for evaluation. Do NOT split frames from the training trajectories
 (e.g., every Nth frame). Adjacent frames in an MD trajectory are highly
 correlated and do not constitute an independent test.
+
+
+## 4. Avoid explicit repr() calls in sandbox code
+
+The restricted interpreter may reject explicit repr(...) as a forbidden function call, especially inside exception handlers. Prefer f-strings like f'{exc}' or just print the object directly instead of calling repr explicitly.
+
+
+## 5. Avoid accessing dunder attributes directly in sandbox inspection
+
+The restricted interpreter may block direct access to dunder attributes like __init__. When inspecting classes, prefer inspect.signature(ClassName) for the constructor signature, inspect.signature(ClassName.make) for regular methods, and inspect.getsource(ClassName) instead of referencing ClassName.__init__.
