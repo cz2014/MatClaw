@@ -186,6 +186,39 @@ def _extract_from_ionic_steps(
     return ls
 
 
+def _harmonize_optional_fields(systems: list) -> list:
+    """Strip optional frame-dependent fields that aren't present in ALL systems.
+
+    dpdata's LabeledSystem.append() requires that optional fields like 'virials'
+    are either present in both systems or absent from both. When merging data from
+    heterogeneous sources (e.g., deepmd/npy with virials + raw dict without),
+    this function drops fields that would cause merge failures.
+
+    Only frame-dependent optional fields are affected (virials, atom_pref,
+    real_atom_types). Core fields (cells, coords, energies, forces) are never
+    touched.
+    """
+    if len(systems) <= 1:
+        return systems
+
+    # Frame-dependent optional fields that dpdata checks during append
+    _OPTIONAL_FRAME_FIELDS = ("virials", "atom_pref", "real_atom_types")
+
+    # Find fields present in ALL systems
+    common = set(_OPTIONAL_FRAME_FIELDS)
+    for sys in systems:
+        present = {f for f in _OPTIONAL_FRAME_FIELDS if f in sys.data}
+        common &= present
+
+    # Strip fields not in the common set
+    for sys in systems:
+        for field in _OPTIONAL_FRAME_FIELDS:
+            if field in sys.data and field not in common:
+                del sys.data[field]
+
+    return systems
+
+
 def _load_labeled_data(data_source: Any, type_map: tuple[str, ...], run_dir: Path) -> Any:
     """Load training data from various sources.
 
@@ -217,6 +250,7 @@ def _load_labeled_data(data_source: Any, type_map: tuple[str, ...], run_dir: Pat
         for item in data_source:
             sub = _load_labeled_data(item, type_map, run_dir)
             systems.append(sub)
+        systems = _harmonize_optional_fields(systems)
         merged = systems[0]
         for s in systems[1:]:
             merged += s
