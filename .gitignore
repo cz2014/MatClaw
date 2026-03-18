@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Developer config
+.claude/
+
+# Secrets and credentials
+.env
+.env.*
+*credentials*
+*secret*
+
+# Workspace outputs (keep directory, ignore contents)
+workspace/*
+workspace_*/
+!workspace/.gitkeep
+benchmark/qa/workspace/
+benchmark/qa/results_*.jsonl
+benchmark/qa/results_*.json
+benchmark/qa_vasp/workspace/
+benchmark/qa_vasp/raw/
+benchmark/tasks/workspace/
+
+# RAG data (copied sources, doc files, and index; rebuild with scripts/build_corpus.py)
+data/corpus/
+data/docs/
+data/sources/
+benchmark/qa/corpus/
+benchmark/qa/sources/
+
+# OpenTelemetry traces
+*.otlp
+traces/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+node_modules/

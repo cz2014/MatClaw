@@ -1,0 +1,3602 @@
+[
+  {
+    "source_file": "jobflow_remote/jobs/data.py",
+    "category": "Usage_Pattern",
+    "question": "How should a JobInfo instance be created when starting from a dictionary returned by a MongoDB query?",
+    "choices": {
+      "A": "A. JobInfo(**query_result)",
+      "B": "B. JobInfo.model_validate(query_result)",
+      "C": "C. JobInfo.from_query_output(query_result)",
+      "D": "D. JobInfo.parse_obj(query_result)"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/runner.py",
+    "category": "Return_Value",
+    "question": "What does Runner.get_worker(worker_name) return if the worker exists in the configuration?",
+    "choices": {
+      "A": "A. A dictionary of worker settings",
+      "B": "B. An instance of WorkerBase",
+      "C": "C. A string representing the worker's URL",
+      "D": "D. The worker's process ID"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow/core/store.py",
+    "category": "Usage_Pattern",
+    "question": "When initializing a JobStore, how is the 'key' property of additional stores automatically configured?",
+    "choices": {
+      "A": "A. It is set to 'uuid'",
+      "B": "B. It is set to 'blob_uuid'",
+      "C": "C. It is set to 'index'",
+      "D": "D. It is left as the default Maggma key"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/config/base.py",
+    "category": "Return_Value",
+    "question": "What type of object does the get_host() method of a LocalWorker return?",
+    "choices": {
+      "A": "A. LocalHost",
+      "B": "B. RemoteHost",
+      "C": "C. BaseSchedulerIO",
+      "D": "D. FabricConnection"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/cli/job.py",
+    "category": "Return_Value",
+    "question": "When using 'jf job dump', where is the output saved if no path is provided?",
+    "choices": {
+      "A": "A. Standard output",
+      "B": "B. jobs.json",
+      "C": "C. jobs_dump.json",
+      "D": "D. A temporary file"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/config/settings.py",
+    "category": "API_Identification",
+    "question": "Which class in jobflow_remote is responsible for handling global configuration settings using Pydantic's BaseSettings?",
+    "choices": {
+      "A": "A. RemoteConfig",
+      "B": "B. JobflowRemoteSettings",
+      "C": "C. ProjectConfig",
+      "D": "D. JFRemoteSettings"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/utils/db.py",
+    "category": "Return_Value",
+    "question": "What is returned by 'mongo_operation' after executing a command?",
+    "choices": {
+      "A": "A. The subprocess.CompletedProcess object.",
+      "B": "B. A tuple containing (stdout, stderr) as strings.",
+      "C": "C. The return code of the command.",
+      "D": "D. The path to the generated backup file."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/daemon.py",
+    "category": "API_Identification",
+    "question": "Which method would you use to connect to a running daemon's process output and see its stdout/stderr in the terminal?",
+    "choices": {
+      "A": "A. attach()",
+      "B": "B. monitor()",
+      "C": "C. foreground_processes()",
+      "D": "D. stream_logs()"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/runner.py",
+    "category": "Parameter_Knowledge",
+    "question": "What is the default behavior of the 'run' command if none of the specific task flags (--transfer, --complete, --queue, --checkout) are provided?",
+    "choices": {
+      "A": "A. The command exits with an error.",
+      "B": "B. The command runs with only the transfer option enabled.",
+      "C": "C. All four task options are automatically enabled.",
+      "D": "D. The command starts a background daemon instead."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Usage_Pattern",
+    "question": "What is the prerequisite for calling the build_indexes method on a JobController instance?",
+    "choices": {
+      "A": "A. The controller must be connected to the database",
+      "B": "B. The database must be empty",
+      "C": "C. The project must have at least one worker",
+      "D": "D. The user must provide a custom index list"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Usage_Pattern",
+    "question": "What is the purpose of the lock_job_for_update context manager used by the Runner?",
+    "choices": {
+      "A": "A. To prevent users from deleting jobs while they run",
+      "B": "B. To manage retries, track step attempts, and handle errors during a remote operation",
+      "C": "C. To encrypt the job document while it is in transit",
+      "D": "D. To ensure only one runner can access the entire database"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow/core/reference.py",
+    "category": "Return_Value",
+    "question": "What is the return type of the resolve_references function?",
+    "choices": {
+      "A": "A. list[Any]",
+      "B": "B. dict[OutputReference, Any]",
+      "C": "C. tuple[OutputReference, ...]",
+      "D": "D. Any"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/flow.py",
+    "category": "Usage_Pattern",
+    "question": "Which set of parameters for 'flow list' are checked for incompatibility to ensure a valid time range is defined?",
+    "choices": {
+      "A": "A. start_date, end_date, and metadata",
+      "B": "B. start_date, days, and hours",
+      "C": "C. name, state, and locked",
+      "D": "D. max_results, sort, and reverse_sort"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/utils.py",
+    "category": "Usage_Pattern",
+    "question": "Before performing operations that might cause inconsistencies, which function is used to verify the state of the background runner?",
+    "choices": {
+      "A": "A. check_stopped_runner",
+      "B": "B. verify_daemon_active",
+      "C": "C. DaemonManager.get_status",
+      "D": "D. JobController.is_running"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/graph.py",
+    "category": "Usage_Pattern",
+    "question": "How are replacement jobs (replacements) visually distinguished from standard parent-child dependencies in the get_mermaid and plot_dash outputs?",
+    "choices": {
+      "A": "A. They are rendered as circular nodes instead of rectangles",
+      "B": "B. They use different color mappings from the JobState",
+      "C": "C. They are rendered using dashed lines/edges",
+      "D": "D. They are hidden unless show_subflows is set to True"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Parameter_Knowledge",
+    "question": "What does the 'job_index' parameter accept when calling get_job_info_by_job_uuid?",
+    "choices": {
+      "A": "A. Only an integer",
+      "B": "B. An integer or the string 'last'",
+      "C": "C. An integer or a list of integers",
+      "D": "D. The string 'first' or 'last' only"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/data.py",
+    "category": "API_Identification",
+    "question": "Which Enum defines the collection names used within the jobflow-remote database system?",
+    "choices": {
+      "A": "A. FlowState",
+      "B": "B. JobState",
+      "C": "C. DbCollection",
+      "D": "D. DynamicResponseType"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow/core/reference.py",
+    "category": "API_Identification",
+    "question": "Which enum defines the behavior of an OutputReference when it cannot be found in the job store?",
+    "choices": {
+      "A": "A. MissingStrategy",
+      "B": "B. ReferenceError",
+      "C": "C. OnMissing",
+      "D": "D. ResolutionMode"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/flow.py",
+    "category": "Parameter_Knowledge",
+    "question": "When using 'flow delete', what does the '--keep-processes' (or -kp) flag ensure?",
+    "choices": {
+      "A": "A. The Flow metadata is kept in the database",
+      "B": "B. The output files are not deleted from storage",
+      "C": "C. SUBMITTED and RUNNING processes are not cancelled on the worker",
+      "D": "D. Only the flow structure is deleted but jobs remain"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/utils/log.py",
+    "category": "Return_Value",
+    "question": "What happens to existing loggers when calling initialize_runner_logger, initialize_cli_logger, or initialize_remote_run_log?",
+    "choices": {
+      "A": "A. They are preserved and appended to the new configuration.",
+      "B": "B. They are disabled via the disable_existing_loggers setting.",
+      "C": "C. They are renamed to include a jobflow_remote prefix.",
+      "D": "D. They are promoted to the ERROR log level."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/runner.py",
+    "category": "Usage_Pattern",
+    "question": "In the Runner.upload() method, what occurs if 'remote.prerun_cleanup' is set to True in the job document?",
+    "choices": {
+      "A": "A. The local temporary folder is deleted",
+      "B": "B. The remote run directory is deleted before uploading new data",
+      "C": "C. The job is automatically moved to the FAILED state",
+      "D": "D. The previous logs are archived in a zip file"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/remote/host/base.py",
+    "category": "API_Identification",
+    "question": "Which method in BaseHost is used to verify the connection by running a simple 'echo' command and checking the output?",
+    "choices": {
+      "A": "A. check_connection",
+      "B": "B. ping",
+      "C": "C. test",
+      "D": "D. verify"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/utils.py",
+    "category": "Return_Value",
+    "question": "What does the IndexDirection.as_pymongo property return?",
+    "choices": {
+      "A": "A. An integer (1 or -1) from the pymongo library",
+      "B": "B. A string ('ascending' or 'descending')",
+      "C": "C. A boolean indicating if the direction is ASC",
+      "D": "D. A dictionary mapping names to values"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/webgui/webgui.py",
+    "category": "Return_Value",
+    "question": "What type of object is returned by the close_dialog and close_info routes?",
+    "choices": {
+      "A": "A. None",
+      "B": "B. An empty string",
+      "C": "C. A Dialog object",
+      "D": "D. A Redirect object"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/state.py",
+    "category": "Usage_Pattern",
+    "question": "According to the grouping constants in the jobflow_remote state module, which of these JobState values is considered a 'RUNNING_STATE' and is also 'RESETTABLE'?",
+    "choices": {
+      "A": "A. JobState.READY",
+      "B": "B. JobState.PAUSED",
+      "C": "C. JobState.UPLOADED",
+      "D": "D. JobState.FAILED"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/runner.py",
+    "category": "Usage_Pattern",
+    "question": "How does the Runner ensure that workers with a 'max_jobs' limit do not exceed their capacity during submission?",
+    "choices": {
+      "A": "A. It uses a global semaphore in the database",
+      "B": "B. It maintains a 'limited_workers' dictionary and queries current job counts via refresh_num_current_jobs",
+      "C": "C. It halts all other runners while one runner is submitting",
+      "D": "D. It relies on the remote scheduler to reject jobs"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/admin.py",
+    "category": "Return_Value",
+    "question": "What happens if 'jc.get_current_db_version()' returns a version equal to or higher than the 'target_version' in the upgrade command?",
+    "choices": {
+      "A": "A. The upgrade proceeds anyway",
+      "B": "B. The database is reset to the target version",
+      "C": "C. The program exits with a warning message",
+      "D": "D. The program prompts the user to downgrade"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/webgui/webgui.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the start_gui function, which parameter allows specifying the network port for the web server?",
+    "choices": {
+      "A": "A. port",
+      "B": "B. port_number",
+      "C": "C. web_port",
+      "D": "D. address"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/utils/remote.py",
+    "category": "Return_Value",
+    "question": "What does the get_host method of the SharedHosts class return?",
+    "choices": {
+      "A": "A. A string representing the worker name",
+      "B": "B. A dictionary of all active connections",
+      "C": "C. An instance of BaseHost",
+      "D": "D. A boolean indicating connection success"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/execution.py",
+    "category": "API_Identification",
+    "question": "Which command in the jobflow_remote execution CLI is used to execute multiple jobs in a batch mode?",
+    "choices": {
+      "A": "A. run",
+      "B": "B. run_batch",
+      "C": "C. execute_all",
+      "D": "D. process_batch"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/jfr_typer.py",
+    "category": "Usage_Pattern",
+    "question": "Which function is used as the default callback in the JFRTyper class when no other callback is specified?",
+    "choices": {
+      "A": "A. cli_error_handler",
+      "B": "B. tree_opt",
+      "C": "C. default_callback",
+      "D": "D. typer_wrapper"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow/core/reference.py",
+    "category": "Usage_Pattern",
+    "question": "How should one create a new OutputReference that points to a specific attribute of an existing reference 'ref'?",
+    "choices": {
+      "A": "A. ref.get_attribute('attr')",
+      "B": "B. OutputReference(ref.uuid, attributes='attr')",
+      "C": "C. ref.attr",
+      "D": "D. ref.add_attr('attr')"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/utils/schedule.py",
+    "category": "Return_Value",
+    "question": "What does the SafeScheduler._run_job method do with exceptions raised during job execution?",
+    "choices": {
+      "A": "A. It returns the exception object to the caller.",
+      "B": "B. It re-raises the exception to stop the scheduler.",
+      "C": "C. It logs the exception traceback as an error and proceeds.",
+      "D": "D. It returns a boolean indicating success or failure."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/project.py",
+    "category": "Usage_Pattern",
+    "question": "When using the 'jf project check' command, what happens if the user does not provide any specific flags like --jobstore, --queue, or --worker?",
+    "choices": {
+      "A": "A. The command returns an error requiring at least one flag",
+      "B": "B. The command only checks the local configuration syntax",
+      "C": "C. The command performs a check on all elements (jobstore, queue, and all workers)",
+      "D": "D. The command only checks the primary jobstore connection"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/remote/data.py",
+    "category": "Usage_Pattern",
+    "question": "In the update_store function, what is the primary mechanism used to transfer data from the remote_store to the local store?",
+    "choices": {
+      "A": "A. Calling store.docs_store.update()",
+      "B": "B. Using shutil.copy() on the file paths",
+      "C": "C. Calling remote_store.save()",
+      "D": "D. Serializing the entire JobStore to a string"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Return_Value",
+    "question": "What is returned by the checkout_job method when it successfully reserves a job for execution?",
+    "choices": {
+      "A": "A. The JobDoc object",
+      "B": "B. A tuple of (uuid, index)",
+      "C": "C. The db_id as a string",
+      "D": "D. True"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/daemon.py",
+    "category": "Return_Value",
+    "question": "What is the status of the daemon if some processes are running but others are stopped, according to check_status()?",
+    "choices": {
+      "A": "A. RUNNING",
+      "B": "B. STOPPED",
+      "C": "C. PARTIALLY_RUNNING",
+      "D": "D. STARTING"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/runner.py",
+    "category": "Usage_Pattern",
+    "question": "When starting a runner as a daemon with 'connect_interactive' enabled, what additional step does the DaemonManager perform after the initial start call?",
+    "choices": {
+      "A": "A. It calls dm.wait_start() and then dm.foreground_processes().",
+      "B": "B. It automatically calls jc.clean_running_runner().",
+      "C": "C. It restarts the supervisord process.",
+      "D": "D. It prompts the user for a new PID via typer.Option."
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/webgui/webgui.py",
+    "category": "Parameter_Knowledge",
+    "question": "What is the default value for the 'interval' parameter in update_jfreport()?",
+    "choices": {
+      "A": "A. 'hours'",
+      "B": "B. 'days'",
+      "C": "C. 'weeks'",
+      "D": "D. 'months'"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/webgui/webgui.py",
+    "category": "Return_Value",
+    "question": "What is the return type of the ScrollableArea helper function?",
+    "choices": {
+      "A": "A. fasthtml.common.Div",
+      "B": "B. fasthtml.common.Main",
+      "C": "C. fasthtml.common.Card",
+      "D": "D. fasthtml.common.Section"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/utils/db.py",
+    "category": "Return_Value",
+    "question": "What does the 'is_locked' property of a MongoLock instance return if accessed inside the 'with' context?",
+    "choices": {
+      "A": "A. True if the document was successfully locked by the current instance.",
+      "B": "B. True if the document was already locked by another process before the current attempt.",
+      "C": "C. The lock_id string.",
+      "D": "D. The timestamp of the lock."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/utils.py",
+    "category": "Usage_Pattern",
+    "question": "What is the correct way to ensure the JobController's resources are properly released after CLI execution?",
+    "choices": {
+      "A": "A. Call JobController.stop()",
+      "B": "B. Call cleanup_job_controller()",
+      "C": "C. Use the @cli_error_handler decorator",
+      "D": "D. Call get_job_controller().close() manually"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/jf.py",
+    "category": "API_Identification",
+    "question": "Which function is used to register additional logger names to be initialized by the jobflow-remote CLI?",
+    "choices": {
+      "A": "A. add_cli_logger_names",
+      "B": "B. initialize_cli_logger",
+      "C": "C. register_loggers",
+      "D": "D. setup_logging"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/data.py",
+    "category": "Parameter_Knowledge",
+    "question": "Which parameter in the RemoteError exception constructor determines if the error should prevent further retries?",
+    "choices": {
+      "A": "A. msg",
+      "B": "B. stop_retry",
+      "C": "C. no_retry",
+      "D": "D. terminal"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/utils/db.py",
+    "category": "Usage_Pattern",
+    "question": "When using MongoLock, what is the correct way to ensure a document is deleted after the lock is released?",
+    "choices": {
+      "A": "A. Set lock.delete_on_release = True inside the context manager.",
+      "B": "B. Pass delete=True to the MongoLock constructor.",
+      "C": "C. Call lock.release(delete=True).",
+      "D": "D. Set lock.update_on_release = {'$delete': True}."
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/cli/plugin.py",
+    "category": "Return_Value",
+    "question": "What action does the load_plugins function perform after successfully loading a plugin module's entry point?",
+    "choices": {
+      "A": "A. It returns a list of loaded module objects.",
+      "B": "B. It calls the module's 'setup_jf_plugin' function if it exists.",
+      "C": "C. It automatically adds the module to the 'sys.modules' cache.",
+      "D": "D. It yields the plugin name to the main CLI application."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Parameter_Knowledge",
+    "question": "What does the 'load' parameter in the get_job_output method of JobController control?",
+    "choices": {
+      "A": "A. Whether to load output data from additional stores",
+      "B": "B. Whether to load the job document from the queue database",
+      "C": "C. Whether to decrypt the output files",
+      "D": "D. Whether to force a refresh from the remote worker"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/remote/queue.py",
+    "category": "Usage_Pattern",
+    "question": "When calling QueueManager.get_jobs_list, how does the presence of a 'user' argument affect the query logic?",
+    "choices": {
+      "A": "A. It filters the local list after the query.",
+      "B": "B. It forces the use of sudo for the command.",
+      "C": "C. It sets the 'jobs' list to None to avoid issues with schedulers that cannot query both.",
+      "D": "D. It raises a ValueError if both user and jobs are provided."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "API_Identification",
+    "question": "Which method provides the status count of flows grouped by their FlowState?",
+    "choices": {
+      "A": "A. count_flows",
+      "B": "B. get_flow_stats",
+      "C": "C. count_flows_states",
+      "D": "D. summarize_flows"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow/core/reference.py",
+    "category": "API_Identification",
+    "question": "Which function should be used to find and extract all OutputReference objects nested within a complex dictionary or list?",
+    "choices": {
+      "A": "A. get_all_references",
+      "B": "B. extract_refs",
+      "C": "C. find_and_get_references",
+      "D": "D. scan_for_references"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the _build_query_job helper method, how is the 'name' parameter handled?",
+    "choices": {
+      "A": "A. Exact string matching only",
+      "B": "B. Converted to a MongoDB regex with fnmatch translations",
+      "C": "C. Case-insensitive substring search",
+      "D": "D. Glob pattern matching via Python side filtering"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/types.py",
+    "category": "Return_Value",
+    "question": "What custom Click parameter type is used to handle dictionary-like strings for the query and metadata options?",
+    "choices": {
+      "A": "A. JSONParamType",
+      "B": "B. DictTypeParser",
+      "C": "C. MapType",
+      "D": "D. StringDictType"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/runner.py",
+    "category": "API_Identification",
+    "question": "Which method in the Runner class is responsible for retrieving the JobStore associated with a specific Flow, utilizing an internal cache?",
+    "choices": {
+      "A": "A. get_jobstore",
+      "B": "B. get_remote_store",
+      "C": "C. get_flow_store",
+      "D": "D. fetch_store"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/submit.py",
+    "category": "Return_Value",
+    "question": "What is the return type of the submit_flow function?",
+    "choices": {
+      "A": "A. list[str]",
+      "B": "B. dict[str, Any]",
+      "C": "C. str",
+      "D": "D. int"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/cli/admin.py",
+    "category": "Return_Value",
+    "question": "In the 'admin unlock' command, what information is displayed to the user after the process completes?",
+    "choices": {
+      "A": "A. The list of Job IDs that were unlocked",
+      "B": "B. The total number of jobs that were unlocked",
+      "C": "C. The names of the projects updated",
+      "D": "D. The status of the database connection"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/config/jobconfig.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the set_run_config function, what is the default behavior of the 'dynamic' parameter?",
+    "choices": {
+      "A": "A. False",
+      "B": "B. None",
+      "C": "C. True",
+      "D": "D. It depends on the ConfigManager"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/runner.py",
+    "category": "API_Identification",
+    "question": "Which Runner method moves jobs from the READY state to being reserved for execution?",
+    "choices": {
+      "A": "A. checkout",
+      "B": "B. submit",
+      "C": "C. upload",
+      "D": "D. advance_state"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/report.py",
+    "category": "Return_Value",
+    "question": "How many JobInfo objects are included in the 'longest_running' attribute of a JobsReport generated via the generate_report method?",
+    "choices": {
+      "A": "A. Exactly 1",
+      "B": "B. Up to 3",
+      "C": "C. Up to 5",
+      "D": "D. All running jobs"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Return_Value",
+    "question": "What does the get_running_runner method return if no runner document exists in the auxiliary collection?",
+    "choices": {
+      "A": "A. None",
+      "B": "B. \"NO_DOCUMENT\"",
+      "C": "C. {}",
+      "D": "D. False"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/daemon.py",
+    "category": "API_Identification",
+    "question": "Which property of the DaemonManager returns the absolute path to the 'supervisord.conf' file?",
+    "choices": {
+      "A": "A. config_path",
+      "B": "B. conf_filepath",
+      "C": "C. supervisord_conf",
+      "D": "D. daemon_config"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/job.py",
+    "category": "Parameter_Knowledge",
+    "question": "What does the 'break_lock' option do in commands like 'rerun' or 'stop'?",
+    "choices": {
+      "A": "A. It deletes the job from the database",
+      "B": "B. It allows the command to run even if the runner is stopped",
+      "C": "C. It unlocks the worker host",
+      "D": "D. It forces a database repair"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/batch.py",
+    "category": "Parameter_Knowledge",
+    "question": "When initializing a LocalBatchManager, what is the purpose of the 'multiprocess_lock' parameter?",
+    "choices": {
+      "A": "A. To lock the entire files_dir for exclusive access",
+      "B": "B. To prevent concurrent interaction from processes belonging to the same worker",
+      "C": "C. To synchronize file uploads to the remote host",
+      "D": "D. To manage network connection timeouts"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/runner.py",
+    "category": "API_Identification",
+    "question": "Which command should be used to remove information about a non-active runner from the database if it was not properly shut down?",
+    "choices": {
+      "A": "A. stop",
+      "B": "B. kill",
+      "C": "C. shutdown",
+      "D": "D. reset"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "jobflow_remote/config/manager.py",
+    "category": "Parameter_Knowledge",
+    "question": "When calling ConfigManager.remove_project(), what is the effect of setting 'remove_folders' to True?",
+    "choices": {
+      "A": "A. It deletes the project's configuration file only",
+      "B": "B. It removes the project from the internal cache only",
+      "C": "C. It removes the folders related to the project, such as tmp and log",
+      "D": "D. It deletes all workers associated with the project"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/remote/host/base.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the BaseHost class constructor, what is the purpose of the 'sanitize' parameter?",
+    "choices": {
+      "A": "A. To encrypt the command before sending it to the host",
+      "B": "B. To prepend and append a specific string to command output for easier parsing",
+      "C": "C. To remove sensitive environment variables from the remote shell",
+      "D": "D. To automatically escape special characters in the command string"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Usage_Pattern",
+    "question": "What is the effect of calling resume_flow on a flow that is in the STOPPED state?",
+    "choices": {
+      "A": "A. It moves all jobs in the flow to READY",
+      "B": "B. It moves STOPPED, USER_STOPPED, and PAUSED jobs back to their appropriate non-stopped states (READY or WAITING)",
+      "C": "C. It restarts only the first job of the flow",
+      "D": "D. It deletes all job files and starts from the beginning"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/batch.py",
+    "category": "Usage_Pattern",
+    "question": "What is the effect of increasing the 'verbosity' level when running the 'batch list' command?",
+    "choices": {
+      "A": "A. It forces a database refresh.",
+      "B": "B. It initiates connections to remote hosts to fetch running job data.",
+      "C": "C. It displays the raw JSON output of the process list.",
+      "D": "D. It lists historical completed processes instead of active ones."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Usage_Pattern",
+    "question": "When calling set_job_run_properties, what happens to the 'resources' field if 'update=True' is passed?",
+    "choices": {
+      "A": "A. The entire resources dictionary is replaced",
+      "B": "B. The existing resources dictionary is merged with the new values",
+      "C": "C. The resources are only updated if the job is in a READY state",
+      "D": "D. The operation fails because resources cannot be updated"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow/core/store.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the JobStore constructor, what is the default value for the 'load' parameter?",
+    "choices": {
+      "A": "A. True",
+      "B": "B. None",
+      "C": "C. False",
+      "D": "D. []"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/config/manager.py",
+    "category": "API_Identification",
+    "question": "Which class is used as a manager for project configuration files, providing methods to parse and update project properties?",
+    "choices": {
+      "A": "A. ConfigManager",
+      "B": "B. ProjectManager",
+      "C": "C. ProjectData",
+      "D": "D. ConfigError"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/remote/queue.py",
+    "category": "API_Identification",
+    "question": "Which function is responsible for ensuring a job name is sanitized and that standard output/error paths are correctly assigned to a resource object?",
+    "choices": {
+      "A": "A. set_name_out",
+      "B": "B. sanitize_resources",
+      "C": "C. QueueManager.write_submission_script",
+      "D": "D. QueueManager.get_submission_script"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/remote/data.py",
+    "category": "Parameter_Knowledge",
+    "question": "What is the default value for the 'store' type in get_single_store if no config_dict is provided?",
+    "choices": {
+      "A": "A. orjson",
+      "B": "B. maggma_json",
+      "C": "C. msgpack",
+      "D": "D. msgspec_json"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/daemon.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the start() method, what happens if 'connect_interactive' is set to True?",
+    "choices": {
+      "A": "A. The user is prompted for a password immediately",
+      "B": "B. The daemon is allowed to perform an interactive initial setup",
+      "C": "C. A GUI window opens for process monitoring",
+      "D": "D. The daemon starts in nodaemon mode"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/report.py",
+    "category": "Parameter_Knowledge",
+    "question": "What is the default value for the 'interval' parameter in the JobsReport.generate_report and FlowsReport.generate_report methods?",
+    "choices": {
+      "A": "A. 'hours'",
+      "B": "B. 'weeks'",
+      "C": "C. 'days'",
+      "D": "D. 'months'"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/remote/host/local.py",
+    "category": "API_Identification",
+    "question": "Which class in the jobflow_remote library provides a concrete implementation for executing commands and managing files on the local file system using the BaseHost interface?",
+    "choices": {
+      "A": "A. LocalHost",
+      "B": "B. SSHHost",
+      "C": "C. SystemHost",
+      "D": "D. DirectHost"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Usage_Pattern",
+    "question": "Which method should be called to properly disconnect from all internal databases and optional jobstores when a JobController is no longer needed?",
+    "choices": {
+      "A": "A. terminate()",
+      "B": "B. disconnect()",
+      "C": "C. close()",
+      "D": "D. shutdown()"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "API_Identification",
+    "question": "Which method would you use to get the output of a job using its system-assigned database ID (db_id)?",
+    "choices": {
+      "A": "A. get_output_by_db_id",
+      "B": "B. get_job_output",
+      "C": "C. fetch_output",
+      "D": "D. get_result"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/job.py",
+    "category": "Return_Value",
+    "question": "If 'jf job info' is called with a PID that does not exist, what is the result?",
+    "choices": {
+      "A": "A. It returns an empty JobInfo object",
+      "B": "B. It raises a Typer error",
+      "C": "C. It calls exit_with_error_msg with 'No data matching the request'",
+      "D": "D. It prints a warning but continues"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/types.py",
+    "category": "Usage_Pattern",
+    "question": "If a user wants to set the verbosity level of the CLI output using the verbosity_opt, how does the underlying Typer option calculate the level?",
+    "choices": {
+      "A": "A. By an integer passed to -v",
+      "B": "B. By the number of times the -v flag is repeated",
+      "C": "C. By a string value (DEBUG, INFO, etc.)",
+      "D": "D. By a boolean flag --verbose"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/daemon.py",
+    "category": "Usage_Pattern",
+    "question": "If the DaemonManager detects that a runner is already marked as running in the database but the hostname or project name does not match the local machine, what happens during start()?",
+    "choices": {
+      "A": "A. It automatically kills the remote process",
+      "B": "B. It ignores the database entry and starts anyway",
+      "C": "C. It logs an error and returns False (or raises an exception)",
+      "D": "D. It updates the database entry with local information"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/project.py",
+    "category": "Return_Value",
+    "question": "In the 'jf project list' command, how is the currently active project visually distinguished in the console output?",
+    "choices": {
+      "A": "A. It is marked with an asterisk (*)",
+      "B": "B. It is printed in green text",
+      "C": "C. It is printed in bold text",
+      "D": "D. It is prefixed with '[ACTIVE]'"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/remote/data.py",
+    "category": "Return_Value",
+    "question": "What does the check_additional_stores function return if all required stores for a Job are present in the provided JobStore?",
+    "choices": {
+      "A": "A. True",
+      "B": "B. None",
+      "C": "C. An empty list",
+      "D": "D. A list containing the string 'success'"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/types.py",
+    "category": "API_Identification",
+    "question": "Which option should be used to limit the number of returned results from a query, and what value indicates no limit?",
+    "choices": {
+      "A": "A. limit_opt, -1",
+      "B": "B. max_results_opt, 0",
+      "C": "C. count_opt, None",
+      "D": "D. results_limit_opt, 0"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/config/base.py",
+    "category": "Return_Value",
+    "question": "What does the to_logging() method of the LogLevel enum return?",
+    "choices": {
+      "A": "A. A string representing the log level",
+      "B": "B. An integer corresponding to Python logging values",
+      "C": "C. A logging.Logger object",
+      "D": "D. None"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/config/base.py",
+    "category": "Parameter_Knowledge",
+    "question": "Which field in WorkerBase is mandatory for execution commands and must contain a '{}' placeholder?",
+    "choices": {
+      "A": "A. pre_run",
+      "B": "B. post_run",
+      "C": "C. execution_cmd",
+      "D": "D. shell_cmd"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/batch.py",
+    "category": "Return_Value",
+    "question": "Which class is instantiated to manage remote batch operations when verbosity is enabled in the batch list command?",
+    "choices": {
+      "A": "A. JobController",
+      "B": "B. RemoteBatchManager",
+      "C": "C. ConfigManager",
+      "D": "D. BatchWorker"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow/core/store.py",
+    "category": "Return_Value",
+    "question": "What type of object does JobStore.count() return?",
+    "choices": {
+      "A": "A. dict",
+      "B": "B. float",
+      "C": "C. int",
+      "D": "D. list"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/remote/host/remote.py",
+    "category": "Return_Value",
+    "question": "What does the RemoteHost.exists() method return if the remote path is not found?",
+    "choices": {
+      "A": "A. None",
+      "B": "B. False",
+      "C": "C. An empty list",
+      "D": "D. Raises a FileNotFoundError"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/jfr_typer.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the JFRTyper class, what is the default value for 'rich_markup_mode' if it is not provided during initialization?",
+    "choices": {
+      "A": "A. 'markdown'",
+      "B": "B. 'rich'",
+      "C": "C. 'plain'",
+      "D": "D. None"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "API_Identification",
+    "question": "Which method is used to retrieve the full Pydantic model representation of a job document rather than a summary?",
+    "choices": {
+      "A": "A. get_job_info",
+      "B": "B. get_job_data",
+      "C": "C. get_job_doc",
+      "D": "D. get_job_model"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/runner.py",
+    "category": "Return_Value",
+    "question": "Which field is removed from the running_runner_doc in the 'info' command if the verbosity level is set to 0?",
+    "choices": {
+      "A": "A. hostname",
+      "B": "B. processes_info",
+      "C": "C. last_pinged",
+      "D": "D. daemon_dir"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/batch.py",
+    "category": "Return_Value",
+    "question": "What is the return type of the RemoteBatchManager.get_running() method?",
+    "choices": {
+      "A": "A. list[str]",
+      "B": "B. dict[str, int]",
+      "C": "C. list[tuple[str, int, str]]",
+      "D": "D. list[Path]"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/config/base.py",
+    "category": "Usage_Pattern",
+    "question": "When defining a WorkerBase subclass, which field acts as the discriminator for Pydantic to distinguish between LocalWorker and RemoteWorker?",
+    "choices": {
+      "A": "A. scheduler_type",
+      "B": "B. type",
+      "C": "C. host",
+      "D": "D. worker_name"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/job.py",
+    "category": "Parameter_Knowledge",
+    "question": "Which parameter of 'jf job files get' is used to define the local destination for the retrieved files?",
+    "choices": {
+      "A": "A. --dir",
+      "B": "B. --output",
+      "C": "C. --path",
+      "D": "D. --save"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/config/manager.py",
+    "category": "Return_Value",
+    "question": "What does the 'projects' property of ConfigManager return?",
+    "choices": {
+      "A": "A. A list of Project objects",
+      "B": "B. A dictionary with project names as keys and Project objects as values",
+      "C": "C. A list of file paths to project configurations",
+      "D": "D. A dictionary with project names as keys and ProjectData named tuples as values"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/state.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the FlowState.from_jobs_states() method, what is the significance of the leaf_states parameter?",
+    "choices": {
+      "A": "A. It determines if the Flow is in the READY state.",
+      "B": "B. It is used to identify if the Flow is COMPLETED.",
+      "C": "C. It filters out JOB_ERROR states.",
+      "D": "D. It determines if the Flow can be PAUSED."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow/core/store.py",
+    "category": "Parameter_Knowledge",
+    "question": "In JobStore.update(), what happens if the 'key' parameter is passed as None?",
+    "choices": {
+      "A": "A. It defaults to ['_id']",
+      "B": "B. It defaults to ['uuid', 'index']",
+      "C": "C. It uses the store's primary key",
+      "D": "D. The update fails"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/flow.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the 'flow list' command, what is the default sorting behavior if no sort option is provided?",
+    "choices": {
+      "A": "A. Sort by name",
+      "B": "B. Sort by state",
+      "C": "C. Sort by created_on",
+      "D": "D. Sort by updated_on"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/data.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the get_initial_job_doc_dict function, what is the significance of the 'parents' parameter?",
+    "choices": {
+      "A": "A. It determines the execution order within a worker.",
+      "B": "B. It is used to set the initial state to WAITING if not empty, otherwise READY.",
+      "C": "C. It defines which worker the job must run on.",
+      "D": "D. It provides the metadata for the parent Flow."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/remote/host/local.py",
+    "category": "Usage_Pattern",
+    "question": "When using LocalHost.rmtree() to delete a directory, how is an error handled if 'raise_on_error' is set to False (the default)?",
+    "choices": {
+      "A": "A. The method raises a RuntimeError immediately",
+      "B": "B. The method returns None and ignores the error silently",
+      "C": "C. A warning is issued and the method returns False",
+      "D": "D. The entire process is aborted and rolled back"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/runner.py",
+    "category": "Return_Value",
+    "question": "What is the return type of the Runner.runner_options property?",
+    "choices": {
+      "A": "A. dict",
+      "B": "B. RunnerOptions",
+      "C": "C. Project",
+      "D": "D. ExecutionConfig"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/formatting.py",
+    "category": "API_Identification",
+    "question": "Which function would you use to create a visual representation of a FlowsReport, including summary tables and state distributions?",
+    "choices": {
+      "A": "A. get_flow_info_table",
+      "B": "B. get_flow_report_components",
+      "C": "C. format_flow_info",
+      "D": "D. get_job_report_components"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "API_Identification",
+    "question": "Which method in JobController is used to generate an instance from a configuration name defined in the local configuration manager?",
+    "choices": {
+      "A": "A. from_project_name",
+      "B": "B. from_project",
+      "C": "C. from_config",
+      "D": "D. connect"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/cli/jfr_typer.py",
+    "category": "Return_Value",
+    "question": "What does the JFRTyper.command decorator do to the function it wraps before passing it to the superclass?",
+    "choices": {
+      "A": "A. Returns a string representing the command name",
+      "B": "B. Wraps the function with cli_error_handler",
+      "C": "C. Converts the function to a Typer model",
+      "D": "D. Registers the function in a global registry"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/webgui/webgui.py",
+    "category": "API_Identification",
+    "question": "Which function is used to refresh the global job report data used by the dashboard?",
+    "choices": {
+      "A": "A. refresh_stats",
+      "B": "B. get_report_data",
+      "C": "C. update_jfreport",
+      "D": "D. load_jobs_report"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "API_Identification",
+    "question": "Which method allows for the batch removal of locks from multiple job documents simultaneously?",
+    "choices": {
+      "A": "A. clear_locks",
+      "B": "B. unlock_jobs",
+      "C": "C. release_jobs",
+      "D": "D. batch_unlock"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow/core/store.py",
+    "category": "Usage_Pattern",
+    "question": "If you need to group results by a specific field using the JobStore, which method should you use?",
+    "choices": {
+      "A": "A. aggregate",
+      "B": "B. query_grouped",
+      "C": "C. groupby",
+      "D": "D. find_and_group"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/job.py",
+    "category": "Usage_Pattern",
+    "question": "How does a user select only jobs that have failed or encountered a remote error when using the 'jf job list' command?",
+    "choices": {
+      "A": "A. Using the --failed flag",
+      "B": "B. Using the --error flag",
+      "C": "C. Setting --state=ERROR",
+      "D": "D. Using the --broken flag"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Usage_Pattern",
+    "question": "What is the correct sequence of internal operations when rerun_job is called on a FAILED job?",
+    "choices": {
+      "A": "A. Lock job -> Lock flow -> Lock descendants -> Reset descendants -> Reset job -> Update flow -> Release locks",
+      "B": "B. Reset job -> Update flow -> Notify workers",
+      "C": "C. Lock job -> Delete files -> Reset state",
+      "D": "D. Lock flow -> Reset all jobs in flow -> Release lock"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/cli/utils.py",
+    "category": "Return_Value",
+    "question": "What does get_start_date return if only the 'days' parameter is provided (and start_date/hours are None)?",
+    "choices": {
+      "A": "A. The current date at midnight",
+      "B": "B. A string formatted as '%Y-%m-%d'",
+      "C": "C. A datetime object representing (now - days)",
+      "D": "D. A timedelta object"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/remote/host/remote.py",
+    "category": "Return_Value",
+    "question": "What are the three components returned by the RemoteHost.execute() method?",
+    "choices": {
+      "A": "A. (stdout, stderr, exit_code)",
+      "B": "B. (output_string, success_boolean, process_id)",
+      "C": "C. (is_connected, stdout, stderr)",
+      "D": "D. (connection_obj, result_obj, error_obj)"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/config/base.py",
+    "category": "API_Identification",
+    "question": "Which class is used to configure execution options for a Runner, such as checkout delays and lock timeouts?",
+    "choices": {
+      "A": "A. RunnerOptions",
+      "B": "B. ExecutionConfig",
+      "C": "C. Project",
+      "D": "D. QueueConfig"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/config/base.py",
+    "category": "Return_Value",
+    "question": "If a RunnerOptions.delta_retry tuple is (30, 300, 1200), what value is returned by get_delta_retry(5)?",
+    "choices": {
+      "A": "A. 30",
+      "B": "B. 300",
+      "C": "C. 1200",
+      "D": "D. 2400"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "API_Identification",
+    "question": "Which method allows setting the jobstore for a flow after it has been created?",
+    "choices": {
+      "A": "A. update_flow_jobstore",
+      "B": "B. set_flow_store",
+      "C": "C. change_jobstore",
+      "D": "D. assign_store"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow/core/store.py",
+    "category": "Return_Value",
+    "question": "What does the JobStore.name property return?",
+    "choices": {
+      "A": "A. The string 'JobStore'",
+      "B": "B. The name of the additional_stores dictionary",
+      "C": "C. The string 'JobStore-' followed by the name of the docs_store",
+      "D": "D. The database collection name"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/config/jobconfig.py",
+    "category": "API_Identification",
+    "question": "Which function in jobflow_remote.config.jobconfig is used to update the execution and resource properties for specific jobs within a Flow?",
+    "choices": {
+      "A": "A. set_run_config",
+      "B": "B. update_flow_metadata",
+      "C": "C. configure_job_store",
+      "D": "D. set_execution_env"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/webgui/webgui.py",
+    "category": "Parameter_Knowledge",
+    "question": "What default sort order is applied in the post query function if none is specified?",
+    "choices": {
+      "A": "A. 1",
+      "B": "B. 0",
+      "C": "C. -1",
+      "D": "D. 99"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Parameter_Knowledge",
+    "question": "When using the reset() method, what format is required for the 'validation' parameter if the number of flows exceeds 'max_limit'?",
+    "choices": {
+      "A": "A. A boolean True",
+      "B": "B. A string matching the project name",
+      "C": "C. A string representing today's date (YYYY-MM-DD)",
+      "D": "D. The admin password"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/upgrade.py",
+    "category": "Usage_Pattern",
+    "question": "How should a new upgrade function for a specific version be integrated into the DatabaseUpgrader workflow?",
+    "choices": {
+      "A": "A. By adding it to the __init__ method of DatabaseUpgrader",
+      "B": "B. By using the @DatabaseUpgrader.register_upgrade(version) decorator",
+      "C": "C. By appending it to the registered_upgrades property list",
+      "D": "D. By calling DatabaseUpgrader.update_db_version() manually"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/daemon.py",
+    "category": "Return_Value",
+    "question": "What is returned by the get_supervisord_pid() method if the PID file does not exist or cannot be parsed?",
+    "choices": {
+      "A": "A. -1",
+      "B": "B. 0",
+      "C": "C. None",
+      "D": "D. False"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/job.py",
+    "category": "Usage_Pattern",
+    "question": "What is the correct sequence of arguments for the 'jf job set-state' command?",
+    "choices": {
+      "A": "A. STATE JOB_DB_ID [JOB_INDEX]",
+      "B": "B. JOB_DB_ID STATE [JOB_INDEX]",
+      "C": "C. JOB_INDEX STATE JOB_DB_ID",
+      "D": "D. STATE [JOB_INDEX] JOB_DB_ID"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/cli/formatting.py",
+    "category": "Usage_Pattern",
+    "question": "When calling get_job_info_table with color=True, how is the color for the job name determined?",
+    "choices": {
+      "A": "A. By the job's current State.",
+      "B": "B. By the priority of the job.",
+      "C": "C. By cycling through colors_list based on the job's host.",
+      "D": "D. By the worker assigned to the job."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/utils/examples.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the conditional_sum_replace job function, what is the default threshold value (min_n) used to determine if a replacement Flow should be created?",
+    "choices": {
+      "A": "A. 5",
+      "B": "B. 10",
+      "C": "C. 0",
+      "D": "D. 1"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/daemon.py",
+    "category": "Parameter_Knowledge",
+    "question": "What is the maximum allowed length for the 'sock_filepath' string in DaemonManager before a DaemonError is raised?",
+    "choices": {
+      "A": "A. 64 characters",
+      "B": "B. 97 characters",
+      "C": "C. 255 characters",
+      "D": "D. 1024 characters"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/config/manager.py",
+    "category": "Usage_Pattern",
+    "question": "What is the correct way to update project values recursively using ConfigManager?",
+    "choices": {
+      "A": "A. ConfigManager.update_project(config_dict, project_name)",
+      "B": "B. ConfigManager.set_project(project_obj)",
+      "C": "C. ConfigManager.modify_project(project_name, **kwargs)",
+      "D": "D. ConfigManager.dump_project(project_data)"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/cli/job.py",
+    "category": "Return_Value",
+    "question": "When running 'jf job list --count', what is the primary output?",
+    "choices": {
+      "A": "A. A list of job IDs",
+      "B": "B. The number of jobs matching the query",
+      "C": "C. A summary table of states",
+      "D": "D. A dictionary of job details"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/daemon.py",
+    "category": "Usage_Pattern",
+    "question": "When calling DaemonManager.restart(), what configuration is used for the new process?",
+    "choices": {
+      "A": "A. The default library configuration",
+      "B": "B. Values passed as arguments to restart()",
+      "C": "C. Values parsed from the existing supervisord.conf file",
+      "D": "D. The configuration stored in the environment variables"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/daemon.py",
+    "category": "Return_Value",
+    "question": "The method parse_config_file() returns a dictionary. Which of these is NOT a key typically found in that dictionary?",
+    "choices": {
+      "A": "A. num_procs_transfer",
+      "B": "B. single",
+      "C": "C. log_level",
+      "D": "D. pid_file_path"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "jobflow_remote/cli/job.py",
+    "category": "API_Identification",
+    "question": "Which subcommand of 'jf job' is specifically used to retrieve the contents of standard output and error files from the queue manager?",
+    "choices": {
+      "A": "A. files ls",
+      "B": "B. output",
+      "C": "C. queue-out",
+      "D": "D. info --log"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/remote/data.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the get_single_store_file_name function, what happens if the 'zip' key in the configuration dictionary is set to True?",
+    "choices": {
+      "A": "A. The file extension becomes .zip",
+      "B": "B. The function returns a BytesIO object",
+      "C": "C. The suffix '.gz' is appended to the filename",
+      "D": "D. The store is initialized in read-only mode"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/run.py",
+    "category": "API_Identification",
+    "question": "Which function is responsible for executing a specific remote job within a directory by loading input data and running the job's function?",
+    "choices": {
+      "A": "A. run_remote_job",
+      "B": "B. run_batch_jobs",
+      "C": "C. execute_job_flow",
+      "D": "D. run_single_batch_jobs"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/cli/formatting.py",
+    "category": "Parameter_Knowledge",
+    "question": "In get_worker_table, what information is added to the table when the verbosity level is exactly 1?",
+    "choices": {
+      "A": "A. The 'details' column with the full dictionary.",
+      "B": "B. The 'info' column using render_scope(worker.cli_info).",
+      "C": "C. The 'type' column only.",
+      "D": "D. The 'post_run' script content."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/utils/db.py",
+    "category": "Parameter_Knowledge",
+    "question": "What is the default value for 'max_wait' in the MongoLock constructor?",
+    "choices": {
+      "A": "A. 60",
+      "B": "B. 120",
+      "C": "C. 600",
+      "D": "D. None"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/webgui/webgui.py",
+    "category": "Parameter_Knowledge",
+    "question": "When calling the POST version of the query route (post function), what is the default value for 'entries_per_page'?",
+    "choices": {
+      "A": "A. 20",
+      "B": "B. 50",
+      "C": "C. 10",
+      "D": "D. 100"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/config/manager.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the ConfigManager constructor, what does the 'warn' parameter control?",
+    "choices": {
+      "A": "A. Whether to raise a ConfigError on failure",
+      "B": "B. Whether to automatically create missing directories",
+      "C": "C. Whether to print warnings during file parsing in the projects folder",
+      "D": "D. Whether to exclude None values during project dumping"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/jf.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the 'jf' CLI main callback, which option allows developers to profile command execution and receive a report at the end?",
+    "choices": {
+      "A": "A. --full-exc",
+      "B": "B. --trace",
+      "C": "C. --profile",
+      "D": "D. --debug"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/utils/remote.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the safe_remove_job_files function, what is the effect of setting the raise_on_error parameter to True?",
+    "choices": {
+      "A": "A. It forces the deletion of files even if safety checks fail.",
+      "B": "B. It raises an UnsafeDeletionError if the directory does not appear to contain a jobflow-remote execution.",
+      "C": "C. It raises an exception if the run_dir is None.",
+      "D": "D. It prevents the function from logging warnings."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/backup.py",
+    "category": "Parameter_Knowledge",
+    "question": "When using the 'jf backup create' command, what is the consequence of setting the --python flag?",
+    "choices": {
+      "A": "A. The backup will be significantly faster",
+      "B": "B. Metadata of the collections will not be saved",
+      "C": "C. The backup will be automatically compressed",
+      "D": "D. It disables the requirement for a project configuration"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/utils/data.py",
+    "category": "Return_Value",
+    "question": "What is the return type of the suuid() function?",
+    "choices": {
+      "A": "A. uuid.UUID",
+      "B": "B. bytes",
+      "C": "C. int",
+      "D": "D. str"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "jobflow_remote/cli/backup.py",
+    "category": "Return_Value",
+    "question": "What information does the JobController.backup_dump method return to the 'create' command to be printed to the console?",
+    "choices": {
+      "A": "A. The total size of the backup file in MB",
+      "B": "B. A dictionary containing the number of documents per collection",
+      "C": "C. The absolute path to the generated backup folder",
+      "D": "D. A boolean indicating if the verification passed"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/utils/examples.py",
+    "category": "Usage_Pattern",
+    "question": "How does the make_list job determine the length of the generated list if the 'length' parameter is not provided?",
+    "choices": {
+      "A": "A. It defaults to 10",
+      "B": "B. It uses the value of the 'a' parameter",
+      "C": "C. It generates a random integer between 2 and 5",
+      "D": "D. It returns an empty list"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/remote/data.py",
+    "category": "API_Identification",
+    "question": "Which class provides a specialized implementation for a JSON store using the orjson library for high-performance serialization?",
+    "choices": {
+      "A": "A. StdJSONStore",
+      "B": "B. MinimalORJSONStore",
+      "C": "C. MinimalFileStore",
+      "D": "D. MinimalMsgspecJSONStore"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/runner.py",
+    "category": "Usage_Pattern",
+    "question": "When a Job is in the DOWNLOADED state, which method is used to parse the results and move it to a final state?",
+    "choices": {
+      "A": "A. complete_job",
+      "B": "B. parse_results",
+      "C": "C. finalize_job",
+      "D": "D. upload_results"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/cli/utils.py",
+    "category": "Parameter_Knowledge",
+    "question": "What does the 'max_doc_lines' parameter control in the get_command_tree function?",
+    "choices": {
+      "A": "A. The maximum height of the terminal window",
+      "B": "B. The number of lines shown from the documentation of each command or option",
+      "C": "C. The limit of the command history log",
+      "D": "D. The depth of the recursive command search"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/job.py",
+    "category": "Usage_Pattern",
+    "question": "In the 'jf job set resources' command, what is the default behavior when updating resources without the '--replace' flag?",
+    "choices": {
+      "A": "A. It clears all previous resources",
+      "B": "B. It only updates the selected keys (merges)",
+      "C": "C. It prompts for confirmation",
+      "D": "D. It fails if keys already exist"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/data.py",
+    "category": "Return_Value",
+    "question": "What is the return type of the FlowDoc.descendants() method?",
+    "choices": {
+      "A": "A. list[str]",
+      "B": "B. dict[str, list[int]]",
+      "C": "C. list[tuple[str, int]]",
+      "D": "D. set[str]"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/backup.py",
+    "category": "API_Identification",
+    "question": "Which CLI command is used to recreate the queue database from a previously saved backup in the jobflow-remote package?",
+    "choices": {
+      "A": "A. jf backup create",
+      "B": "B. jf backup restore",
+      "C": "C. jf admin restore",
+      "D": "D. jf database load"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow/core/reference.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the OutputReference.resolve() method, what happens if the 'deserialize' parameter is set to False?",
+    "choices": {
+      "A": "A. The method returns a raw BSON object string",
+      "B": "B. Data from the store is not processed by MontyDecoder",
+      "C": "C. The job store connection is closed automatically",
+      "D": "D. Only primitive types like int and str are returned"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/utils/remote.py",
+    "category": "API_Identification",
+    "question": "Which class in jobflow_remote.utils.remote provides a singleton context manager for reusing host connections across different sections of code?",
+    "choices": {
+      "A": "A. SharedHosts",
+      "B": "B. HostManager",
+      "C": "C. ConnectionPool",
+      "D": "D. RemoteHostRegistry"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/config/base.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the RunnerOptions class, what is the default value for 'lock_timeout' in seconds?",
+    "choices": {
+      "A": "A. 3600",
+      "B": "B. 43200",
+      "C": "C. 86400",
+      "D": "D. 300"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Return_Value",
+    "question": "What does the get_job_info_by_pid method return if a matching process ID is found?",
+    "choices": {
+      "A": "A. The integer PID",
+      "B": "B. A JobInfo object",
+      "C": "C. The job UUID string",
+      "D": "D. A JobDoc object"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/utils/data.py",
+    "category": "Usage_Pattern",
+    "question": "When using store_from_dict to create a Maggma Store, what keys must be present in the dictionary for it to be processed via MontyDecoder?",
+    "choices": {
+      "A": "A. 'type' and 'args'",
+      "B": "B. 'store_type' and 'module'",
+      "C": "C. '@class' and '@module'",
+      "D": "D. 'class_name' and 'params'"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/flow.py",
+    "category": "Return_Value",
+    "question": "What is the default limit for the number of Flows returned by the 'flow list' command?",
+    "choices": {
+      "A": "A. 10",
+      "B": "B. 50",
+      "C": "C. 100",
+      "D": "D. Unlimited (0)"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/utils/schedule.py",
+    "category": "API_Identification",
+    "question": "Which class extends the standard Scheduler to handle job failures by logging exceptions and optionally rescheduling them?",
+    "choices": {
+      "A": "A. SafeScheduler",
+      "B": "B. JobScheduler",
+      "C": "C. RobustScheduler",
+      "D": "D. RemoteScheduler"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/webgui/webgui.py",
+    "category": "API_Identification",
+    "question": "Which function is responsible for launching the Jobflow Remote web interface?",
+    "choices": {
+      "A": "A. start_gui",
+      "B": "B. serve_app",
+      "C": "C. run_web_ui",
+      "D": "D. init_dashboard"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/cli/flow.py",
+    "category": "API_Identification",
+    "question": "Which command should be used to restart a Flow that is currently in a STOPPED or PAUSED state?",
+    "choices": {
+      "A": "A. flow restart",
+      "B": "B. flow run",
+      "C": "C. flow resume",
+      "D": "D. flow update"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the rerun_job method, what is the effect of setting 'force=True'?",
+    "choices": {
+      "A": "A. It ignores if the job is currently locked by another process",
+      "B": "B. It allows rerunning jobs that are not in FAILED or REMOTE_ERROR states",
+      "C": "C. It deletes the job output from the JobStore automatically",
+      "D": "D. It bypasses the connection check to the remote host"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Return_Value",
+    "question": "What does the get_jobs_info method of JobController return?",
+    "choices": {
+      "A": "A. list[dict]",
+      "B": "B. list[JobInfo]",
+      "C": "C. list[JobDoc]",
+      "D": "D. dict[str, JobInfo]"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/config/helper.py",
+    "category": "Usage_Pattern",
+    "question": "When calling check_worker with full_check=False, which specific packages are verified for version consistency between the local and host environments?",
+    "choices": {
+      "A": "A. 'jobflow' and 'jobflow-remote'",
+      "B": "B. 'maggma' and 'jobflow'",
+      "C": "C. 'pymongo' and 'jobflow-remote'",
+      "D": "D. All packages installed in the local environment"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/cli/batch.py",
+    "category": "API_Identification",
+    "question": "Which command in the 'batch' CLI group is used to display currently executing processes on batch workers?",
+    "choices": {
+      "A": "A. status",
+      "B": "B. list",
+      "C": "C. show",
+      "D": "D. processes"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/remote/host/remote.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the RemoteHost constructor, what is the purpose of the 'retry_on_closed_connection' parameter?",
+    "choices": {
+      "A": "A. It automatically restarts the remote SSH daemon if it crashes",
+      "B": "B. It re-opens the connection and retries the command once if a socket/SSH error occurs during execution",
+      "C": "C. It sets the number of seconds to wait before timing out a connection",
+      "D": "D. It enables a loop that pings the server every 60 seconds"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/config/settings.py",
+    "category": "Parameter_Knowledge",
+    "question": "What is the default environment variable prefix used by JobflowRemoteSettings to load configuration from the system environment?",
+    "choices": {
+      "A": "A. JOBFLOW_",
+      "B": "B. REMOTE_",
+      "C": "C. JF_",
+      "D": "D. JFREMOTE_"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "jobflow_remote/cli/formatting.py",
+    "category": "Return_Value",
+    "question": "What does the format_run_time function return if the job state is RUNNING?",
+    "choices": {
+      "A": "A. A datetime object.",
+      "B": "B. A float representing total seconds.",
+      "C": "C. A string prefixed with '~' followed by h:mm.",
+      "D": "D. An integer representing hours."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/utils/db.py",
+    "category": "API_Identification",
+    "question": "Which function is used to dump a PyMongo collection to a BSON file using pure Python instead of system binaries?",
+    "choices": {
+      "A": "A. mongodump_from_store",
+      "B": "B. mongo_operation",
+      "C": "C. pymongo_dump",
+      "D": "D. bson.BSON.encode"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/remote/host/remote.py",
+    "category": "API_Identification",
+    "question": "Which method in RemoteHost should be used to upload a local file to the remote server?",
+    "choices": {
+      "A": "A. upload()",
+      "B": "B. put()",
+      "C": "C. push()",
+      "D": "D. write_file()"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/config/helper.py",
+    "category": "Return_Value",
+    "question": "What does the check_worker function return upon execution?",
+    "choices": {
+      "A": "A. A tuple containing two optional strings (error and warning)",
+      "B": "B. A boolean indicating success",
+      "C": "C. A dictionary of worker status metadata",
+      "D": "D. The Host object associated with the worker"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/cli/project.py",
+    "category": "API_Identification",
+    "question": "Which command in the project CLI is used to create a new configuration file with dummy elements for manual editing?",
+    "choices": {
+      "A": "A. create",
+      "B": "B. generate",
+      "C": "C. init",
+      "D": "D. new"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/formatting.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the get_job_info_table function, what effect does increasing the verbosity parameter to 2 have on the output?",
+    "choices": {
+      "A": "A. It adds the 'Queue id' column only.",
+      "B": "B. It adds 'Lock id' and 'Lock time' columns to the default output.",
+      "C": "C. It enables coloring for job names based on host.",
+      "D": "D. It includes the full job document in the table cells."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/run.py",
+    "category": "Return_Value",
+    "question": "What happens to the 'output' field of the response object in run_remote_job before it is dumped to the output file?",
+    "choices": {
+      "A": "A. It is serialized to a JSON string",
+      "B": "B. It is set to None",
+      "C": "C. It is moved to a separate metadata file",
+      "D": "D. It is compressed using gzip"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow/core/store.py",
+    "category": "API_Identification",
+    "question": "Which method in JobStore provides functionality to remove documents based on specific criteria from both the main document store and additional stores?",
+    "choices": {
+      "A": "A. delete_docs",
+      "B": "B. purge_all",
+      "C": "C. remove_docs",
+      "D": "D. clear_store"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow/core/store.py",
+    "category": "API_Identification",
+    "question": "Which class serves as the primary database interface in jobflow for managing documents across multiple stores?",
+    "choices": {
+      "A": "A. JobStore",
+      "B": "B. MongoStore",
+      "C": "C. FlowStore",
+      "D": "D. DocumentManager"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Return_Value",
+    "question": "When calling delete_flow, what boolean value is returned if the flow uuid is not found in the database?",
+    "choices": {
+      "A": "A. True",
+      "B": "B. False",
+      "C": "C. None",
+      "D": "D. null"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/remote/host/local.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the LocalHost.execute() method, what happens if the 'command' argument is provided as a list of strings?",
+    "choices": {
+      "A": "A. Each string is executed as a separate process",
+      "B": "B. The list is joined into a single string separated by spaces",
+      "C": "C. The method raises a TypeError",
+      "D": "D. Only the first element of the list is executed"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/execution.py",
+    "category": "Parameter_Knowledge",
+    "question": "When using the 'execution run-batch' command, what does the '--max-wait' (or -mw) option specify?",
+    "choices": {
+      "A": "A. The total timeout for the entire batch process",
+      "B": "B. The timeout for an individual job execution",
+      "C": "C. The maximum time to wait for new jobs before stopping",
+      "D": "D. The interval between polling the database for jobs"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/runner.py",
+    "category": "Usage_Pattern",
+    "question": "How does the 'stop' command differ from the 'kill' command when managing runner processes?",
+    "choices": {
+      "A": "A. Stop only works on local processes while kill works on remote processes.",
+      "B": "B. Stop allows tasks to finish before exiting, while kill returns immediately without waiting for cleanup.",
+      "C": "C. Stop requires a PID while kill uses the project name.",
+      "D": "D. Stop is a Typer command while kill is a private helper function."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow/core/reference.py",
+    "category": "Return_Value",
+    "question": "What does the find_and_resolve_references function return if the input argument is a primitive type like an integer?",
+    "choices": {
+      "A": "A. The integer value itself",
+      "B": "B. A dictionary containing the integer",
+      "C": "C. None",
+      "D": "D. An empty OutputReference"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Usage_Pattern",
+    "question": "When adding a batch process using add_batch_process, why are two IDs (process_id and process_uuid) required?",
+    "choices": {
+      "A": "A. One for the database and one for the filesystem",
+      "B": "B. One from the QueueManager (scheduler ID) and a unique ID for job association",
+      "C": "C. One for the user and one for the runner",
+      "D": "D. To allow for primary and secondary backup IDs"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/utils/examples.py",
+    "category": "API_Identification",
+    "question": "Which job function in the examples provided is specifically designed to raise a RuntimeError for testing error handling?",
+    "choices": {
+      "A": "A. add_raise",
+      "B": "B. add_many",
+      "C": "C. conditional_sum_replace",
+      "D": "D. add_distributed"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/cli/formatting.py",
+    "category": "Parameter_Knowledge",
+    "question": "In format_job_info, what is the effect of setting show_none to False?",
+    "choices": {
+      "A": "A. None values are displayed as 'N/A'.",
+      "B": "B. The 'job' key is always popped from the dictionary.",
+      "C": "C. Keys with None values are excluded from the output dictionary.",
+      "D": "D. The function returns an empty string if any value is None."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/submit.py",
+    "category": "API_Identification",
+    "question": "Which function in jobflow_remote.jobs.submit is used to add a flow or job to the database for future execution?",
+    "choices": {
+      "A": "A. run_flow",
+      "B": "B. submit_flow",
+      "C": "C. add_job_to_db",
+      "D": "D. execute_job"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/remote/data.py",
+    "category": "API_Identification",
+    "question": "Which function is used to determine the storage path for a job's data based on its ID and index?",
+    "choices": {
+      "A": "A. get_job_path",
+      "B": "B. get_local_data_path",
+      "C": "C. uuid_to_path",
+      "D": "D. get_store_file_paths"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/state.py",
+    "category": "API_Identification",
+    "question": "Which JobState property or mapping provides the single-letter or abbreviated representation of a state, such as 'W' for WAITING or 'C' for COMPLETED?",
+    "choices": {
+      "A": "A. short_value",
+      "B": "B. abbreviation",
+      "C": "C. code",
+      "D": "D. tag"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/daemon.py",
+    "category": "Usage_Pattern",
+    "question": "How does the DaemonManager ensure that only one instance of the runner is active across potentially multiple machines?",
+    "choices": {
+      "A": "A. By checking the local process list only",
+      "B": "B. By using a lock on the 'supervisord.pid' file",
+      "C": "C. By locking a document in an auxiliary MongoDB collection",
+      "D": "D. By checking for the existence of the socket file"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/utils.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the get_job_db_ids function, what happens if a job_index is provided but the job_db_id is determined to be a database ID (db_id) rather than a UUID?",
+    "choices": {
+      "A": "A. A RuntimeError is raised",
+      "B": "B. The job_index is silently used to offset the db_id",
+      "C": "C. A warning is printed and the index is ignored",
+      "D": "D. The function returns (None, None)"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/utils/remote.py",
+    "category": "Usage_Pattern",
+    "question": "When using the SharedHosts context manager, when are the host connections actually closed?",
+    "choices": {
+      "A": "A. Immediately after get_host() returns a host.",
+      "B": "B. When the first context manager block is exited.",
+      "C": "C. Only when the last nested context manager exits and the reference count reaches zero.",
+      "D": "D. Manually by calling the __del__ method."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/utils.py",
+    "category": "API_Identification",
+    "question": "Which function should be used to initialize the global ConfigManager and JobController instances within the CLI utility module?",
+    "choices": {
+      "A": "A. initialize_config_manager",
+      "B": "B. get_config_manager",
+      "C": "C. setup_shared_resources",
+      "D": "D. load_cli_config"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/cli/execution.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the 'execution run' command, what is the default value for the 'run_dir' argument if it is not provided?",
+    "choices": {
+      "A": "A. None",
+      "B": "B. '/tmp'",
+      "C": "C. '.' (current directory)",
+      "D": "D. './jobs'"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/jf.py",
+    "category": "Usage_Pattern",
+    "question": "What action is performed by the main_result_callback after a CLI command completes its execution?",
+    "choices": {
+      "A": "A. It saves the current configuration to disk.",
+      "B": "B. It calls cleanup_job_controller and completes profiling if enabled.",
+      "C": "C. It prints the help menu for the next command.",
+      "D": "D. It refreshes the project data from the ConfigManager."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/config/settings.py",
+    "category": "Usage_Pattern",
+    "question": "How does JobflowRemoteSettings handle the loading of settings when a configuration file exists at the path specified by the `config_file` field?",
+    "choices": {
+      "A": "A. It ignores the file if environment variables are set.",
+      "B": "B. It uses the file to override the built-in defaults before applying other provided values.",
+      "C": "C. It only loads from the file if the `load_plugins` parameter is True.",
+      "D": "D. It requires a manual call to `JobflowRemoteSettings.from_file()`."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/runner.py",
+    "category": "Usage_Pattern",
+    "question": "When initializing a Runner, what is the effect of setting connect_interactive=True?",
+    "choices": {
+      "A": "A. It forces the Runner to prompt the user for credentials for every host",
+      "B": "B. It opens connections to hosts marked as interactive during initialization",
+      "C": "C. It allows the Runner to be controlled via a terminal GUI",
+      "D": "D. It disables background daemon mode for the Runner process"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "API_Identification",
+    "question": "Which internal method is used to try and kill a process on a remote scheduler before resetting a job?",
+    "choices": {
+      "A": "A. kill_remote_process",
+      "B": "B. _cancel_queue_process",
+      "C": "C. stop_remote",
+      "D": "D. terminate_worker_job"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow/core/store.py",
+    "category": "API_Identification",
+    "question": "Which method should be used to retrieve the output of a specific job by its unique identifier, including automatic resolution of references?",
+    "choices": {
+      "A": "A. query_one",
+      "B": "B. get_job",
+      "C": "C. get_output",
+      "D": "D. fetch_results"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/runner.py",
+    "category": "Parameter_Knowledge",
+    "question": "What does the 'transfer' parameter control in the Runner.run() method?",
+    "choices": {
+      "A": "A. Whether the runner uses SSH or FTP",
+      "B": "B. Whether file transfer actions (upload/download) are performed",
+      "C": "C. The maximum file size allowed for uploads",
+      "D": "D. Whether the runner can transfer jobs between different workers"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/formatting.py",
+    "category": "API_Identification",
+    "question": "Which function is used to format a single JobInfo or JobDoc into a rendered scope suitable for a detailed view?",
+    "choices": {
+      "A": "A. format_state",
+      "B": "B. format_job_info",
+      "C": "C. get_job_info_table",
+      "D": "D. render_scope_jfr"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/runner.py",
+    "category": "API_Identification",
+    "question": "Which method is responsible for transferring job input files from the local environment to the remote host?",
+    "choices": {
+      "A": "A. upload",
+      "B": "B. put_files",
+      "C": "C. submit",
+      "D": "D. transfer_data"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/config/base.py",
+    "category": "API_Identification",
+    "question": "Which class represents the configuration for executing multiple jobs within a single scheduler process (e.g., SLURM job)?",
+    "choices": {
+      "A": "A. BatchConfig",
+      "B": "B. RunnerOptions",
+      "C": "C. ExecutionConfig",
+      "D": "D. QueueConfig"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Usage_Pattern",
+    "question": "How does JobController determine which JobStore to use when calling get_job_output if multiple stores are configured?",
+    "choices": {
+      "A": "A. It always uses the default jobstore",
+      "B": "B. It checks the 'jobstore' field in the Flow document",
+      "C": "C. It requires the user to pass the store name as a parameter",
+      "D": "D. It checks the worker's local configuration"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/remote/host/base.py",
+    "category": "Usage_Pattern",
+    "question": "How does the BaseHost.sanitize_command() method modify a command string when sanitization is enabled?",
+    "choices": {
+      "A": "A. It wraps the command with echo statements using the SANITIZE_KEY",
+      "B": "B. It pipes the command output to /dev/null",
+      "C": "C. It adds 'sudo' to the beginning of the command string",
+      "D": "D. It replaces all whitespace with the SANITIZE_KEY"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/daemon.py",
+    "category": "Usage_Pattern",
+    "question": "What is the purpose of the 'wait' parameter in the DaemonManager.stop() method?",
+    "choices": {
+      "A": "A. It waits for the log file to be flushed",
+      "B": "B. It waits until all daemon processes have actually stopped",
+      "C": "C. It waits for a network timeout",
+      "D": "D. It delays the stop command for a specified number of seconds"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/batch.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the 'batch list' command, which parameter allows the user to filter results for a specific worker?",
+    "choices": {
+      "A": "A. --name",
+      "B": "B. --id",
+      "C": "C. --worker",
+      "D": "D. --host"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/job.py",
+    "category": "API_Identification",
+    "question": "Which group of commands is used for modifying properties like worker, priority, and resources for existing jobs?",
+    "choices": {
+      "A": "A. jf job update",
+      "B": "B. jf job edit",
+      "C": "C. jf job set",
+      "D": "D. jf job config"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/daemon.py",
+    "category": "Parameter_Knowledge",
+    "question": "When calling the write_config method of DaemonManager, what happens if the 'single' parameter is set to True?",
+    "choices": {
+      "A": "A. Only a single log file is created",
+      "B": "B. All runner tasks are executed in a single process",
+      "C": "C. Only the checkout task is enabled",
+      "D": "D. The daemon is restricted to a single CPU core"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/admin.py",
+    "category": "Usage_Pattern",
+    "question": "Before proceeding with an upgrade in 'admin upgrade', what check is performed to ensure no conflicting processes are running?",
+    "choices": {
+      "A": "A. check_active_jobs",
+      "B": "B. check_stopped_runner",
+      "C": "C. verify_db_connection",
+      "D": "D. get_config_manager"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/job.py",
+    "category": "Return_Value",
+    "question": "If 'jf job info' is called with a verbosity level greater than 0, which controller method is used?",
+    "choices": {
+      "A": "A. get_job_info",
+      "B": "B. get_job_details",
+      "C": "C. get_job_doc",
+      "D": "D. get_job_summary"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/formatting.py",
+    "category": "Return_Value",
+    "question": "What is the default value for size in the create_bar function, which defines the histogram width?",
+    "choices": {
+      "A": "A. 10",
+      "B": "B. 20",
+      "C": "C. 30",
+      "D": "D. 50"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/utils.py",
+    "category": "Usage_Pattern",
+    "question": "When using the cli_error_handler decorator, which type of exception is explicitly re-raised without being caught or converted to an error message?",
+    "choices": {
+      "A": "A. ValueError",
+      "B": "B. ProjectUndefinedError",
+      "C": "C. typer.Exit",
+      "D": "D. RuntimeError"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/utils.py",
+    "category": "Return_Value",
+    "question": "What is the return type of the str_to_dict function when provided with a string like 'key1=val1,key2=val2'?",
+    "choices": {
+      "A": "A. list[str]",
+      "B": "B. dict | None",
+      "C": "C. tuple[str, str]",
+      "D": "D. json.JSONObject"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/admin.py",
+    "category": "Parameter_Knowledge",
+    "question": "When using the 'admin reset' command, what is the default limit of flows that, if exceeded, requires providing today's date for validation?",
+    "choices": {
+      "A": "A. 10",
+      "B": "B. 25",
+      "C": "C. 50",
+      "D": "D. 100"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/jf.py",
+    "category": "Return_Value",
+    "question": "What happens if a ConfigError is raised during the project data retrieval in the main entry point of the 'jf' CLI?",
+    "choices": {
+      "A": "A. The CLI terminates with a non-zero exit code.",
+      "B": "B. The error is caught and execution continues without printing a warning.",
+      "C": "C. A red error message is printed to the console using out_console.",
+      "D": "D. The CLI automatically switches to a 'default' project."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/config/settings.py",
+    "category": "Return_Value",
+    "question": "What is the default value of the `cli_log_level` field in JobflowRemoteSettings?",
+    "choices": {
+      "A": "A. LogLevel.INFO",
+      "B": "B. LogLevel.DEBUG",
+      "C": "C. LogLevel.WARN",
+      "D": "D. LogLevel.ERROR"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/batch.py",
+    "category": "API_Identification",
+    "question": "Which class is responsible for managing remote files and subdirectories on a host for jobs handled by a batch worker?",
+    "choices": {
+      "A": "A. RemoteBatchManager",
+      "B": "B. LocalBatchManager",
+      "C": "C. BaseHost",
+      "D": "D. JobController"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/state.py",
+    "category": "Return_Value",
+    "question": "What FlowState is returned by from_jobs_states() if any job in the flow has a state of FAILED?",
+    "choices": {
+      "A": "A. FlowState.STOPPED",
+      "B": "B. FlowState.REMOTE_ERROR",
+      "C": "C. FlowState.FAILED",
+      "D": "D. FlowState.RUNNING"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow/core/store.py",
+    "category": "Usage_Pattern",
+    "question": "How does JobStore.from_file handle a file that contains a monty-serialized JobStore object?",
+    "choices": {
+      "A": "A. It ignores it and uses kwargs",
+      "B": "B. It fails with a TypeError",
+      "C": "C. It returns the deserialized object directly",
+      "D": "D. It converts it to a dict and calls from_dict_spec"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/plugin.py",
+    "category": "Usage_Pattern",
+    "question": "When creating a plugin for jobflow_remote, which function must be defined in the plugin module to ensure it is correctly registered?",
+    "choices": {
+      "A": "A. register_plugin",
+      "B": "B. init_plugin",
+      "C": "C. setup_jf_plugin",
+      "D": "D. configure_jf"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/utils/data.py",
+    "category": "API_Identification",
+    "question": "Which function is used to determine if a dictionary or nested structure contains any keys starting with specific substrings?",
+    "choices": {
+      "A": "A. find_dict_keys",
+      "B": "B. check_dict_keywords",
+      "C": "C. filter_dict_keys",
+      "D": "D. has_matching_keys"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/remote/data.py",
+    "category": "Usage_Pattern",
+    "question": "When calling resolve_job_dict_args on a serialized Job, what condition prevents the resolution of references?",
+    "choices": {
+      "A": "A. If the JobStore is in read-only mode",
+      "B": "B. If job_dict['config']['resolve_references'] is False",
+      "C": "C. If the job_id is missing from the dictionary",
+      "D": "D. If the dictionary has already been sanitized"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/job.py",
+    "category": "API_Identification",
+    "question": "Which command in the job CLI group provides a summary report about jobs in the database with trends over time?",
+    "choices": {
+      "A": "A. list",
+      "B": "B. info",
+      "C": "C. report",
+      "D": "D. summary"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/config/helper.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the generate_dummy_worker function, which values are accepted for the 'host_type' parameter?",
+    "choices": {
+      "A": "A. 'local' or 'remote'",
+      "B": "B. 'slurm' or 'shell'",
+      "C": "C. 'ssh' or 'direct'",
+      "D": "D. 'linux' or 'windows'"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/webgui/webgui.py",
+    "category": "Usage_Pattern",
+    "question": "Which CSS framework/reset is explicitly disabled in the fast_app initialization to allow custom styles?",
+    "choices": {
+      "A": "A. Bootstrap",
+      "B": "B. Tailwind",
+      "C": "C. Pico CSS",
+      "D": "D. Bulma"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/execution.py",
+    "category": "Usage_Pattern",
+    "question": "Which of the following parameters is required (not optional) when calling the 'execution run-batch' command via the CLI?",
+    "choices": {
+      "A": "A. max_time",
+      "B": "B. parallel_jobs",
+      "C": "C. process_uuid",
+      "D": "D. max_jobs"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/remote/queue.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the QueueManager.submit method, what is the effect of setting the 'create_submit_dir' parameter to True?",
+    "choices": {
+      "A": "A. It forces the scheduler to create a temporary directory.",
+      "B": "B. It tells the host to create the work directory recursively before writing the script.",
+      "C": "C. It generates a unique UUID for the submission directory.",
+      "D": "D. It initializes a Git repository in the working directory."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/project.py",
+    "category": "Parameter_Knowledge",
+    "question": "When running the 'jf project generate' command, which parameter allows the creation of a configuration file containing all available fields and additional elements?",
+    "choices": {
+      "A": "A. --verbose",
+      "B": "B. --all",
+      "C": "C. --full",
+      "D": "D. --complete"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/job.py",
+    "category": "API_Identification",
+    "question": "Which command is used to retrieve a list of files located in a job's remote run directory?",
+    "choices": {
+      "A": "A. jf job list-files",
+      "B": "B. jf job files ls",
+      "C": "C. jf job dir",
+      "D": "D. jf job remote-ls"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Return_Value",
+    "question": "What value is returned by the count_jobs method of JobController?",
+    "choices": {
+      "A": "A. A list of database IDs",
+      "B": "B. A dictionary of states and counts",
+      "C": "C. An integer representing the number of matches",
+      "D": "D. A cursor object"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Parameter_Knowledge",
+    "question": "What is the purpose of the 'break_lock' parameter found in many JobController methods like stop_job or rerun_job?",
+    "choices": {
+      "A": "A. To allow the operation even if the document is currently locked by another process",
+      "B": "B. To disconnect the database session",
+      "C": "C. To ignore the remote queue's lock file",
+      "D": "D. To allow modifications to COMPLETED jobs"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/utils/log.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the initialize_cli_logger function, what is the effect of setting the full_exc_info parameter to False?",
+    "choices": {
+      "A": "A. It disables logging to the terminal.",
+      "B": "B. It prevents the logger from recording any error messages.",
+      "C": "C. The CLIFormatter will only print the exception name and message instead of the full stack trace.",
+      "D": "D. It reduces the log level to WARNING regardless of other settings."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/types.py",
+    "category": "Return_Value",
+    "question": "What is the underlying Python type for the flow_state_opt and job_state_opt after parsing?",
+    "choices": {
+      "A": "A. Optional[list[str]]",
+      "B": "B. Optional[list[FlowState]] and Optional[list[JobState]]",
+      "C": "C. dict",
+      "D": "D. list[int]"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/types.py",
+    "category": "Parameter_Knowledge",
+    "question": "Which formats are supported by the start_date_opt for parsing dates from the CLI?",
+    "choices": {
+      "A": "A. Only ISO8601",
+      "B": "B. Only %Y-%m-%d",
+      "C": "C. %Y-%m-%d, %Y-%m-%dT%H:%M:%S, %H:%M:%S",
+      "D": "D. Unix Timestamps only"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/job.py",
+    "category": "API_Identification",
+    "question": "Which command is recommended to resolve a REMOTE_ERROR by immediately retrying the failed remote action?",
+    "choices": {
+      "A": "A. jf job rerun",
+      "B": "B. jf job retry",
+      "C": "C. jf job reset",
+      "D": "D. jf job fix"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/runner.py",
+    "category": "API_Identification",
+    "question": "Which Typer command in the runner module is specifically intended for executing the Runner in the foreground for testing purposes rather than as a daemon?",
+    "choices": {
+      "A": "A. start",
+      "B": "B. run",
+      "C": "C. foreground",
+      "D": "D. info"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/plugin.py",
+    "category": "API_Identification",
+    "question": "Which entry point group is searched by jobflow_remote to identify available plugins?",
+    "choices": {
+      "A": "A. jobflow.remote_plugins",
+      "B": "B. jobflow_remote.plugins",
+      "C": "C. jobflow_remote.cli_plugins",
+      "D": "D. jobflow_remote.extensions"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/runner.py",
+    "category": "Return_Value",
+    "question": "What type of object does Runner.get_queue_manager(worker_name) return?",
+    "choices": {
+      "A": "A. QueueManager",
+      "B": "B. BaseHost",
+      "C": "C. RemoteBatchManager",
+      "D": "D. WorkerBase"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/utils/db.py",
+    "category": "Return_Value",
+    "question": "What does the 'mongodump_from_store' function return upon completion?",
+    "choices": {
+      "A": "A. A list of document dictionaries.",
+      "B": "B. The exit code of the subprocess.",
+      "C": "C. The stdout string from the command.",
+      "D": "D. An integer representing the number of documents dumped."
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "jobflow_remote/cli/plugin.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the list_plugins function (CLI command 'list'), what is the effect of setting the '--error' (or '-e') option?",
+    "choices": {
+      "A": "A. It forces the CLI to ignore any plugin loading errors.",
+      "B": "B. It logs plugin loading errors to a hidden system file.",
+      "C": "C. It prints the detailed error messages and tracebacks for plugins that failed to load.",
+      "D": "D. It attempts to re-install plugins that failed to initialize."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/utils.py",
+    "category": "API_Identification",
+    "question": "Which utility function validates if a string is a correctly formatted UUID?",
+    "choices": {
+      "A": "A. is_uuid",
+      "B": "B. check_valid_uuid",
+      "C": "C. validate_id",
+      "D": "D. parse_unique_id"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/utils.py",
+    "category": "API_Identification",
+    "question": "Which Enum class is used to define the allowed time units for generating reports in the CLI?",
+    "choices": {
+      "A": "A. TimeUnit",
+      "B": "B. IntervalType",
+      "C": "C. ReportInterval",
+      "D": "D. DateRange"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/daemon.py",
+    "category": "API_Identification",
+    "question": "Which method is responsible for removing the supervisord PID and socket files from the disk?",
+    "choices": {
+      "A": "A. delete_metadata()",
+      "B": "B. clean_files()",
+      "C": "C. reset_daemon()",
+      "D": "D. purge_temp()"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/upgrade.py",
+    "category": "Return_Value",
+    "question": "What does the DatabaseUpgrader.upgrade() method return to indicate whether an upgrade was actually executed?",
+    "choices": {
+      "A": "A. A list of UpgradeAction objects",
+      "B": "B. The new version string",
+      "C": "C. A boolean value",
+      "D": "D. None"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/runner.py",
+    "category": "Parameter_Knowledge",
+    "question": "What is the default behavior of get_jobstore(flow_id) if the flow_id is not in the internal cache and no optional jobstores match?",
+    "choices": {
+      "A": "A. It returns None",
+      "B": "B. It returns the primary project jobstore",
+      "C": "C. It raises a ConfigError",
+      "D": "D. It creates a new temporary jobstore"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/runner.py",
+    "category": "Usage_Pattern",
+    "question": "Which sequence of states correctly describes the progression of a job handled by the Runner on a remote host?",
+    "choices": {
+      "A": "A. READY -> CHECKED_OUT -> UPLOADED -> SUBMITTED -> RUNNING -> TERMINATED -> DOWNLOADED -> COMPLETED",
+      "B": "B. READY -> SUBMITTED -> UPLOADED -> RUNNING -> TERMINATED -> COMPLETED",
+      "C": "C. READY -> CHECKED_OUT -> RUNNING -> UPLOADED -> DOWNLOADED -> COMPLETED",
+      "D": "D. READY -> UPLOADED -> CHECKED_OUT -> SUBMITTED -> COMPLETED"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow/core/reference.py",
+    "category": "Usage_Pattern",
+    "question": "Why is it generally preferred to use resolve_references() instead of calling OutputReference.resolve() multiple times?",
+    "choices": {
+      "A": "A. It bypasses the MontyDecoder for speed",
+      "B": "B. It automatically handles pydantic validation",
+      "C": "C. It minimizes the number of database requests using caching",
+      "D": "D. It is the only way to resolve references with attributes"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/config/manager.py",
+    "category": "Usage_Pattern",
+    "question": "When adding a new worker via ConfigManager.set_worker(), what happens if a worker with the same name already exists and the 'replace' parameter is False?",
+    "choices": {
+      "A": "A. The existing worker is silently overwritten",
+      "B": "B. A ConfigError is raised",
+      "C": "C. The new worker is added with a suffix",
+      "D": "D. The method returns False"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/report.py",
+    "category": "API_Identification",
+    "question": "Which property in the JobsReport class calculates the total count of jobs in either a FAILED or REMOTE_ERROR state?",
+    "choices": {
+      "A": "A. failed_count",
+      "B": "B. error",
+      "C": "C. total_failures",
+      "D": "D. issue_count"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Usage_Pattern",
+    "question": "What must be true for a job to be paused via the pause_job method?",
+    "choices": {
+      "A": "A. The job must be in a RUNNING state",
+      "B": "B. The job must be in READY or WAITING states",
+      "C": "C. The job must not have any children",
+      "D": "D. The flow must be locked manually by the user first"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/remote/host/remote.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the RemoteHost.execute() method, what happens if the 'command' argument is provided as a list of strings?",
+    "choices": {
+      "A": "A. The method raises a TypeError",
+      "B": "B. The list is converted to a single string by joining elements with a space",
+      "C": "C. Each command in the list is executed as a separate SSH session",
+      "D": "D. The list is passed directly to fabric.Connection.run without modification"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/upgrade.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the DatabaseUpgrader.dry_run method, what version is used as the default target_version if None is provided?",
+    "choices": {
+      "A": "A. The version currently in the database",
+      "B": "B. The version of the jobflow-remote package",
+      "C": "C. The oldest registered upgrade version",
+      "D": "D. Version '0.1.5'"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/config/base.py",
+    "category": "Usage_Pattern",
+    "question": "What type of Store is required for the 'store' field in a QueueConfig object?",
+    "choices": {
+      "A": "A. MemoryStore",
+      "B": "B. MongoStore",
+      "C": "C. JobStore",
+      "D": "D. GridFSStore"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/flow.py",
+    "category": "Return_Value",
+    "question": "What determines whether the 'flow list' command prints a table of flow information or a single numeric count?",
+    "choices": {
+      "A": "A. The --verbosity flag",
+      "B": "B. The --count flag",
+      "C": "C. The --max-results parameter",
+      "D": "D. The --metadata filter"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/runner.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the 'start' command, which parameter must be set to True if the --connect-interactive flag is used?",
+    "choices": {
+      "A": "A. transfer",
+      "B": "B. complete",
+      "C": "C. single",
+      "D": "D. log_level"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/runner.py",
+    "category": "Usage_Pattern",
+    "question": "What is the primary difference in how Runner.check_run_status() handles a finished job on a local worker versus a remote worker?",
+    "choices": {
+      "A": "A. Local jobs are deleted immediately",
+      "B": "B. Local jobs move directly to DOWNLOADED, while remote jobs move to TERMINATED",
+      "C": "C. Local jobs move to COMPLETED, remote jobs move to DOWNLOADED",
+      "D": "D. There is no difference in state handling"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/daemon.py",
+    "category": "Usage_Pattern",
+    "question": "What is the recommended way to instantiate a DaemonManager using only the name of a project defined in the configuration?",
+    "choices": {
+      "A": "A. DaemonManager(project_name='my_project')",
+      "B": "B. DaemonManager.from_project_name('my_project')",
+      "C": "C. DaemonManager.load_from_config('my_project')",
+      "D": "D. DaemonManager.init_daemon('my_project')"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/run.py",
+    "category": "Usage_Pattern",
+    "question": "When run_remote_job finishes execution or encounters an error, what action is taken regarding the JfrState singleton?",
+    "choices": {
+      "A": "A. The state is saved to a persistent database",
+      "B": "B. The state is passed to the next job in the queue",
+      "C": "C. The state is reset by calling JfrState().reset()",
+      "D": "D. The state is deleted from memory"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/job.py",
+    "category": "Parameter_Knowledge",
+    "question": "When using 'jf job output', what does the '--load' flag control?",
+    "choices": {
+      "A": "A. It loads the output into a local variable",
+      "B": "B. It triggers loading of data from additional stores",
+      "C": "C. It loads the output into a database",
+      "D": "D. It automatically opens the file in an editor"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/webgui/webgui.py",
+    "category": "API_Identification",
+    "question": "Which global dictionary maps daemon status enums to their corresponding UI display colors?",
+    "choices": {
+      "A": "A. color_map",
+      "B": "B. status_colors",
+      "C": "C. daemon_ui_styles",
+      "D": "D. state_theme"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/remote/queue.py",
+    "category": "Return_Value",
+    "question": "What is the return type of the QueueManager.execute_cmd method?",
+    "choices": {
+      "A": "A. str",
+      "B": "B. int",
+      "C": "C. dict",
+      "D": "D. tuple[str, str, int]"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Return_Value",
+    "question": "What does the get_trends method return?",
+    "choices": {
+      "A": "A. A list of JobInfo objects",
+      "B": "B. A dictionary mapping dates/intervals to state counts",
+      "C": "C. A Matplotlib figure object",
+      "D": "D. A list of datetime objects"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/utils/db.py",
+    "category": "Usage_Pattern",
+    "question": "How is the 'lock_id' determined in MongoLock if it is not explicitly provided to the constructor?",
+    "choices": {
+      "A": "A. It is set to the document's '_id'.",
+      "B": "B. It is set to the hostname of the machine.",
+      "C": "C. It is randomly generated using 'suuid()'.",
+      "D": "D. It defaults to the string 'locked'."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/flow.py",
+    "category": "Usage_Pattern",
+    "question": "When identifying a Flow for commands like 'info' or 'graph', what flag must be used if the provided ID refers to a Job ID instead of a Flow ID?",
+    "choices": {
+      "A": "A. --db-id",
+      "B": "B. --job-id",
+      "C": "C. --id-type job",
+      "D": "D. --force"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/remote/host/base.py",
+    "category": "Return_Value",
+    "question": "What is the return type of the BaseHost.execute() abstract method?",
+    "choices": {
+      "A": "A. str",
+      "B": "B. bool",
+      "C": "C. tuple[str, str, int]",
+      "D": "D. dict[str, Any]"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/utils.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the execute_multi_jobs_cmd function, what is the purpose of the 'interactive' boolean parameter?",
+    "choices": {
+      "A": "A. It determines if the user is prompted for a password",
+      "B": "B. It controls whether a loading spinner is shown based on worker capabilities",
+      "C": "C. It forces the command to run in the foreground",
+      "D": "D. It enables autocomplete for job IDs"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/runner.py",
+    "category": "API_Identification",
+    "question": "Which method is responsible for checking the queue status (e.g., via qstat) and updating jobs from SUBMITTED to RUNNING?",
+    "choices": {
+      "A": "A. check_run_status",
+      "B": "B. query_queue",
+      "C": "C. update_batch_jobs",
+      "D": "D. monitor_processes"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/graph.py",
+    "category": "Return_Value",
+    "question": "What type of object does the get_graph function return?",
+    "choices": {
+      "A": "A. dict",
+      "B": "B. networkx.DiGraph",
+      "C": "C. dash.Dash",
+      "D": "D. str"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the get_trends method, what is the default behavior if 'num_intervals' is not provided?",
+    "choices": {
+      "A": "A. It defaults to 10 intervals",
+      "B": "B. It is calculated based on the 'interval' type (e.g., 7 for days, 12 for months)",
+      "C": "C. It returns all data available in the database",
+      "D": "D. It returns only the most recent interval"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow/core/reference.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the OnMissing enum, which value causes the resolver to return the original OutputReference object if it cannot be resolved?",
+    "choices": {
+      "A": "A. ERROR",
+      "B": "B. NONE",
+      "C": "C. PASS",
+      "D": "D. IGNORE"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/formatting.py",
+    "category": "Usage_Pattern",
+    "question": "How are the columns in the JobInfo table determined if the output_keys parameter is not provided to get_job_info_table?",
+    "choices": {
+      "A": "A. They are retrieved from the JOB_INFO_ORDER list.",
+      "B": "B. They are automatically derived from the keys of the first JobInfo object.",
+      "C": "C. They are selected from header_name_data_getter_map based on the verbosity level.",
+      "D": "D. Only the 'Name' and 'State' columns are shown."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/submit.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the submit_flow function, what happens if the 'worker' parameter is set to None?",
+    "choices": {
+      "A": "A. The submission fails with a ValueError",
+      "B": "B. The job is submitted to all configured workers",
+      "C": "C. The function uses the first configured worker for the project",
+      "D": "D. The job remains in a pending state without a worker assigned"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/daemon.py",
+    "category": "API_Identification",
+    "question": "Which specific exception is raised by DaemonManager when a runner is already running on a different machine according to the database?",
+    "choices": {
+      "A": "A. RunnerLockedError",
+      "B": "B. ConnectionError",
+      "C": "C. RunningDaemonError",
+      "D": "D. ProcessActiveError"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/types.py",
+    "category": "API_Identification",
+    "question": "Which Typer option is specifically designed to display a tree representation of the CLI command structure using an eager callback?",
+    "choices": {
+      "A": "A. tree_opt",
+      "B": "B. tree_callback_opt",
+      "C": "C. command_tree_opt",
+      "D": "D. structure_opt"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/remote/host/local.py",
+    "category": "Return_Value",
+    "question": "What are the three components returned by the LocalHost.execute() method?",
+    "choices": {
+      "A": "A. (stdout, stderr, exit_code)",
+      "B": "B. (is_success, output, error)",
+      "C": "C. (process_id, stdout, stderr)",
+      "D": "D. (stdout, stderr, duration)"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/cli/runner.py",
+    "category": "Return_Value",
+    "question": "What visual indicator is used by the 'status' command to represent a DaemonStatus.RUNNING state in the console output?",
+    "choices": {
+      "A": "A. gold1",
+      "B": "B. red",
+      "C": "C. green",
+      "D": "D. blue"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/remote/host/remote.py",
+    "category": "API_Identification",
+    "question": "Which class is used as a custom authentication strategy in RemoteHost when 'interactive_login' is enabled and no SSH keys are provided?",
+    "choices": {
+      "A": "A. FabricAuthStrategy",
+      "B": "B. InteractiveAuthStrategy",
+      "C": "C. PasswordAuthStrategy",
+      "D": "D. StandardSSHStrategy"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/admin.py",
+    "category": "API_Identification",
+    "question": "Which class is instantiated within the 'admin upgrade' command to handle the dry-run and upgrade logic?",
+    "choices": {
+      "A": "A. JobController",
+      "B": "B. DatabaseUpgrader",
+      "C": "C. ConfigManager",
+      "D": "D. JFRTyper"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "Return_Value",
+    "question": "What does the queue_supports_transactions cached property return?",
+    "choices": {
+      "A": "A. A string version of MongoDB",
+      "B": "B. A boolean indicating if the MongoStore supports sessions and transactions",
+      "C": "C. The MongoDB connection string",
+      "D": "D. None"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/runner.py",
+    "category": "API_Identification",
+    "question": "Which method should be called to close all host connections and jobstore connections when the Runner is finished?",
+    "choices": {
+      "A": "A. stop",
+      "B": "B. shutdown",
+      "C": "C. cleanup",
+      "D": "D. terminate"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/job.py",
+    "category": "Parameter_Knowledge",
+    "question": "In 'jf job list', which sort option is the default?",
+    "choices": {
+      "A": "A. SortOption.CREATED_ON",
+      "B": "B. SortOption.NAME",
+      "C": "C. SortOption.UPDATED_ON",
+      "D": "D. SortOption.STATE"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/utils/db.py",
+    "category": "Parameter_Knowledge",
+    "question": "In 'mongo_operation', what happens if 'mongo_bin_path' is not provided?",
+    "choices": {
+      "A": "A. The operation fails with a ValueError.",
+      "B": "B. The function defaults to using 'pymongo_dump'.",
+      "C": "C. The executable is searched for in the system's PATH.",
+      "D": "D. The function uses a hardcoded path to /usr/bin/mongo."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/config/manager.py",
+    "category": "API_Identification",
+    "question": "Which method in ConfigManager retrieves only the names of potential projects from files, even if those files cannot be fully parsed as Project objects?",
+    "choices": {
+      "A": "A. load_projects_data",
+      "B": "B. project_names_from_files",
+      "C": "C. get_project_data",
+      "D": "D. select_project_name"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/daemon.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the start() method of DaemonManager, what is the effect of setting 'num_procs_transfer' when 'single' is False?",
+    "choices": {
+      "A": "A. It sets the number of concurrent network connections",
+      "B": "B. It defines the number of processes for the transfer step in split mode",
+      "C": "C. It limits the file size of transfers",
+      "D": "D. It specifies the number of retry attempts for transfers"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/runner.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the Runner.run() method, what happens if the 'ticks' parameter is provided?",
+    "choices": {
+      "A": "A. The runner waits for 'ticks' seconds between loops",
+      "B": "B. The runner executes for a specific number of loop iterations before exiting",
+      "C": "C. The runner limits the CPU usage to the specified tick rate",
+      "D": "D. The runner only processes 'ticks' number of jobs per minute"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/remote/host/remote.py",
+    "category": "Usage_Pattern",
+    "question": "When using RemoteHost.mkdir(), what is the default behavior if the target directory already exists?",
+    "choices": {
+      "A": "A. An OSError is raised",
+      "B": "B. The method returns False immediately",
+      "C": "C. The directory is recreated, deleting old contents",
+      "D": "D. It succeeds without error because exist_ok defaults to True"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "jobflow_remote/utils/log.py",
+    "category": "API_Identification",
+    "question": "Which function is specifically designed to initialize the logger for the execution of jobs, using a StreamHandler directed to stdout?",
+    "choices": {
+      "A": "A. initialize_runner_logger",
+      "B": "B. initialize_remote_run_log",
+      "C": "C. initialize_cli_logger",
+      "D": "D. initialize_job_handler"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/utils/schedule.py",
+    "category": "Usage_Pattern",
+    "question": "How can a user configure SafeScheduler to wait a specific amount of time before a failed job is attempted again?",
+    "choices": {
+      "A": "A. By setting the retry_delay parameter in the Job object.",
+      "B": "B. By passing seconds_after_failure to the SafeScheduler constructor.",
+      "C": "C. By using the exponential_backoff decorator on the job function.",
+      "D": "D. By calling scheduler.set_delay() after a failure occurs."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow/core/store.py",
+    "category": "Parameter_Knowledge",
+    "question": "When calling JobStore.get_output(), what does setting the 'which' parameter to 'last' signify?",
+    "choices": {
+      "A": "A. Use the job with the highest index",
+      "B": "B. Use the most recently modified job",
+      "C": "C. Use the first job that ran",
+      "D": "D. Use only the last document in the collection"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/webgui/webgui.py",
+    "category": "Return_Value",
+    "question": "When requesting flow graph information via get_graph_job_flow, what format is the graph logic rendered in?",
+    "choices": {
+      "A": "A. D3.js",
+      "B": "B. Mermaid.js",
+      "C": "C. Graphviz",
+      "D": "D. Cytoscape"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/job.py",
+    "category": "Usage_Pattern",
+    "question": "Which command should be used to move a job from a PAUSED or STOPPED state back into an active state?",
+    "choices": {
+      "A": "A. jf job play",
+      "B": "B. jf job start",
+      "C": "C. jf job resume",
+      "D": "D. jf job rerun"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/cli/formatting.py",
+    "category": "Return_Value",
+    "question": "What type of object does the format_upgrade_actions function return for rendering in the CLI?",
+    "choices": {
+      "A": "A. rich.table.Table",
+      "B": "B. rich.text.Text",
+      "C": "C. rich.markdown.Markdown",
+      "D": "D. rich.panel.Panel"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/data.py",
+    "category": "Return_Value",
+    "question": "What does the run_time property of the JobInfo class return?",
+    "choices": {
+      "A": "A. A datetime object representing the start time.",
+      "B": "B. The total seconds between start_time and end_time as a float.",
+      "C": "C. A string formatted as HH:MM:SS.",
+      "D": "D. The estimated time remaining for the job."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "API_Identification",
+    "question": "Which method is used by the runner to atomically transition a job from WAITING to READY when its parents complete?",
+    "choices": {
+      "A": "A. refresh_children",
+      "B": "B. ready_jobs",
+      "C": "C. unlock_children",
+      "D": "D. update_dependencies"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/graph.py",
+    "category": "API_Identification",
+    "question": "Which function provides the necessary structural data components (nodes, edges, hosts, and replace edges) used to build flow visualizations?",
+    "choices": {
+      "A": "A. get_graph",
+      "B": "B. get_graph_elements",
+      "C": "C. get_mermaid",
+      "D": "D. plot_dash"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/job.py",
+    "category": "Usage_Pattern",
+    "question": "What is the effect of using the 'rerun' command with the '--no-delete' flag?",
+    "choices": {
+      "A": "A. It prevents the job from being deleted from the DB",
+      "B": "B. It skips deleting the job's files on the worker",
+      "C": "C. It keeps the job in the current state",
+      "D": "D. It prevents children jobs from being reset"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow/core/store.py",
+    "category": "Return_Value",
+    "question": "What does JobStore.query_one return if no document matches the search criteria?",
+    "choices": {
+      "A": "A. An empty dict",
+      "B": "B. False",
+      "C": "C. None",
+      "D": "D. StopIteration"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/config/jobconfig.py",
+    "category": "Return_Value",
+    "question": "What does the load_job_store function return when called with a project name?",
+    "choices": {
+      "A": "A. A dictionary of project settings",
+      "B": "B. A JobStore object",
+      "C": "C. A ConfigManager instance",
+      "D": "D. An ExecutionConfig object"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/jobcontroller.py",
+    "category": "API_Identification",
+    "question": "Which JobController method allows an administrator to wipe the queue database, drop collections, and rebuild indexes?",
+    "choices": {
+      "A": "A. clear()",
+      "B": "B. drop_all()",
+      "C": "C. reset()",
+      "D": "D. initialize()"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/report.py",
+    "category": "Usage_Pattern",
+    "question": "To generate a JobsReport or FlowsReport, what object must be passed as the first argument to the respective generate_report class methods?",
+    "choices": {
+      "A": "A. A MongoDatabase instance",
+      "B": "B. A JobController instance",
+      "C": "C. A FlowState dictionary",
+      "D": "D. A WorkGraph object"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/utils/schedule.py",
+    "category": "Parameter_Knowledge",
+    "question": "In the SafeScheduler constructor, what happens if reschedule_on_failure is set to False and a job fails?",
+    "choices": {
+      "A": "A. The job is retried immediately.",
+      "B": "B. The job is permanently canceled.",
+      "C": "C. The job remains in the queue for the next tick.",
+      "D": "D. The scheduler raises a SystemExit exception."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/jobs/daemon.py",
+    "category": "Parameter_Knowledge",
+    "question": "Which log level is the default for the write_config method in the DaemonManager class?",
+    "choices": {
+      "A": "A. debug",
+      "B": "B. info",
+      "C": "C. warning",
+      "D": "D. error"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/cli/types.py",
+    "category": "Usage_Pattern",
+    "question": "According to the help text in job_index_arg and job_index_opt, what happens if a job index is not explicitly provided?",
+    "choices": {
+      "A": "A. The command fails with an error",
+      "B": "B. The job with index 0 is selected",
+      "C": "C. The job with the largest index is selected",
+      "D": "D. All indexes for that job ID are selected"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "jobflow/core/store.py",
+    "category": "Usage_Pattern",
+    "question": "What is the correct sequence of calls to ensure all underlying database connections are established for a JobStore?",
+    "choices": {
+      "A": "A. JobStore.open()",
+      "B": "B. JobStore.connect()",
+      "C": "C. JobStore.initialize()",
+      "D": "D. JobStore.docs_store.connect()"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "jobflow_remote/utils/db.py",
+    "category": "Usage_Pattern",
+    "question": "What occurs if both 'delete_on_release' and 'update_on_release' are set on a MongoLock instance?",
+    "choices": {
+      "A": "A. The document is updated and then deleted.",
+      "B": "B. The document is deleted and the update is ignored.",
+      "C": "C. The update is applied but the deletion is ignored.",
+      "D": "D. A ValueError is raised."
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "jobflow_remote/config/helper.py",
+    "category": "API_Identification",
+    "question": "Which function is responsible for creating a mock Project configuration object, optionally including multiple workers and execution configurations?",
+    "choices": {
+      "A": "A. generate_dummy_project",
+      "B": "B. generate_dummy_worker",
+      "C": "C. create_test_project",
+      "D": "D. get_dummy_config"
+    },
+    "correct_answer": "A"
+  }
+]

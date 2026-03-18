@@ -1,0 +1,11 @@
+[
+  "test_SRHCapture",
+  "test_substitution",
+  "test_substitution_generators",
+  "test_supercells",
+  "test_topography_analyzer",
+  "test_vacancy",
+  "test_vacancy_generators",
+  "test_voronoi_interstitial_generator",
+  "test_wswq_slope"
+]

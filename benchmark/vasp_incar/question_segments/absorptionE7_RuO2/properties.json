@@ -1,0 +1,159 @@
+{
+  "JSON_File_Name": "absorptionE7_RuO2",
+  "task_type": "absorption_energy",
+  "source": "VaspAgent_with_Benchmark/data/absorptionE7/RuO2/data3.json",
+  "properties": {
+    "step1_incar": {
+      "description": "INCAR for CO molecule geometry optimization",
+      "format": "incar",
+      "step_type": "relaxation",
+      "config_constraints": {
+        "ISPIN": {
+          "match": "in_set",
+          "value": [
+            1,
+            2
+          ]
+        },
+        "ISIF": {
+          "match": "exact",
+          "value": 2
+        },
+        "IBRION": {
+          "match": "in_set",
+          "value": [
+            1,
+            2
+          ]
+        },
+        "ISMEAR": {
+          "match": "in_set",
+          "value": [
+            0,
+            1
+          ]
+        },
+        "ENCUT": {
+          "match": "gt",
+          "min": 349
+        },
+        "EDIFFG": {
+          "match": "range",
+          "min": -0.1,
+          "max": -0.005
+        },
+        "SIGMA": {
+          "match": "range",
+          "min": 0.01,
+          "max": 0.3
+        },
+        "NSW": {
+          "match": "gt",
+          "min": 0
+        }
+      }
+    },
+    "step2_incar": {
+      "description": "INCAR for RuO2 surface geometry optimization",
+      "format": "incar",
+      "step_type": "relaxation",
+      "config_constraints": {
+        "ISPIN": {
+          "match": "in_set",
+          "value": [
+            1,
+            2
+          ]
+        },
+        "ISIF": {
+          "match": "exact",
+          "value": 2
+        },
+        "IBRION": {
+          "match": "in_set",
+          "value": [
+            1,
+            2
+          ]
+        },
+        "ISMEAR": {
+          "match": "in_set",
+          "value": [
+            0,
+            1,
+            2
+          ]
+        },
+        "ENCUT": {
+          "match": "gt",
+          "min": 349
+        },
+        "EDIFFG": {
+          "match": "range",
+          "min": -0.1,
+          "max": -0.005
+        },
+        "SIGMA": {
+          "match": "range",
+          "min": 0.01,
+          "max": 0.3
+        },
+        "NSW": {
+          "match": "gt",
+          "min": 0
+        }
+      }
+    },
+    "step3_incar": {
+      "description": "INCAR for CO-on-RuO2 adsorbed system geometry optimization",
+      "format": "incar",
+      "step_type": "relaxation",
+      "config_constraints": {
+        "ISPIN": {
+          "match": "in_set",
+          "value": [
+            1,
+            2
+          ]
+        },
+        "ISIF": {
+          "match": "exact",
+          "value": 2
+        },
+        "IBRION": {
+          "match": "in_set",
+          "value": [
+            1,
+            2
+          ]
+        },
+        "ISMEAR": {
+          "match": "in_set",
+          "value": [
+            0,
+            1,
+            2
+          ]
+        },
+        "ENCUT": {
+          "match": "gt",
+          "min": 349
+        },
+        "EDIFFG": {
+          "match": "range",
+          "min": -0.1,
+          "max": -0.005
+        },
+        "SIGMA": {
+          "match": "range",
+          "min": 0.01,
+          "max": 0.3
+        },
+        "NSW": {
+          "match": "gt",
+          "min": 0
+        }
+      }
+    }
+  }
+}

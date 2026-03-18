@@ -1,0 +1,26 @@
+[
+  {
+    "source_file": "ELPH_NBANDS_SUM.md",
+    "category": "Tag_Dependency",
+    "question": "If the electron self-energy results have not converged at the limit of ELPH_NBANDS_SUM = ELPH_NBANDS, which tag must be increased to allow for more intermediate states?",
+    "choices": {
+      "A": "A. NBANDS",
+      "B": "B. NEDOS",
+      "C": "C. ELPH_NBANDS",
+      "D": "D. ENCUT"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "Precompiler_flags.md",
+    "category": "Tag_Dependency",
+    "question": "If the precompiler flag -Duse_collective is specified in the CPP_OPTIONS, what is the effect on the MPI_BLOCK flag?",
+    "choices": {
+      "A": "A. MPI_BLOCK must be set to 0",
+      "B": "B. The value of MPI_BLOCK becomes meaningless",
+      "C": "C. MPI_BLOCK must be increased to 512",
+      "D": "D. MPI_BLOCK is required for scaLAPACK"
+    },
+    "correct_answer": "B"
+  }
+]
