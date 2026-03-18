@@ -12,6 +12,12 @@ dependencies = [
     "smolagents[litellm]",
     "pymatgen",
     "pyyaml",
+    "bm25s>=0.2",
+    "tiktoken>=0.5",
+    "astchunk",
+    "faiss-cpu>=1.7",
+    "google-genai>=0.3",
+    "pymupdf>=1.24",
 ]
 
 [project.optional-dependencies]
@@ -26,20 +32,6 @@ workflow = [
 telemetry = [
     "arize-phoenix",
     "openinference-instrumentation-smolagents",
-]
-rag = [
-    "bm25s>=0.2",
-    "tiktoken>=0.5",
-    "astchunk",
-]
-rag-vector = [
-    "bm25s>=0.2",
-    "tiktoken>=0.5",
-    "faiss-cpu>=1.7",
-    "google-genai>=0.3",
-]
-pdf = [
-    "pymupdf>=1.24",
 ]
 
 [tool.setuptools.packages.find]

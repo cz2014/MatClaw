@@ -12,7 +12,7 @@ providers:
 
   gemini:
     model_id: gemini/gemini-3-flash-preview
-    api_key: ${EMBEDDING_API_KEY}
+    api_key: ${GEMINI_API_KEY}
     context_window: 100000     # Gemini: steep decay above 128K (MRCR v2)
 
   claude:

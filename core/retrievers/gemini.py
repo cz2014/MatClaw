@@ -10,7 +10,7 @@ import numpy as np
 from .vector import BaseEmbedder
 
 # Environment variable for Gemini API key (users can modify this)
-API_KEY_ENV_VAR = "EMBEDDING_API_KEY"
+API_KEY_ENV_VAR = "GEMINI_API_KEY"
 
 
 class GeminiEmbedder(BaseEmbedder):
