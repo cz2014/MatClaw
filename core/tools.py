@@ -1207,7 +1207,7 @@ class RemotePutTool(Tool):
 Supports both single files and directories. Directories are transferred as
 tar archives (packed locally, uploaded, extracted remotely).
 
-Default upload directory: /pscratch/sd/c/cz2014/agent_tmp_dir
+Default upload directory: <your_scratch_dir>/agent_tmp_dir
 (avoid /tmp on remote -- it is node-local and periodically cleaned).
 
 Returns the remote path of the uploaded file or directory."""
