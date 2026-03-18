@@ -5,7 +5,7 @@ A code-first LLM agent for computational materials science workflows. Built on H
 ## How It Works
 
 <p align="center">
-  <img src=".ref/matclaw.png" alt="MatClaw architecture" width="800">
+  <img src=".ref/matclaw.jpg" alt="MatClaw architecture" width="800">
 </p>
 
 The researcher provides a task description in natural language. The LLM-driven agent generates and executes Python code through a sandboxed interpreter, leveraging materials science libraries (pymatgen, ASE, atomate2, jobflow) to manipulate structures, submit jobs to remote HPC clusters (VASP, DeePMD-kit, LAMMPS, etc.), and analyze results. The agent reads execution outputs and errors, self-corrects, and iterates until the task is complete. A file-based long-term memory and a database of computational results persist across sessions.
