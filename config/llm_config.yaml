@@ -1,7 +1,7 @@
 # LLM configuration for MLFF agent
 # API keys use ${ENV_VAR} syntax - expanded at runtime
 
-default_provider: openai
+default_provider: claude
 
 providers:
   openai:
@@ -15,6 +15,15 @@ providers:
     api_key: ${EMBEDDING_API_KEY}
     context_window: 100000     # Gemini: steep decay above 128K (MRCR v2)
 
+  claude:
+    model_id: anthropic/claude-opus-4-6
+    api_key: ${CLAUDE_API_KEY}
+    context_window: 200000
+    timeout: 600
+    thinking:
+      type: enabled
+      budget_tokens: 10000
+
   deepseek:
     model_id: deepseek/deepseek-chat
     api_key: ${DEEPSEEK_API_KEY}
@@ -26,6 +35,7 @@ agent:
   context_pruning: true         # enable zone-based context management (default: true)
   experience_file: config/experience.md   # cross-session lessons, auto-injected into prompts
   additional_authorized_imports:
+    - json
     - math
     - numpy
     - numpy.*

@@ -562,6 +562,7 @@ class RetryingLiteLLMModel(LiteLLMModel):
         "reset by peer", "broken pipe", "eof", "ssl",
         "service unavailable", "503", "502", "500",
         "internal server error", "bad gateway",
+        "disconnected",
     ]
 
     _TRANSIENT_API_ERROR_PATTERNS = [
@@ -940,6 +941,7 @@ def create_agent(
     from core.tools import (
         FetchHistoryTool,
         QueryJobstoreTool,
+        ReadPdfTool,
         RemoteGetTool,
         RemoteLsTool,
         RemotePutTool,
@@ -950,6 +952,7 @@ def create_agent(
     tools = list(tools) + [
         WriteTextTool(workspace_dir),
         ReadTextTool(workspace_dir),
+        ReadPdfTool(workspace_dir),
         FetchHistoryTool(workspace_dir),
         RemotePutTool(workspace_dir),
         RemoteGetTool(workspace_dir),

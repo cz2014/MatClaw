@@ -38,6 +38,9 @@ rag-vector = [
     "faiss-cpu>=1.7",
     "google-genai>=0.3",
 ]
+pdf = [
+    "pymupdf>=1.24",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -1104,6 +1104,107 @@ Use this instead of open() for all file reads."""
         return p.read_text(encoding="utf-8")
 
 
+class ReadPdfTool(Tool):
+    name = "read_pdf"
+    description = """Read text from a PDF file in the workspace directory.
+
+The path is relative to the workspace root (same as read_text).
+By default, extracts all pages (up to 20 pages per call). Output is
+truncated to ~12000 characters if the extracted text is very long.
+Use the optional pages parameter to target specific sections if needed.
+
+Args:
+    rel_path: File path relative to workspace (e.g., 'He2023.pdf').
+    pages: Optional page range string, e.g. '1-5', '3', '1,3,5-7'.
+        Page numbers are 1-based. If omitted, extracts all pages
+        (up to 20 pages per call)."""
+
+    inputs = {
+        "rel_path": {
+            "type": "string",
+            "description": "PDF file path relative to workspace (e.g., 'paper.pdf')",
+        },
+        "pages": {
+            "type": "string",
+            "description": "Page range, e.g. '1-5', '3', '1,3,5-7'. 1-based.",
+            "nullable": True,
+        },
+    }
+    output_type = "string"
+
+    _MAX_PAGES_PER_CALL = 20
+    _MAX_CHARS = 12000
+
+    def __init__(self, workspace: Path):
+        super().__init__()
+        self._workspace = workspace.resolve()
+
+    @staticmethod
+    def _parse_pages(pages_str: str, total_pages: int) -> list[int]:
+        """Parse page range string into sorted list of 0-based page indices."""
+        result = set()
+        for part in pages_str.split(","):
+            part = part.strip()
+            if "-" in part:
+                start_s, end_s = part.split("-", 1)
+                start, end = int(start_s.strip()), int(end_s.strip())
+                for i in range(start, end + 1):
+                    if 1 <= i <= total_pages:
+                        result.add(i - 1)
+            else:
+                i = int(part)
+                if 1 <= i <= total_pages:
+                    result.add(i - 1)
+        return sorted(result)
+
+    def forward(self, rel_path: str, pages: str | None = None) -> str:
+        try:
+            import pymupdf
+        except ImportError:
+            raise ImportError(
+                "pymupdf is required for read_pdf. "
+                "Install with: pip install pymupdf"
+            )
+
+        pdf_path = _safe_path(self._workspace, rel_path)
+        if not pdf_path.exists():
+            raise FileNotFoundError(f"PDF not found: {pdf_path}")
+        if pdf_path.suffix.lower() != ".pdf":
+            raise ValueError(f"Not a PDF file: {pdf_path}")
+
+        doc = pymupdf.open(str(pdf_path))
+        total_pages = len(doc)
+
+        if pages:
+            page_indices = self._parse_pages(pages, total_pages)
+        else:
+            page_indices = list(range(min(total_pages, self._MAX_PAGES_PER_CALL)))
+
+        if len(page_indices) > self._MAX_PAGES_PER_CALL:
+            raise ValueError(
+                f"Requested {len(page_indices)} pages, max is "
+                f"{self._MAX_PAGES_PER_CALL} per call. Use a narrower page range."
+            )
+
+        header = (
+            f"[PDF: {pdf_path.name}, {total_pages} pages total, "
+            f"extracting pages {', '.join(str(i+1) for i in page_indices)}]"
+        )
+        parts = [header]
+        for idx in page_indices:
+            text = doc[idx].get_text()
+            parts.append(f"\n--- Page {idx + 1} ---\n{text}")
+
+        doc.close()
+        result = "\n".join(parts)
+
+        if len(result) > self._MAX_CHARS:
+            result = result[:self._MAX_CHARS] + (
+                "\n\n[... truncated, use pages= to read specific sections ...]"
+            )
+        return result
+
+
 # --- Remote transfer tools ---
 
 
@@ -1342,7 +1443,14 @@ ForceFieldMDMaker args (passed through):
     time_step: Timestep in fs (default 2.0)
     traj_file: Trajectory filename (e.g. "trajectory.traj")
     traj_interval: Save trajectory every N steps
-    ionic_step_data: Tuple of data to record per step, e.g. ("energy", "forces", "mol_or_struct")
+    ionic_step_data: Tuple of data to record per step, e.g. ("energy", "forces", "mol_or_struct").
+        WARNING: setting this to anything non-None causes atomate2 to store full Structure
+        objects for EVERY frame in MongoDB, creating huge additional_store_data.json files
+        (600+ MB for 500 atoms x 1900 frames). Only set this if you need per-step data
+        for training (train_deepmd). For analysis-only runs, leave as None (default).
+    store_trajectory: Whether to store Trajectory object in MongoDB. Default "no".
+        The .traj file is always written to disk regardless. Set to "partial" or "full"
+        only if you need the trajectory in MongoDB (adds ~200 MB for large runs).
     name: Job name (optional)
 
 Introspection:
@@ -1362,6 +1470,7 @@ Introspection:
         "traj_file": {"type": "string", "description": "Trajectory filename, e.g. 'traj.traj'", "nullable": True},
         "traj_interval": {"type": "integer", "description": "Save trajectory every N steps", "nullable": True},
         "ionic_step_data": {"type": "object", "description": "Tuple of data per step, e.g. ('energy', 'forces', 'mol_or_struct')", "nullable": True},
+        "store_trajectory": {"type": "string", "description": "Store Trajectory in MongoDB: 'no' (default), 'partial', or 'full'", "nullable": True},
         "show_source": {"type": "boolean", "description": "If True, return source code instead of creating a job", "nullable": True},
     }
     output_type = "object"
@@ -1379,6 +1488,7 @@ Introspection:
         traj_file=None,
         traj_interval=None,
         ionic_step_data=None,
+        store_trajectory=None,
         show_source=None,
     ):
         if show_source:
@@ -1403,6 +1513,7 @@ Introspection:
             "traj_file": traj_file,
             "traj_interval": traj_interval,
             "ionic_step_data": ionic_step_data,
+            "store_trajectory": store_trajectory if store_trajectory is not None else "no",
         }
         maker = EFieldMDMaker(
             force_field_name="DeepMD",

@@ -41,51 +41,50 @@ The restricted interpreter may reject explicit repr(...) as a forbidden function
 The restricted interpreter may block direct access to dunder attributes like __init__. When inspecting classes, prefer inspect.signature(ClassName) for the constructor signature, inspect.signature(ClassName.make) for regular methods, and inspect.getsource(ClassName) instead of referencing ClassName.__init__.
 
 
-## 6. Active learning for MLFF distillation (DP-GEN-style concurrent learning)
-
-Lessons from previous failed active learning and literature:
-
-Active learning iteration workflow:
-1. Train 4 student models with DIFFERENT random seeds on the current
-   training set (call train_deepmd N times with different seed= values).
-2. Run exploration MD with ONE student model at diverse T/P conditions.
-3. Evaluate ALL student models on the exploration frames (batch_static_eval
-   with each model). Compute per-frame inter-model force variance:
-   sigma = max_i sqrt(mean((F_i - F_mean)^2)) across models.
-4. Filter out unphysical frames: reject frames with min interatomic
-   distance < 1.5 A (student MD can generate atoms overlapping in early
-   iterations -- this is expected, just filter them out).
-5. Apply SELECTION BAND on sigma:
-   - sigma < 0.05 eV/A: already well-described, skip
-   - 0.05 < sigma < 0.15 eV/A: SELECT for labeling
-   - sigma > 0.15 eV/A: likely unphysical/unconverged, skip
-6. Label selected frames with the TEACHER model (batch_static_eval with
-   teacher). The teacher replaces DFT as the labeling oracle.
-7. Add teacher-labeled frames to the training set and retrain all students.
-
-Key points:
-- Start with ~500-2000 initial frames from diverse teacher MD, add
-  ~200-700 per iteration.
-- Exploration MDs should be SHORT: 1,000-16,000 steps at 1 fs timestep
-  (1-16 ps per run). Save frames every 10-150 steps. Diversity comes from
-  running MANY short probes at different T/P conditions, not from long
-  trajectories. Use NPT ensemble for pressure exploration.
-- Explore across many temperatures (50-1400K) and pressures (1-50,000 bar).
-  Each iteration: 5-8 temperatures x 7-8 pressures x multiple starting
-  structures. Early iterations use shorter runs (~1000 steps), later
-  iterations can be longer (~10,000-16,000 steps).
-
-
-## 7. Avoid globals() for sandbox state checks
+## 6. Avoid globals() for sandbox state checks
 
 The restricted sandbox may reject explicit globals() calls as forbidden evaluation. To test whether a cross-step variable exists, use a try/except NameError pattern instead, and reconstruct needed state from files if the variable is missing.
 
 
-## 8. Avoid probing undefined sandbox variables; persist workflow state to files instead
+## 7. Avoid probing undefined sandbox variables; persist workflow state to files instead
 
 In this sandbox, referencing an undefined variable can fail before a Python try/except NameError handler runs. For multi-step workflows, do not probe for state with bare variable references. Instead, recompute cheap local inputs and persist important workflow state (job UUIDs, specs, summaries) to workspace files using write_text so later steps can reconstruct state deterministically.
 
 
-## 9. Avoid exhaustive all-frame pair-distance scans in one sandbox step
+## 8. Avoid exhaustive all-frame pair-distance scans in one sandbox step
 
 Computing O(N_atoms^2) minimum-distance checks across every frame of multiple trajectories can hit the sandbox operation limit even when each frame is modest. For phase inspection, sample a few representative frames (first/middle/last) and persist trajectory paths. Perform rigorous full-frame distance filtering later only on the exploration set you actually need to screen for selection.
+
+
+## 9. Avoid string state filters in query_jobstore count_jobs/get_jobs_info
+
+Passing states as plain strings such as {"states": ["COMPLETED"]} to query_jobstore can fail inside jobflow-remote because the underlying methods expect JobState/FlowState enum objects. In the agent sandbox, prefer queries without states, use name patterns, or use custom_query if a state-based Mongo filter is truly needed.
+
+
+## 10. Avoid Python @ matrix-multiplication syntax in sandbox trajectory analysis
+
+The restricted sandbox can raise NotImplementedError for the MatMult AST node even when NumPy arrays support @ normally. In analysis code, replace expressions like positions @ c_hat with np.sum(positions * c_hat.reshape((1, 3)), axis=1) or np.dot(...) to stay compatible.
+
+
+## 11. Avoid recursive full-dict traversal on large atomate2 TaskDocs in sandbox
+
+A completed MD TaskDoc can be large enough that a generic recursive search over the whole nested object hits the sandbox operation limit. When a needed field is already known to exist at the top level (for example out['dir_name'] in ForceFieldMDMaker/EFieldMDMaker outputs), access it directly instead of walking the entire document.
+
+
+## 12. Only set ionic_step_data when per-step data will be consumed downstream
+
+Setting ionic_step_data to any non-None value (even just ("energy",)) causes atomate2
+to serialize the full Structure for every saved frame into additional_store_data.json.
+For long MD runs with many atoms, this JSON blob can grow to hundreds of megabytes,
+which jobflow-remote must download via paramiko SFTP -- a slow, unreliable transfer
+that frequently fails on large files.
+
+Leave ionic_step_data as None (default, produces empty ionic_steps) unless the per-step
+data will actually be consumed by a downstream job (e.g., train_deepmd). For post-hoc
+trajectory analysis, download the .traj file via remote_get instead -- it is compact
+binary and transfers reliably.
+
+
+## 13. Create workspace directories with write_text before saving matplotlib figures
+
+In this sandbox, matplotlib savefig() will fail with FileNotFoundError if parent directories do not exist. Because open()/os.makedirs() are not available, create output directories first by calling write_text() on a placeholder file such as 'path/.keep'; write_text creates parent directories automatically.
