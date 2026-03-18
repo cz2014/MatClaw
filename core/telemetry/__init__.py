@@ -8,7 +8,7 @@ _logger = logging.getLogger(__name__)
 TELEMETRY_ENV_VAR = "MLFF_ENABLE_TELEMETRY"
 
 
-def setup_telemetry(project_name: str = "mlff-agent") -> bool:
+def setup_telemetry(project_name: str = "matclaw") -> bool:
     """Initialize OpenTelemetry tracing with Phoenix backend.
 
     Must be called BEFORE creating any agents.

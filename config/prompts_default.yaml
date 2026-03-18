@@ -1,4 +1,4 @@
-# Custom prompt templates for MLFF agent
+# Custom prompt templates for MatClaw
 # Follows smolagents PromptTemplates structure (v1.23.0)
 # Set any field to null to use smolagents default
 # See: https://huggingface.co/docs/smolagents/en/tutorials/building_good_agents

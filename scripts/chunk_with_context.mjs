@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Code-chunk wrapper for MLFF agent RAG.
+ * Code-chunk wrapper for MatClaw RAG.
  * Uses tree-sitter to produce contextualizedText with scope chain.
  *
  * Usage: node chunk_with_context.mjs <sources_dir> <output_jsonl> <max_chunk_bytes> [packages...]

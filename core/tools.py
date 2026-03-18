@@ -1,4 +1,4 @@
-"""Tool definitions for the MLFF agent."""
+"""Tool definitions for the MatClaw."""
 
 from __future__ import annotations
 

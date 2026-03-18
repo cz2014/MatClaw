@@ -1,6 +1,6 @@
 """Analyze agent run logs from steps.jsonl.
 
-steps.jsonl is written by the MLFF agent's step callback during execution.
+steps.jsonl is written by the MatClaw's step callback during execution.
 Each line is a JSON record containing a timestamp, step type, and the full
 step data (as a dict serialized from smolagents' ActionStep or PlanningStep).
 

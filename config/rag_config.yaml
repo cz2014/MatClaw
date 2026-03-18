@@ -1,4 +1,4 @@
-# RAG Configuration for MLFF Agent
+# RAG Configuration for MatClaw
 # Central registry: defines all available corpora under data/corpus/
 
 # Per-corpus configuration (each subdir under data/corpus/)

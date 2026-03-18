@@ -1,4 +1,4 @@
-# LLM configuration for MLFF agent
+# LLM configuration for MatClaw
 # API keys use ${ENV_VAR} syntax - expanded at runtime
 
 default_provider: claude

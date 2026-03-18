@@ -1,4 +1,4 @@
-"""RAG retrieval logic, indexer, and schemas for MLFF agent.
+"""RAG retrieval logic, indexer, and schemas for MatClaw.
 
 v0 implementation: BM25 + fixed-width/AST chunking over local source code.
 """

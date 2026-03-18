@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Health-check daemon for MLFF agent long-running workflows.
+"""Health-check daemon for MatClaw long-running workflows.
 
 Runs periodic health checks alongside a long-running agent process:
   - Agent process alive (pgrep)
@@ -330,7 +330,7 @@ def main_loop(workspace: Path, interval: int, agent_pattern: str, project: str =
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Health-check daemon for MLFF agent workflows",
+        description="Health-check daemon for MatClaw workflows",
     )
     parser.add_argument(
         "--workspace", type=Path, required=True,
