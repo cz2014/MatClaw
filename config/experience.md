@@ -88,3 +88,24 @@ binary and transfers reliably.
 ## 13. Create workspace directories with write_text before saving matplotlib figures
 
 In this sandbox, matplotlib savefig() will fail with FileNotFoundError if parent directories do not exist. Because open()/os.makedirs() are not available, create output directories first by calling write_text() on a placeholder file such as 'path/.keep'; write_text creates parent directories automatically.
+
+
+## 14. CIPS DP-GEN methodology from He et al. PRB 2023
+
+Key parameters from He et al. for CuInP2S6 DP model training:
+- 4 independent DP models trained (ensemble of 4)
+- Concurrent learning: train -> explore (NPT MD) -> select -> label -> retrain
+- Exploration: NPT MD at various temperatures (50K-1400K) and pressures (1-50000 bar)
+- Selection criterion: max deviation of 4 model forces σ = max|Fi - <Fi>|
+  - σ < 0.05 eV/A: well described, skip
+  - 0.05 < σ < 0.15 eV/A: label with DFT and add to training set
+  - σ > 0.15 eV/A: too distorted, skip
+- Convergence: all explored configs have σ < 0.05
+- 23 iterations produced 11,260 training configurations
+- Network size: (240, 240, 240) fitting networks
+- Starting structures: 1x1x1 and 1x2x2 supercells of FE, AFE1, AFE2, AFE3
+- Also included mono-, bi-, triple-, quadruple-layer configs
+- Born effective charges (out-of-plane): Z*_Cu=0.6, Z*_In=1.8, Z*_P2S6=-2.4
+- Time step: 0.001 ps = 1 fs for MD
+- Final model accuracy: MAE energy 1.10 meV/atom, MAE force 0.70 eV/A
+- Curie temperature: ~315K experimental, ~340K predicted

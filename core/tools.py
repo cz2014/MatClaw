@@ -1109,15 +1109,14 @@ class ReadPdfTool(Tool):
     description = """Read text from a PDF file in the workspace directory.
 
 The path is relative to the workspace root (same as read_text).
-By default, extracts all pages (up to 20 pages per call). Output is
-truncated to ~12000 characters if the extracted text is very long.
+By default, extracts all pages. Output is truncated to ~80K characters
+if the extracted text is very long.
 Use the optional pages parameter to target specific sections if needed.
 
 Args:
     rel_path: File path relative to workspace (e.g., 'He2023.pdf').
     pages: Optional page range string, e.g. '1-5', '3', '1,3,5-7'.
-        Page numbers are 1-based. If omitted, extracts all pages
-        (up to 20 pages per call)."""
+        Page numbers are 1-based. If omitted, extracts all pages."""
 
     inputs = {
         "rel_path": {
@@ -1132,8 +1131,7 @@ Args:
     }
     output_type = "string"
 
-    _MAX_PAGES_PER_CALL = 20
-    _MAX_CHARS = 12000
+    _MAX_CHARS = 80000
 
     def __init__(self, workspace: Path):
         super().__init__()
@@ -1178,13 +1176,7 @@ Args:
         if pages:
             page_indices = self._parse_pages(pages, total_pages)
         else:
-            page_indices = list(range(min(total_pages, self._MAX_PAGES_PER_CALL)))
-
-        if len(page_indices) > self._MAX_PAGES_PER_CALL:
-            raise ValueError(
-                f"Requested {len(page_indices)} pages, max is "
-                f"{self._MAX_PAGES_PER_CALL} per call. Use a narrower page range."
-            )
+            page_indices = list(range(total_pages))
 
         header = (
             f"[PDF: {pdf_path.name}, {total_pages} pages total, "
