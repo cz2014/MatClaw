@@ -8,8 +8,8 @@ Runs periodic health checks alongside a long-running agent process:
   - Agent error rate (parse recent steps)
 
 On failure: sends macOS notification and logs to <workspace>/monitor.log.
-State is persisted to <workspace>/monitor_state.json for external
-monitoring tools to read.
+State is persisted to <workspace>/monitor_state.json for the /monitor-agent
+Claude Code skill to read.
 
 Usage:
   python scripts/monitor.py --workspace workspace --interval 30

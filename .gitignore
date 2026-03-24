@@ -31,7 +31,7 @@ ENV/
 *.swp
 *.swo
 
-# Developer config
+# Claude Code
 .claude/
 
 # Secrets and credentials
