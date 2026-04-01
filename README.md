@@ -1,6 +1,8 @@
 # MatClaw
 
-A code-first LLM agent for computational materials science workflows. Built on HuggingFace's smolagents, MatClaw executes Python to manipulate crystal structures, submit HPC jobs, curate training data, and iterate on model quality — composing loops, conditionals, and library calls naturally rather than relying on rigid tool chains.
+An autonomous code-first LLM agent for end-to-end materials computations. Built on HuggingFace's [smolagents](https://github.com/huggingface/smolagents), MatClaw writes and executes Python directly in a sandboxed interpreter, composing any installed domain library (pymatgen, ASE, atomate2, jobflow, DeePMD-kit) to orchestrate multi-code workflows on remote HPC clusters without predefined tool functions.
+
+> **Paper:** [MatClaw: An Autonomous Code-First LLM Agent for End-to-End Materials Computations](paper/paper.pdf)
 
 ## How It Works
 
@@ -8,7 +10,14 @@ A code-first LLM agent for computational materials science workflows. Built on H
   <img src=".ref/matclaw.jpg" alt="MatClaw architecture" width="800">
 </p>
 
-The researcher provides a task description in natural language. The LLM-driven agent generates and executes Python code through a sandboxed interpreter, leveraging materials science libraries (pymatgen, ASE, atomate2, jobflow) to manipulate structures, submit jobs to remote HPC clusters (VASP, DeePMD-kit, LAMMPS, etc.), and analyze results. The agent reads execution outputs and errors, self-corrects, and iterates until the task is complete. A file-based long-term memory and a database of computational results persist across sessions.
+The researcher provides a task description in natural language. The agent generates and executes Python code through a sandboxed interpreter, calling domain libraries to manipulate structures, submit jobs to remote HPC clusters (VASP, DeePMD-kit, LAMMPS, etc.), and analyze results. The agent reads execution outputs and errors, self-corrects, and iterates until the task is complete.
+
+**Key design choices:**
+
+- **Code-first execution.** The agent's action space is executable Python, not a fixed set of tool-function calls. This supports composition, branching, loops, and error recovery naturally.
+- **Four-layer memory.** A persistent memory architecture — in-context working memory, episodic conversation history, a semantic experience log, and an external database of computational results — prevents the progressive forgetting that derails long-running workflows.
+- **Retrieval-augmented generation.** Structure-aware code chunking with BM25 retrieval raises per-step API accuracy to ~99%, providing the reliability floor that multi-step workflows require.
+- **Guided autonomy.** The most productive collaboration model is not full autonomy but guided autonomy: the researcher provides high-level domain constraints and literature pointers, and the agent handles workflow orchestration, error recovery, and iterative refinement.
 
 ## Install
 
@@ -43,6 +52,19 @@ from main import main
 main(task="Your task description here", workspace_dir=Path("workspace"))
 ```
 
+## Demonstrations
+
+Three end-to-end demonstrations on CuInP2S6 (CIPS) are described in the paper. Full agent conversation logs, outputs, and workspace artifacts are included in this repository:
+
+| Task | Description | Workspace |
+|------|-------------|-----------|
+| 1a. MLFF distillation | Active-learning force field training from a VASP teacher model | `workspace_demo1a_distill/` |
+| 1b. MLFF distillation (literature-guided) | Same task with a reference paper provided for methodology extraction | `workspace_demo1b_distill_pdf/` |
+| 2a. Curie temperature (first attempt) | Temperature sweep without convergence validation — produces unreliable result | `workspace_demo2a_curie_no_convergence/` |
+| 2b. Curie temperature (with constraint) | Adding a one-sentence convergence requirement yields 3.5x more precise result | `workspace_demo2b_curie_with_convergence/` |
+
+Demo test scripts that launch each task are in `tests/` (e.g., `tests/demo1a_cips_distill.py`).
+
 ## HPC Setup
 
 MatClaw submits computational jobs to remote HPC clusters via [jobflow-remote](https://github.com/Matgenix/jobflow-remote). Each cluster needs:
@@ -70,19 +92,19 @@ RAG is configured via `config/rag_config.yaml`. Set `enabled: true/false` to con
 ## Benchmarks
 
 ```bash
-# Code QA (pymatgen/atomate2, 120 or 300 questions)
+# Pymatgen source code QA (300 questions)
 python benchmark/qa/run_qa.py
 
 # VASP wiki QA (500 questions)
 python benchmark/qa_vasp/run_qa.py
 
-# Python library QA (jobflow-remote, 120 questions)
+# jobflow-remote source code QA (300 questions)
 python benchmark/qa_pylib/run_qa.py
 
-# Real-world coding tasks (pymatgen-analysis-defects, 48 tasks)
+# Real-world coding tasks (pymatgen-analysis-defects)
 python benchmark/tasks/run_tasks.py
 
-# VASP INCAR generation (16 tasks)
+# VASP INCAR generation
 python benchmark/vasp_incar/run_incar.py
 ```
 

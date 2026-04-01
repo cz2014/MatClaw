@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "matclaw"
 version = "0.1.0"
-description = "Code-first agent for ML force-field workflows"
+description = "Code-first LLM agent for computational materials science"
 readme = "project_intro.md"
 requires-python = ">=3.10"
 dependencies = [
