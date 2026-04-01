@@ -1,0 +1,138 @@
+# LLM configuration for MLFF agent
+# API keys use ${ENV_VAR} syntax - expanded at runtime
+
+default_provider: openai
+
+providers:
+  openai:
+    model_id: gpt-5.4
+    api_key: ${OPENAI_API_KEY}
+    context_window: 200000     # GPT-5.2: near-perfect at 256K (MRCR v2)
+    reasoning_effort: high
+
+  gemini:
+    model_id: gemini/gemini-3-flash-preview
+    api_key: ${EMBEDDING_API_KEY}
+    context_window: 100000     # Gemini: steep decay above 128K (MRCR v2)
+
+  deepseek:
+    model_id: deepseek/deepseek-chat
+    api_key: ${DEEPSEEK_API_KEY}
+    context_window: 100000     # conservative default (no MRCR data)
+
+# Agent execution settings
+agent:
+  max_steps: 100
+  context_pruning: true         # enable zone-based context management (default: true)
+  additional_authorized_imports:
+    - math
+    - numpy
+    - numpy.*
+    - scipy
+    - scipy.*
+    - pymatgen
+    - pymatgen.*
+    - jobflow
+    - jobflow.*
+    - jobflow_remote
+    - jobflow_remote.*
+    - atomate2
+    - atomate2.*
+    - dpdata
+    - dpdata.*
+    - matplotlib
+    - matplotlib.*
+    - ase
+    - ase.*
+    - inspect
+  instructions: |
+    Never use open() for file operations. Always use write_text/read_text.
+
+    MongoDB has a hard 16 MB document size limit on job inputs and plain @job
+    returns. The train_deepmd pre-check rejects inline dicts above ~10 MB
+    (~800 frames of 90-atom structures). To bypass: write data locally, use
+    remote_put to upload, and pass the remote path string instead of inline
+    data. Both train_deepmd and batch_static_eval accept remote path strings.
+
+    Default upload directory: /pscratch/sd/c/cz2014/agent_tmp_dir
+    (avoid /tmp -- node-local and periodically cleaned).
+
+    If real computations are requested, use jobflow-remote to submit jobs to remote HPC:
+    - Prefer to use atomate2 Makers (e.g., RelaxMaker) to create jobs if possible, otherwise define custom jobs
+    - Use submit_flow() to submit, then wait_for_jobflow() to block until completion
+    - Output is a dict: e.g., output["output"]["energy"], output["output"]["structure"]
+
+    IMPORTANT: Do NOT define custom @job-decorated functions in the sandbox.
+    The @job decorator transforms a function into a jobflow Job factory --
+    calling it returns an OutputReference placeholder, not a computed result.
+    The function body never executes locally; it would only run on the remote
+    worker, where sandbox-defined functions don't exist. Instead, use the
+    provided tools (train_deepmd, batch_static_eval, wait_for_jobflow) which
+    are pre-registered as remote jobs. For data merging, pass a list of sources to train_deepmd's
+    data_source parameter.
+
+    BATCHING STRATEGIES: Each SLURM job submission costs ~1-2 min overhead
+    (queue registration, node allocation, environment setup). Two mechanisms
+    reduce this overhead:
+
+    1. BATCH WORKER (multiple Jobs -> one SLURM submission):
+       Packs all Jobs in a Flow into one SLURM allocation (up to 4 parallel
+       per node). Pays the ~1-2 min overhead once instead of N times.
+       Without batch worker, N jobs also compete for the shared queue's
+       concurrent submission limit, causing 30-60+ min wait per job.
+       Rule: use the batch worker for any Flow with 2+ independent Jobs.
+
+    2. BATCH_STATIC_EVAL TOOL (N evaluations -> one Job):
+       Runs N force-field static evaluations in a single Job, eliminating
+       per-evaluation SLURM overhead. Accepts structures as inline dicts or
+       a remote file path (.traj, .xyz, .extxyz) for large sets.
+
+    Choosing between them: compare each job's computation time to the ~1-2
+    min SLURM overhead. If computation time >> overhead (e.g., a 30-min
+    training run), use the batch worker -- each job justifies its own SLURM
+    submission. If computation time << overhead (e.g., a millisecond static
+    evaluation paying 1-2 min overhead), use batch_static_eval to pack all
+    evaluations into one job.
+
+    Use the STANDARD worker for single long-running Jobs or sequential chains.
+
+    Queue selection: debug queue waits <10 min but caps at 27 min walltime.
+    Shared queue waits 30-60+ min but allows up to 14h. Use debug when job
+    runtime is under 27 min.
+
+    HELD-OUT EVALUATION: When constructing a held-out test set from MD
+    trajectories, generate a SEPARATE MD trajectory for evaluation. Do NOT
+    split frames from the training trajectories (e.g., every Nth frame).
+    Adjacent frames in an MD trajectory are highly correlated and do not
+    constitute an independent test.
+
+# Worker descriptions injected into agent instructions when project is specified.
+# Keys are "{project}.{worker}" identifiers.
+# description: Human-written text explaining when to use this worker.
+# The raw jfremote worker config is also injected automatically.
+
+workers:
+  perlmutter.perlmutter_gpu:
+    description: >
+      Standard worker (one SLURM job per Job). A100 GPU, shared queue,
+      14h walltime, max 10 concurrent jobs. Typical queue wait: 30-60+ min.
+      Use for long-running single jobs (DeePMD training, long MD trajectories).
+
+  perlmutter.perlmutter_debug:
+    description: >
+      Debug worker (one SLURM job per Job). A100 GPU, debug queue,
+      27 min walltime, max 2 concurrent jobs. Typical queue wait: <10 min.
+      Use for quick validation runs and short jobs that need fast scheduling.
+
+  perlmutter.perlmutter_batch:
+    description: >
+      Batch worker. Packs up to 5000 Jobs into one SLURM submission
+      (4 parallel). A100 GPU, shared queue, 14h walltime.
+      Typical queue wait: 30-60+ min, but amortized across all jobs.
+      Use for flows with many short jobs (static evaluations, single-point
+      calculations). Each Job gets its own working directory.
+
+  anvil.anvil_cpu:
+    description: >
+      Standard worker (one SLURM job per Job). 128-core CPU wholenode,
+      max 2 concurrent jobs. Use for VASP calculations and CPU-only tasks.

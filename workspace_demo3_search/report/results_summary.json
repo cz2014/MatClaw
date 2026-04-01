@@ -1,0 +1,95 @@
+{
+  "best_condition": {
+    "Ez_eV_per_A_per_e": -0.16,
+    "T_K": 50,
+    "slope_ps_per_site": 0.321,
+    "n_flipped": 42,
+    "total_cu": 50
+  },
+  "all_results": [
+    {
+      "Ez": -0.01,
+      "T": 200,
+      "n_flipped": 12,
+      "slope": null
+    },
+    {
+      "Ez": -0.05,
+      "T": 200,
+      "n_flipped": 39,
+      "slope": -0.064
+    },
+    {
+      "Ez": -0.05,
+      "T": 100,
+      "n_flipped": 0,
+      "slope": null
+    },
+    {
+      "Ez": -0.03,
+      "T": 150,
+      "n_flipped": 8,
+      "slope": null
+    },
+    {
+      "Ez": -0.1,
+      "T": 100,
+      "n_flipped": 26,
+      "slope": 0.232
+    },
+    {
+      "Ez": -0.08,
+      "T": 150,
+      "n_flipped": 42,
+      "slope": 0.054
+    },
+    {
+      "Ez": -0.15,
+      "T": 50,
+      "n_flipped": 23,
+      "slope": 0.146
+    },
+    {
+      "Ez": -0.12,
+      "T": 80,
+      "n_flipped": 19,
+      "slope": 0.272
+    },
+    {
+      "Ez": -0.14,
+      "T": 80,
+      "n_flipped": 44,
+      "slope": 0.274
+    },
+    {
+      "Ez": -0.18,
+      "T": 50,
+      "n_flipped": 50,
+      "slope": 0.054
+    },
+    {
+      "Ez": -0.15,
+      "T": 10,
+      "n_flipped": 0,
+      "slope": null
+    },
+    {
+      "Ez": -0.2,
+      "T": 30,
+      "n_flipped": 50,
+      "slope": 0.066
+    },
+    {
+      "Ez": -0.16,
+      "T": 50,
+      "n_flipped": 42,
+      "slope": 0.321
+    },
+    {
+      "Ez": -0.13,
+      "T": 60,
+      "n_flipped": 1,
+      "slope": null
+    }
+  ]
+}

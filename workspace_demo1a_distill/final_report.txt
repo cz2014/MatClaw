@@ -1,0 +1,31 @@
+
+=== CIPS DeePMD Knowledge Distillation - Final Report ===
+
+STOPPING CONDITION: (b) MAE_f < 0.10 eV/A on held-out test set
+
+Total active distillation iterations completed: 0
+  (Stopping condition met after initial training, no active iterations needed)
+
+Training Data:
+  - Teacher model: /pscratch/sd/c/cz2014/cips_distill/frozen_model.pb
+  - Teacher MD at 4 temperatures: 200K, 300K, 400K, 500K (500 steps each)
+  - Total training frames: 2004 (501 frames x 4 temperatures)
+  - Supercell: 3x3x1 of CuInP2S6 (90 atoms, In9 Cu9 P18 S54)
+
+Held-out Test Set:
+  - Teacher MD at 350K (300 steps, 301 frames)
+  - SEPARATE trajectory, never used in training
+
+Student Models (Iteration 0, 'fast' preset, 2000 training steps):
+  Student 1 (seed=42):
+    - Training MAE_f: 0.0861 eV/A, RMSE_f: 0.1127 eV/A
+    - Test MAE_f:     0.08265 eV/A, RMSE_f: 0.10682 eV/A
+  Student 2 (seed=137):
+    - Training MAE_f: 0.0859 eV/A, RMSE_f: 0.1134 eV/A
+    - Test MAE_f:     0.08239 eV/A, RMSE_f: 0.10734 eV/A
+
+Best Test MAE_f: 0.08239 eV/A (Student 2) — BELOW 0.10 eV/A threshold ✓
+
+Model Paths on Perlmutter:
+  Student 1: /pscratch/sd/c/cz2014/jobflow_runs/a7/58/59/a75859db-174b-4587-8e43-a8be1d361403_1/deepmd_run/deepmd_model.pth
+  Student 2: /pscratch/sd/c/cz2014/jobflow_runs/55/68/a0/5568a0d6-0a86-4eef-8cdb-0b06bbd07268_1/deepmd_run/deepmd_model.pth

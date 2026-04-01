@@ -1,0 +1,6 @@
+{
+  "model1_path": "/pscratch/sd/c/cz2014/jobflow_runs/ea/4c/4c/ea4c4c57-6392-42d1-a205-a091517ef620_1/deepmd_run/deepmd_model.pth",
+  "model2_path": "/pscratch/sd/c/cz2014/jobflow_runs/6b/db/6b/6bdb6b74-6d65-4f88-918a-ad353b74664e_1/deepmd_run/deepmd_model.pth",
+  "data_total_path": "/pscratch/sd/c/cz2014/jobflow_runs/ea/4c/4c/ea4c4c57-6392-42d1-a205-a091517ef620_1/deepmd_run/data_total",
+  "n_total_frames": 1000
+}

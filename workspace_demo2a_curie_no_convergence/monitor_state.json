@@ -1,0 +1,282 @@
+{
+  "agent_alive": {
+    "latest": {
+      "name": "agent_alive",
+      "status": "OK",
+      "message": "pid=74530",
+      "ts": "2026-03-12T04:57:19.508900+00:00"
+    },
+    "history": [
+      {
+        "name": "agent_alive",
+        "status": "OK",
+        "message": "pid=74530",
+        "ts": "2026-03-12T02:45:45.492886+00:00"
+      },
+      {
+        "name": "agent_alive",
+        "status": "OK",
+        "message": "pid=74530",
+        "ts": "2026-03-12T02:46:45.897555+00:00"
+      },
+      {
+        "name": "agent_alive",
+        "status": "OK",
+        "message": "pid=74530",
+        "ts": "2026-03-12T02:48:46.455479+00:00"
+      },
+      {
+        "name": "agent_alive",
+        "status": "OK",
+        "message": "pid=74530",
+        "ts": "2026-03-12T02:52:47.466216+00:00"
+      },
+      {
+        "name": "agent_alive",
+        "status": "OK",
+        "message": "pid=74530",
+        "ts": "2026-03-12T03:00:49.399845+00:00"
+      },
+      {
+        "name": "agent_alive",
+        "status": "OK",
+        "message": "pid=74530",
+        "ts": "2026-03-12T03:16:53.044964+00:00"
+      },
+      {
+        "name": "agent_alive",
+        "status": "OK",
+        "message": "pid=74530",
+        "ts": "2026-03-12T03:36:57.701311+00:00"
+      },
+      {
+        "name": "agent_alive",
+        "status": "OK",
+        "message": "pid=74530",
+        "ts": "2026-03-12T03:57:03.998986+00:00"
+      },
+      {
+        "name": "agent_alive",
+        "status": "OK",
+        "message": "pid=74530",
+        "ts": "2026-03-12T04:17:10.144503+00:00"
+      },
+      {
+        "name": "agent_alive",
+        "status": "OK",
+        "message": "pid=74530",
+        "ts": "2026-03-12T04:37:14.828241+00:00"
+      }
+    ]
+  },
+  "runner_alive": {
+    "latest": {
+      "name": "runner_alive",
+      "status": "OK",
+      "message": "runner alive (foreground, project=perlmutter, pid=73836)",
+      "ts": "2026-03-12T04:57:19.535000+00:00"
+    },
+    "history": [
+      {
+        "name": "runner_alive",
+        "status": "OK",
+        "message": "runner alive (foreground, project=perlmutter, pid=73836)",
+        "ts": "2026-03-12T02:45:45.519328+00:00"
+      },
+      {
+        "name": "runner_alive",
+        "status": "OK",
+        "message": "runner alive (foreground, project=perlmutter, pid=73836)",
+        "ts": "2026-03-12T02:46:45.924256+00:00"
+      },
+      {
+        "name": "runner_alive",
+        "status": "OK",
+        "message": "runner alive (foreground, project=perlmutter, pid=73836)",
+        "ts": "2026-03-12T02:48:46.478761+00:00"
+      },
+      {
+        "name": "runner_alive",
+        "status": "OK",
+        "message": "runner alive (foreground, project=perlmutter, pid=73836)",
+        "ts": "2026-03-12T02:52:47.495386+00:00"
+      },
+      {
+        "name": "runner_alive",
+        "status": "OK",
+        "message": "runner alive (foreground, project=perlmutter, pid=73836)",
+        "ts": "2026-03-12T03:00:49.431317+00:00"
+      },
+      {
+        "name": "runner_alive",
+        "status": "OK",
+        "message": "runner alive (foreground, project=perlmutter, pid=73836)",
+        "ts": "2026-03-12T03:16:53.071485+00:00"
+      },
+      {
+        "name": "runner_alive",
+        "status": "OK",
+        "message": "runner alive (foreground, project=perlmutter, pid=73836)",
+        "ts": "2026-03-12T03:36:57.728157+00:00"
+      },
+      {
+        "name": "runner_alive",
+        "status": "OK",
+        "message": "runner alive (foreground, project=perlmutter, pid=73836)",
+        "ts": "2026-03-12T03:57:04.024431+00:00"
+      },
+      {
+        "name": "runner_alive",
+        "status": "OK",
+        "message": "runner alive (foreground, project=perlmutter, pid=73836)",
+        "ts": "2026-03-12T04:17:10.171376+00:00"
+      },
+      {
+        "name": "runner_alive",
+        "status": "OK",
+        "message": "runner alive (foreground, project=perlmutter, pid=73836)",
+        "ts": "2026-03-12T04:37:14.856570+00:00"
+      }
+    ]
+  },
+  "mongodb": {
+    "latest": {
+      "name": "mongodb",
+      "status": "OK",
+      "message": "ping successful",
+      "ts": "2026-03-12T04:57:19.541111+00:00"
+    },
+    "history": [
+      {
+        "name": "mongodb",
+        "status": "OK",
+        "message": "ping successful",
+        "ts": "2026-03-12T02:45:45.523465+00:00"
+      },
+      {
+        "name": "mongodb",
+        "status": "OK",
+        "message": "ping successful",
+        "ts": "2026-03-12T02:46:45.928213+00:00"
+      },
+      {
+        "name": "mongodb",
+        "status": "OK",
+        "message": "ping successful",
+        "ts": "2026-03-12T02:48:46.482834+00:00"
+      },
+      {
+        "name": "mongodb",
+        "status": "OK",
+        "message": "ping successful",
+        "ts": "2026-03-12T02:52:47.499613+00:00"
+      },
+      {
+        "name": "mongodb",
+        "status": "OK",
+        "message": "ping successful",
+        "ts": "2026-03-12T03:00:49.435815+00:00"
+      },
+      {
+        "name": "mongodb",
+        "status": "OK",
+        "message": "ping successful",
+        "ts": "2026-03-12T03:16:53.076376+00:00"
+      },
+      {
+        "name": "mongodb",
+        "status": "OK",
+        "message": "ping successful",
+        "ts": "2026-03-12T03:36:57.732461+00:00"
+      },
+      {
+        "name": "mongodb",
+        "status": "OK",
+        "message": "ping successful",
+        "ts": "2026-03-12T03:57:04.028462+00:00"
+      },
+      {
+        "name": "mongodb",
+        "status": "OK",
+        "message": "ping successful",
+        "ts": "2026-03-12T04:17:10.175087+00:00"
+      },
+      {
+        "name": "mongodb",
+        "status": "OK",
+        "message": "ping successful",
+        "ts": "2026-03-12T04:37:14.861544+00:00"
+      }
+    ]
+  },
+  "error_rate": {
+    "latest": {
+      "name": "error_rate",
+      "status": "OK",
+      "message": "1/10 errors (10%), 14 total steps",
+      "ts": "2026-03-12T04:57:19.552452+00:00"
+    },
+    "history": [
+      {
+        "name": "error_rate",
+        "status": "OK",
+        "message": "1/2 errors (50%), 2 total steps",
+        "ts": "2026-03-12T02:45:45.523925+00:00"
+      },
+      {
+        "name": "error_rate",
+        "status": "OK",
+        "message": "1/3 errors (33%), 3 total steps",
+        "ts": "2026-03-12T02:46:45.928885+00:00"
+      },
+      {
+        "name": "error_rate",
+        "status": "OK",
+        "message": "1/4 errors (25%), 4 total steps",
+        "ts": "2026-03-12T02:48:46.484689+00:00"
+      },
+      {
+        "name": "error_rate",
+        "status": "OK",
+        "message": "1/6 errors (17%), 6 total steps",
+        "ts": "2026-03-12T02:52:47.502794+00:00"
+      },
+      {
+        "name": "error_rate",
+        "status": "OK",
+        "message": "1/6 errors (17%), 6 total steps",
+        "ts": "2026-03-12T03:00:49.439300+00:00"
+      },
+      {
+        "name": "error_rate",
+        "status": "OK",
+        "message": "1/8 errors (12%), 8 total steps",
+        "ts": "2026-03-12T03:16:53.079707+00:00"
+      },
+      {
+        "name": "error_rate",
+        "status": "OK",
+        "message": "1/10 errors (10%), 10 total steps",
+        "ts": "2026-03-12T03:36:57.738183+00:00"
+      },
+      {
+        "name": "error_rate",
+        "status": "OK",
+        "message": "0/10 errors (0%), 12 total steps",
+        "ts": "2026-03-12T03:57:04.033777+00:00"
+      },
+      {
+        "name": "error_rate",
+        "status": "OK",
+        "message": "0/10 errors (0%), 12 total steps",
+        "ts": "2026-03-12T04:17:10.180746+00:00"
+      },
+      {
+        "name": "error_rate",
+        "status": "OK",
+        "message": "0/10 errors (0%), 12 total steps",
+        "ts": "2026-03-12T04:37:14.867059+00:00"
+      }
+    ]
+  }
+}

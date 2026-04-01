@@ -1,0 +1,62 @@
+2026-03-17 12:07:21 monitor started: workspace=/Users/cz/Work/MLFF_agent/workspace_search2 initial_interval=30s agent_pattern='test9_cips_search' project='perlmutter'
+2026-03-17 12:07:21 checks: agent_alive, runner_alive, mongodb, error_rate
+2026-03-17 12:07:21 backoff: 30s -> 1200s (2x, reset on new FAIL)
+2026-03-17 12:07:22 agent_alive=OK: pid=97548
+2026-03-17 12:07:22 runner_alive=OK: runner alive (foreground, project=perlmutter, pid=94199)
+2026-03-17 12:07:22 mongodb=OK: ping successful
+2026-03-17 12:07:22 error_rate=OK: no steps.jsonl yet
+2026-03-17 12:07:22 backoff increased to 60s
+2026-03-17 12:10:24 agent_alive=OK: pid=97548
+2026-03-17 12:10:24 runner_alive=OK: runner alive (foreground, project=perlmutter, pid=94199)
+2026-03-17 12:10:24 mongodb=OK: ping successful
+2026-03-17 12:10:24 error_rate=OK: 0/2 errors (0%), 2 total steps
+2026-03-17 12:10:24 backoff increased to 120s
+2026-03-17 12:18:33 agent_alive=OK: pid=97548
+2026-03-17 12:18:33 runner_alive=OK: runner alive (foreground, project=perlmutter, pid=94199)
+2026-03-17 12:18:33 mongodb=OK: ping successful
+2026-03-17 12:18:33 error_rate=OK: 0/3 errors (0%), 3 total steps
+2026-03-17 12:18:33 backoff increased to 240s
+2026-03-17 12:47:10 agent_alive=OK: pid=97548
+2026-03-17 12:47:10 runner_alive=OK: runner alive (foreground, project=perlmutter, pid=94199)
+2026-03-17 12:47:10 mongodb=OK: ping successful
+2026-03-17 12:47:10 error_rate=OK: 0/3 errors (0%), 3 total steps
+2026-03-17 12:47:10 backoff increased to 480s
+2026-03-17 13:37:07 agent_alive=OK: pid=97548
+2026-03-17 13:37:07 runner_alive=OK: runner alive (foreground, project=perlmutter, pid=98627)
+2026-03-17 13:37:07 mongodb=OK: ping successful
+2026-03-17 13:37:07 error_rate=OK: 0/3 errors (0%), 3 total steps
+2026-03-17 13:37:07 backoff increased to 960s
+2026-03-17 14:17:01 agent_alive=OK: pid=97548
+2026-03-17 14:17:01 runner_alive=OK: runner alive (foreground, project=perlmutter, pid=98627)
+2026-03-17 14:17:01 mongodb=OK: ping successful
+2026-03-17 14:17:01 error_rate=OK: 0/3 errors (0%), 3 total steps
+2026-03-17 14:17:01 backoff increased to 1200s
+2026-03-17 14:37:05 agent_alive=OK: pid=97548
+2026-03-17 14:37:05 runner_alive=OK: runner alive (foreground, project=perlmutter, pid=2202)
+2026-03-17 14:37:05 mongodb=OK: ping successful
+2026-03-17 14:37:05 error_rate=OK: 0/4 errors (0%), 4 total steps
+2026-03-17 14:57:10 agent_alive=OK: pid=97548
+2026-03-17 14:57:10 runner_alive=OK: runner alive (foreground, project=perlmutter, pid=2202)
+2026-03-17 14:57:10 mongodb=OK: ping successful
+2026-03-17 14:57:10 error_rate=OK: 0/6 errors (0%), 6 total steps
+2026-03-17 15:17:38 agent_alive=OK: pid=97548
+2026-03-17 15:17:38 runner_alive=OK: runner alive (foreground, project=perlmutter, pid=2202)
+2026-03-17 15:17:38 mongodb=OK: ping successful
+2026-03-17 15:17:38 error_rate=OK: 0/6 errors (0%), 6 total steps
+2026-03-17 15:56:42 agent_alive=OK: pid=97548
+2026-03-17 15:56:42 runner_alive=OK: runner alive (foreground, project=perlmutter, pid=2202)
+2026-03-17 15:56:42 mongodb=OK: ping successful
+2026-03-17 15:56:42 error_rate=OK: 0/9 errors (0%), 9 total steps
+2026-03-17 16:16:47 agent_alive=OK: pid=97548
+2026-03-17 16:16:47 runner_alive=OK: runner alive (foreground, project=perlmutter, pid=2202)
+2026-03-17 16:16:47 mongodb=OK: ping successful
+2026-03-17 16:16:47 error_rate=OK: 0/10 errors (0%), 13 total steps
+2026-03-17 16:38:35 agent_alive=OK: pid=97548
+2026-03-17 16:38:35 runner_alive=OK: runner alive (foreground, project=perlmutter, pid=2202)
+2026-03-17 16:38:35 mongodb=OK: ping successful
+2026-03-17 16:38:35 error_rate=OK: 0/10 errors (0%), 19 total steps
+2026-03-17 17:05:19 agent_alive=OK: pid=97548
+2026-03-17 17:05:19 runner_alive=OK: runner alive (foreground, project=perlmutter, pid=2202)
+2026-03-17 17:05:19 mongodb=OK: ping successful
+2026-03-17 17:05:19 error_rate=OK: 0/10 errors (0%), 24 total steps
+2026-03-17 17:11:15 monitor stopped

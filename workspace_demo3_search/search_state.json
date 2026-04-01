@@ -1,0 +1,102 @@
+{
+  "jobs": [
+    {
+      "uuid": "73cee551-d516-4182-8de1-a52c052e0e1f",
+      "Ez": -0.01,
+      "T": 200,
+      "name": "Ez-0.01_T200",
+      "dir_name": "/pscratch/sd/c/cz2014/jobflow_runs/73/ce/e5/73cee551-d516-4182-8de1-a52c052e0e1f_1"
+    },
+    {
+      "uuid": "31332573-8d8a-46d5-80d3-19cdb4f10d66",
+      "Ez": -0.05,
+      "T": 200,
+      "name": "Ez-0.05_T200",
+      "dir_name": "/pscratch/sd/c/cz2014/jobflow_runs/31/33/25/31332573-8d8a-46d5-80d3-19cdb4f10d66_1"
+    },
+    {
+      "uuid": "8f95022f-abd7-4c02-9308-e03b29bb106d",
+      "Ez": -0.05,
+      "T": 100,
+      "name": "Ez-0.05_T100",
+      "dir_name": "/pscratch/sd/c/cz2014/jobflow_runs/8f/95/02/8f95022f-abd7-4c02-9308-e03b29bb106d_1"
+    },
+    {
+      "uuid": "7eca1692-702d-45a7-a301-eb19b7888eef",
+      "Ez": -0.03,
+      "T": 150,
+      "name": "Ez-0.03_T150",
+      "dir_name": "/pscratch/sd/c/cz2014/jobflow_runs/7e/ca/16/7eca1692-702d-45a7-a301-eb19b7888eef_1"
+    },
+    {
+      "uuid": "29d76a67-2c65-4158-b324-684e4f20533d",
+      "Ez": -0.1,
+      "T": 100,
+      "name": "Ez-0.10_T100",
+      "dir_name": "/pscratch/sd/c/cz2014/jobflow_runs/29/d7/6a/29d76a67-2c65-4158-b324-684e4f20533d_1"
+    },
+    {
+      "uuid": "a89994f5-9979-42f1-bf0d-1a02743280d6",
+      "Ez": -0.08,
+      "T": 150,
+      "name": "Ez-0.08_T150",
+      "dir_name": "/pscratch/sd/c/cz2014/jobflow_runs/a8/99/94/a89994f5-9979-42f1-bf0d-1a02743280d6_1"
+    },
+    {
+      "uuid": "87aefb38-c17b-4b18-90ea-a59daf251629",
+      "Ez": -0.15,
+      "T": 50,
+      "name": "Ez-0.15_T50",
+      "dir_name": "/pscratch/sd/c/cz2014/jobflow_runs/87/ae/fb/87aefb38-c17b-4b18-90ea-a59daf251629_1"
+    },
+    {
+      "uuid": "5796d31c-0057-430a-b636-9b84c25980a4",
+      "Ez": -0.12,
+      "T": 80,
+      "name": "Ez-0.12_T80",
+      "dir_name": "/pscratch/sd/c/cz2014/jobflow_runs/57/96/d3/5796d31c-0057-430a-b636-9b84c25980a4_1"
+    },
+    {
+      "uuid": "c698c868-011d-4f5a-971d-f51ed35abab4",
+      "Ez": -0.14,
+      "T": 80,
+      "name": "Ez-0.14_T80",
+      "dir_name": "/pscratch/sd/c/cz2014/jobflow_runs/c6/98/c8/c698c868-011d-4f5a-971d-f51ed35abab4_1"
+    },
+    {
+      "uuid": "13e42ac2-a510-4e4e-b0c6-9f1c74cd03be",
+      "Ez": -0.18,
+      "T": 50,
+      "name": "Ez-0.18_T50",
+      "dir_name": "/pscratch/sd/c/cz2014/jobflow_runs/13/e4/2a/13e42ac2-a510-4e4e-b0c6-9f1c74cd03be_1"
+    },
+    {
+      "uuid": "7979b0e4-44b3-41dd-aea6-0b8b98c7aad0",
+      "Ez": -0.15,
+      "T": 10,
+      "name": "Ez-0.15_T10",
+      "dir_name": "/pscratch/sd/c/cz2014/jobflow_runs/79/79/b0/7979b0e4-44b3-41dd-aea6-0b8b98c7aad0_1"
+    },
+    {
+      "uuid": "783df1ef-0359-4c55-9aa7-2cf9a41f3eb6",
+      "Ez": -0.2,
+      "T": 30,
+      "name": "Ez-0.20_T30",
+      "dir_name": "/pscratch/sd/c/cz2014/jobflow_runs/78/3d/f1/783df1ef-0359-4c55-9aa7-2cf9a41f3eb6_1"
+    },
+    {
+      "uuid": "7304b44d-5b28-468d-91a4-ea7f80c0027f",
+      "Ez": -0.16,
+      "T": 50,
+      "name": "Ez-0.16_T50",
+      "dir_name": "/pscratch/sd/c/cz2014/jobflow_runs/73/04/b4/7304b44d-5b28-468d-91a4-ea7f80c0027f_1"
+    },
+    {
+      "uuid": "2e1776fc-12df-456e-a563-b0d0ee32d52c",
+      "Ez": -0.13,
+      "T": 60,
+      "name": "Ez-0.13_T60",
+      "dir_name": "/pscratch/sd/c/cz2014/jobflow_runs/2e/17/76/2e1776fc-12df-456e-a563-b0d0ee32d52c_1"
+    }
+  ]
+}

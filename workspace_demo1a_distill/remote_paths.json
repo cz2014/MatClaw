@@ -1,0 +1,4 @@
+{
+  "train_data_iter0": "/pscratch/sd/c/cz2014/agent_tmp_dir/train_data_iter0",
+  "test_data": "/pscratch/sd/c/cz2014/agent_tmp_dir/test_data"
+}
