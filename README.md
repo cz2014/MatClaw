@@ -4,6 +4,12 @@ An autonomous code-first LLM agent for end-to-end materials computations. Built 
 
 > **Looking for examples?** The [`release`](https://github.com/cz2014/MatClaw/tree/release) branch contains demo scripts and complete workspace outputs from the paper demonstrations.
 
+## Demo
+
+MoS2 lattice relaxation on NERSC Perlmutter — from natural language task to VASP results in a single command:
+
+<video src=".ref/mos2_demo.mp4" controls width="800"></video>
+
 ## How It Works
 
 <p align="center">
