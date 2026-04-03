@@ -99,25 +99,24 @@ agent:
 # The raw jfremote worker config is also injected automatically.
 
 workers:
-  perlmutter.perlmutter_gpu:
-    description: >
-      Standard worker (one SLURM job per Job). A100 GPU, shared queue,
-      14h walltime, max 10 concurrent jobs. Typical queue wait: 30-60+ min.
-      Use for long-running single jobs (DeePMD training, long MD trajectories).
-
   perlmutter.perlmutter_debug:
     description: >
-      Debug worker (one SLURM job per Job). A100 GPU, debug queue,
-      27 min walltime, max 2 concurrent jobs. Typical queue wait: <10 min.
-      Use for quick validation runs and short jobs that need fast scheduling.
+      DEFAULT. Use this unless you have a specific reason not to.
+      A100 GPU, debug queue. Queue wait: <5 minutes. Walltime limit: 27 min.
+      Most jobs finish well within 27 min. Always start here.
+
+  perlmutter.perlmutter_gpu:
+    description: >
+      DO NOT use this unless a single job absolutely requires >27 min walltime.
+      A100 GPU, shared queue. Queue wait: 1-4 HOURS. Walltime: 14h. Max 10 concurrent.
+      Using this for short jobs wastes hours waiting in queue. Think before choosing this.
 
   perlmutter.perlmutter_batch:
     description: >
-      Batch worker. Packs up to 5000 Jobs into one SLURM submission
-      (4 parallel). A100 GPU, shared queue, 14h walltime.
-      Typical queue wait: 30-60+ min, but amortized across all jobs.
-      Use for flows with many short jobs (static evaluations, single-point
-      calculations). Each Job gets its own working directory.
+      DO NOT use for single jobs or small flows.
+      Batch worker: packs up to 5000 jobs into one SLURM submission (4 parallel).
+      A100 GPU, shared queue. Queue wait: 1-4 HOURS. Walltime: 14h.
+      ONLY use when a Flow has 2+ independent jobs to amortize the queue wait.
 
   anvil.anvil_cpu:
     description: >
