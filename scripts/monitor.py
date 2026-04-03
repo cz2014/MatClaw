@@ -333,24 +333,40 @@ def main():
         description="Health-check daemon for MatClaw workflows",
     )
     parser.add_argument(
-        "--workspace", type=Path, required=True,
+        "workspace", type=Path, nargs="?", default=None,
         help="Workspace directory (contains steps.jsonl, writes monitor.log + monitor_state.json)",
+    )
+    parser.add_argument(
+        "--workspace", type=Path, dest="workspace_flag", default=None,
+        help="Workspace directory (alias for positional argument)",
     )
     parser.add_argument(
         "--interval", type=int, default=60,
         help="Check interval in seconds (default: 60)",
     )
     parser.add_argument(
-        "--agent-pattern", type=str, default="python main.py",
-        help="Process pattern for pgrep to check agent liveness (default: 'python main.py')",
+        "--agent-pattern", type=str, default="matclaw",
+        help="Process pattern to check agent liveness (default: 'matclaw')",
     )
     parser.add_argument(
         "--project", type=str, default="anvil",
         help="jobflow-remote project name for runner/SSH checks (default: 'anvil')",
     )
+    parser.add_argument(
+        "--once", action="store_true",
+        help="Run all checks once, print JSON to stdout, and exit",
+    )
 
     args = parser.parse_args()
-    main_loop(args.workspace, args.interval, args.agent_pattern, args.project)
+    workspace = args.workspace or args.workspace_flag
+    if workspace is None:
+        parser.error("workspace is required (positional or --workspace)")
+
+    if args.once:
+        results = _run_all_checks(args.agent_pattern, workspace, args.project)
+        print(json.dumps(results, indent=2))
+    else:
+        main_loop(workspace, args.interval, args.agent_pattern, args.project)
 
 
 if __name__ == "__main__":
