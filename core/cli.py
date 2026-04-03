@@ -50,13 +50,14 @@ def _run(args, parser):
     # Config defaults to <workspace>/config
     config_dir = (args.config or workspace_dir / "config").resolve()
 
-    # Read task from file
-    if args.task:
-        task = args.task.read_text().strip()
-    elif not args.resume:
-        parser.error("--task is required unless --resume is used")
-    else:
+    # Read task from file (default: task.txt in workspace)
+    task_file = args.task or workspace_dir / "task.txt"
+    if task_file.exists():
+        task = task_file.read_text().strip()
+    elif args.resume:
         task = None
+    else:
+        parser.error(f"No task file found at {task_file}. Use --task or create task.txt in the workspace.")
 
     # Copy setup files if provided
     if args.setup:

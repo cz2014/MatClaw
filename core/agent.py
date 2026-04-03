@@ -825,7 +825,7 @@ def create_agent(
     workspace_dir: Path,
     provider_name: str | None = None,
     tools: list | None = None,
-    enable_step_logging: bool = True,  # TODO: default to False once history.jsonl is validated
+    enable_step_logging: bool = False,
     planning_interval: int | None = None,
     final_answer_checks: list | None = None,
     prompts_file: str = "prompts.yaml",

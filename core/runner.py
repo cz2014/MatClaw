@@ -44,6 +44,7 @@ def run_agent(
     instructions_extra: str | None = None,
     inject_images: bool = False,
     resume: bool = False,
+    enable_step_logging: bool = False,
 ):
     """Set up workspace, create agent, and run the task.
 
@@ -81,6 +82,7 @@ def run_agent(
         instructions_extra=instructions_extra,
         inject_images=inject_images,
         resume=resume,
+        enable_step_logging=enable_step_logging,
     )
 
     # Pause/resume
