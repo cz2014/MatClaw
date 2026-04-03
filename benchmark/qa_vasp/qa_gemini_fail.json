@@ -1,0 +1,26 @@
+[
+  {
+    "source_file": "VRijkl.md",
+    "category": "Tag_Dependency",
+    "question": "When calculating off-centre Coulomb integrals for the VRijkl file, which tag can be used to downsample the k-point grid to reduce computational demand?",
+    "choices": {
+      "A": "A. KSPACING",
+      "B": "B. LDOWNSAMPLE",
+      "C": "C. NPAR",
+      "D": "D. NKRED"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "Practical_guide_to_GW_calculations.md",
+    "category": "Error_Restart",
+    "question": "During a single-step GW procedure, if the internal DFT step encounters a 'ZPOTRF fails' LAPACK error due to linearly dependent column vectors, what is the recommended troubleshooting protocol?",
+    "choices": {
+      "A": "A. Switch to the two-step GW procedure",
+      "B": "B. Increase the EDIFF convergence criteria",
+      "C": "C. Set LPEAD = .FALSE.",
+      "D": "D. Change ALGO to Normal"
+    },
+    "correct_answer": "A"
+  }
+]

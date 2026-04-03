@@ -1,0 +1,1322 @@
+[
+  {
+    "source_file": "pymatgen/analysis/pourbaix_diagram.py",
+    "question": "In pymatgen/analysis/pourbaix_diagram.py, which function is used to calculate the decomposition energy of an entry?\n```python\n        decomposition_energy /= entry.composition.num_atoms\n        return decomposition_energy\n\n    def [MASK](self, entry, pH, V):\n        \"\"\"Find decomposition to most stable entries in eV/atom,\n        supports vectorized inputs for pH and V.\n```",
+    "choices": {
+      "A": "A. get_hull_energy",
+      "B": "B. find_stable_entry",
+      "C": "C. get_decomposition_energy",
+      "D": "D. get_stable_entry"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/core/units.py",
+    "question": "Code Source File: pymatgen/core/units.py\nWhich class's method is being assigned to `newobj.from_str` within the `_my_partial` function?\n```python\ndef _my_partial(func, *args, **kwargs):\n    \"\"\"Partial returns a partial object and therefore we cannot inherit class\n    methods defined in FloatWithUnit. This function calls partial and patches\n    the new class before returning.\n    \"\"\"\n    newobj = partial(func, *args, **kwargs)\n    # monkey patch\n    newobj.[MASK] = FloatWithUnit.from_str\n    return newobj\n```",
+    "choices": {
+      "A": "A. to_str",
+      "B": "B. from_str",
+      "C": "C. as_str",
+      "D": "D. init"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/res.py",
+    "question": "In pymatgen/io/res.py, within the `_parse_titl` function, what method is used to split the input line into fields?\n```python\n    def _parse_titl(self, line: str) -> AirssTITL | None:\n        \"\"\"Parse the TITL entry. Checks for AIRSS values in the entry.\"\"\"\n        fields = line.[MASK](maxsplit=6)\n        if len(fields) >= 6:\n            # this is probably an AIRSS res file\n            seed, pressure, volume, energy, spin, abs_spin = fields[:6]\n            spg, nap = \"P1\", \"1\"\n            if len(fields) == 7:\n                rest = fields[6]\n                # just extract spacegroup and num appearances from the rest\n                lp = rest.find(\"(\")\n                rp = rest.find(\")\")\n                spg = rest[lp + 1 : rp]\n                nmin = rest.find(\"n -\")\n                nap = rest[nmin + 4 :]\n            return AirssTITL(\n                seed, float(pressure), float(volume), float(energy), float(spin), float(abs_spin), spg, int(nap)\n            )\n        # there should at least be the first 6 fields if it's an AIRSS res file\n        # if it doesn't have them, then just stop looking\n        return None\n```",
+    "choices": {
+      "A": "A. partition",
+      "B": "B. splitlines",
+      "C": "C. split",
+      "D": "D. rsplit"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/utils/scripts_utils.py",
+    "question": "In pymatgen/analysis/chemenv/utils/scripts_utils.py, what method of the `CG` is called to get the edges of the coordination geometry?\n```python\nedges = cg.[MASK](neighbors)\n```",
+    "choices": {
+      "A": "A. get_edges",
+      "B": "B. edge_list",
+      "C": "C. edges",
+      "D": "D. find_edges"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/chemenv_strategies.py",
+    "question": "Code Source File: pymatgen/analysis/chemenv/coordination_environments/chemenv_strategies.py\n```python\n    def setup_options(self, all_options_dict):\n        \\\"\\\"\\\"Set up options for this strategy based on a dict.\n\n        Args:\n            all_options_dict: Dict of option_name->option_value.\n        \\\"\\\"\\\"\n        for option_name, option_value in all_options_dict.items():\n            self.[MASK](option_name, option_value)\n```\nWhat method is used to set a specific option for the strategy, given the option name and value?",
+    "choices": {
+      "A": "A. set_attribute",
+      "B": "B. set_option",
+      "C": "C. update_option",
+      "D": "D. configure_option"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/molecule_matcher.py",
+    "question": "From pymatgen/analysis/molecule_matcher.py, what function from the itertools module is used to chain the results of the element index permutations together?\n```python\nyield np.array(list(itertools.[MASK](*inds)))\n```",
+    "choices": {
+      "A": "A. permutations",
+      "B": "B. product",
+      "C": "C. combinations",
+      "D": "D. chain"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/analysis/surface_analysis.py",
+    "question": "Code source file: pymatgen/analysis/surface_analysis.py\nIn the `from_computed_structure_entry` method, which attribute of the `entry` object is used to initialize the SlabEntry's structure?\n```python\n    def from_computed_structure_entry(\n        cls, entry, miller_index, label=None, adsorbates=None, clean_entry=None, **kwargs\n    ) -> Self:\n        \"\"\"Get SlabEntry from a ComputedStructureEntry.\"\"\"\n        return cls(\n            entry.[MASK],\n            entry.energy,\n            miller_index,\n            label=label,\n            adsorbates=adsorbates,\n            clean_entry=clean_entry,\n            **kwargs,\n        )\n\n```",
+    "choices": {
+      "A": "A. composition",
+      "B": "B. lattice",
+      "C": "C. structure",
+      "D": "D. formula"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/transformations/advanced_transformations.py",
+    "question": "From Code Source File: pymatgen/transformations/advanced_transformations.py, what is the purpose of the following function?\n        def [MASK](n1, n2):\n            \"\"\"Find least common multiple of two numbers.\"\"\"\n            return n1 * n2 / gcd(n1, n2)",
+    "choices": {
+      "A": "A. Find greatest common divisor of two numbers.",
+      "B": "B. Find least common factor of two numbers.",
+      "C": "C. Find least common multiple of two numbers.",
+      "D": "D. Find highest common factor of two numbers."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/aims/parsers.py",
+    "question": "From pymatgen/io/aims/parsers.py, what key is used to extract the band gap from the parsed homo-lumo data?\n```python\n    def gap(self) -> float:\n        \"\"\"The band gap.\"\"\"\n        return self._parse_homo_lumo()[ [MASK] ]\n```",
+    "choices": {
+      "A": "A. band_gap",
+      "B": "B. gap",
+      "C": "C. energy",
+      "D": "D. value"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/core/tensors.py",
+    "question": "According to the pymatgen/core/tensors.py code snippet, the function `ranks` iterates through what object?\n```python\n    def ranks() -> list:\n        \"\"\"Ranks for all tensors.\"\"\"\n        return [tensor.rank for tensor in [MASK]]\n```",
+    "choices": {
+      "A": "A. tensors",
+      "B": "B. self",
+      "C": "C. rank",
+      "D": "D. list"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/core/tensors.py",
+    "question": "From pymatgen/core/tensors.py, what is the default value of the `symprec` parameter in `fit_to_structure`?\n```python\n    def fit_to_structure(\n        self,\n        structure: Structure,\n        symprec: float = [MASK],\n    ):\n        \\\"\\\"\\\"Get a tensor that is invariant with respect to symmetry\n        operations corresponding to a structure.\n        \\\"\\\"\\\"\n        sga = SpacegroupAnalyzer(structure, symprec)\n        symm_ops = sga.get_symmetry_operations(cartesian=True)\n```",
+    "choices": {
+      "A": "A. 0.01",
+      "B": "B. 0.001",
+      "C": "C. 0.1",
+      "D": "D. 1.0"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/transformations/site_transformations.py",
+    "question": "According to the code snippet from \"pymatgen/transformations/site_transformations.py\":\n```python\n    def use_multiprocessing(self):\n        \"\"\"Indicates whether the transformation can be applied by a\n        subprocessing pool. This should be overridden to return True for\n        transformations that the transmuter can [MASK].\n        \"\"\"\n        return False\n\n```\nWhat should replace [MASK]?",
+    "choices": {
+      "A": "A. serialize",
+      "B": "B. compute",
+      "C": "C. parallelize",
+      "D": "D. optimize"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/coordination_geometries.py",
+    "question": "Code Source File: pymatgen/analysis/chemenv/coordination_environments/coordination_geometries.py\nWhat is the correct method to retrieve the Voronoi indices of the neighbors set, aligned according to a given permutation?\n```python\nnb_set = hints_info[\"nb_set\"]\npermutation = hints_info[\"permutation\"]\nnb_set_voronoi_indices_perfect_aligned = nb_set.[MASK](permutation=permutation)\n```",
+    "choices": {
+      "A": "A. get_neighbor_voronoi_indices",
+      "B": "B. get_neighb_voronoi_indices",
+      "C": "C. get_voronoi_indices",
+      "D": "D. get_site_voronoi_indices"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/chemenv_strategies.py",
+    "question": "In pymatgen/analysis/chemenv/coordination_environments/chemenv_strategies.py, which method is called to evaluate the weight based on normalized distances?\n```python\n        if len(normalized_distances) == 0:\n            return 1\n        return self.weight_rf.[MASK](min(normalized_distances))\n```",
+    "choices": {
+      "A": "A. calculate",
+      "B": "B. weight",
+      "C": "C. eval",
+      "D": "D. compute"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/electronic_structure/bandstructure.py",
+    "question": "In pymatgen/electronic_structure/bandstructure.py, what should replace [MASK] to iterate through the orbital indices when constructing the projections dictionary?\n```python\n                            dddd = []\n                            for kk in range(len(dct[\"projections\"][spin][ii][jj])):\n                                ddddd = []\n                                orb = Orbital([MASK]).name\n```",
+    "choices": {
+      "A": "A. ll",
+      "B": "B. jj",
+      "C": "C. ii",
+      "D": "D. kk"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/core/ion.py",
+    "question": "Given the code snippet from pymatgen/core/ion.py:\ndef charge(self) -> float:\n        \"\"\"Charge of the ion.\"\"\"\n        return self.[MASK]\nWhat is the correct replacement for [MASK]?",
+    "choices": {
+      "A": "A. charge",
+      "B": "B. _charge",
+      "C": "C. self.charge",
+      "D": "D. get_ion_charge"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/defects/plotting/thermo.py",
+    "question": "Code Source File: pymatgen/analysis/defects/plotting/thermo.py\n```python\ndef _label_lines(fig: go.Figure, name: str, x_anno: float, color: str) -> None:\n    \"\"\"Label the lines in the figure.\"\"\"\n    for trace_ in fig.[MASK](selector={\"name\": name}):\n        x_pos, y_pos = trace_.x, trace_.y\n        y_anno = np.interp(x=x_anno, xp=x_pos, fp=y_pos)\n        fig.add_annotation(\n            x=x_anno,\n            y=y_anno,\n            text=trace_.name,\n            font=dict(color=color),\n            arrowcolor=color,\n            bgcolor=\"white\",\n            bordercolor=color,\n        )\n\n```\nWhat is the correct method to use for selecting traces in the figure?",
+    "choices": {
+      "A": "A. find_traces",
+      "B": "B. select_traces",
+      "C": "C. get_traces",
+      "D": "D. filter_traces"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/aims/parsers.py",
+    "question": "In pymatgen/io/aims/parsers.py, what is the correct function to search backwards in the lines of the file?\n```python\n    def stresses(self) -> np.ndarray | None:\n        \"\"\"The stresses from the aims.out file and convert to kBar.\"\"\"\n        line_start = self.[MASK]([\"Per atom stress (eV) used for heat flux calculation\"])\n        if line_start == LINE_NOT_FOUND:\n            return None\n        line_start += 3\n        stresses = []\n        for line in self.lines[line_start : line_start + self.n_atoms]:\n            xx, yy, zz, xy, xz, yz = (float(d) for d in line.split()[2:8])\n            stresses.append(Tensor.from_voigt([xx, yy, zz, yz, xz, xy]))\n\n        return np.array(stresses) * EV_PER_A3_TO_KBAR\n```",
+    "choices": {
+      "A": "A. search_for",
+      "B": "B. find",
+      "C": "C. reverse_search_for",
+      "D": "D. search_backwards"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/coordination_geometries.py",
+    "question": "In pymatgen/analysis/chemenv/coordination_environments/coordination_geometries.py, consider the following code:\n```python\n    def edges(self, sites, permutation=None, input=\"sites\"):  # noqa: A002\n        \"\"\"Get the list of edges of this coordination geometry. Each edge is given as a\n        list of its end vertices coordinates.\n        \"\"\"\n        if input == \"sites\":\n            coords = [site.coords for [MASK] in sites]\n        elif input == \"coords\":\n            coords = sites\n        else:\n            raise RuntimeError(\"Invalid input for edges.\")\n\n        # if permutation is None:\n        #     coords = [site.coords for site in sites]\n        # else:\n        #     coords = [sites[ii].coords for ii in permutation]\n        if permutation is not None:\n            coords = [coords[ii] for ii in permutation]\n        return [[coords[ii] for ii in edge] for edge in self._edges]\n```\nWhat is the correct variable name to replace [MASK]?",
+    "choices": {
+      "A": "A. jj",
+      "B": "B. ii",
+      "C": "C. site",
+      "D": "D. coords"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/phonon/gruneisen.py",
+    "question": "Given the pymatgen/phonon/gruneisen.py code snippet, which attribute is conditionally added to the dictionary based on whether the Gruneisen object has an associated crystal structure?\n\nif self.[MASK]:\n    dct[\"structure\"] = self.structure.as_dict()",
+    "choices": {
+      "A": "A. lattice_rec",
+      "B": "B. structure",
+      "C": "C. bands",
+      "D": "D. labels_dict"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/res.py",
+    "question": "Code Source File: pymatgen/io/res.py\nIn the following code snippet, what attribute is being returned?\ndef volume(self) -&gt; float:\n        \"\"\"Volume of the structure. This is in cubic Angstroms if CASTEP was used.\"\"\"\n        return self._TITL.[MASK]",
+    "choices": {
+      "A": "A. structure",
+      "B": "B. lattice",
+      "C": "C. volume",
+      "D": "D. density"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/entries/computed_entries.py",
+    "question": "Given the code snippet from pymatgen/entries/computed_entries.py:\ndef uncorrected_energy_per_atom(self) -> float:\n        \"\"\"\n        Returns:\n            float: the *uncorrected* energy of the entry, normalized by atoms in eV/atom.\n        \"\"\"\n        return self.uncorrected_energy / self.composition.[MASK]\nWhat is the correct replacement for [MASK]?",
+    "choices": {
+      "A": "A. num_elements",
+      "B": "B. num_atoms",
+      "C": "C. get_atomic_mass",
+      "D": "D. get_density"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/hhi.py",
+    "question": "Code Source File: pymatgen/analysis/hhi.py\n```python\n    def _get_hhi_el(self, el_or_symbol):\n        \"\"\"Get the tuple of HHI_production, HHI reserve for a single element only.\"\"\"\n        if isinstance(el_or_symbol, Element):\n            el_or_symbol = el_or_symbol.[MASK]\n\n        return self.symbol_hhip_hhir[el_or_symbol][0], self.symbol_hhip_hhir[el_or_symbol][1]\n```\nWhat is the missing attribute in the code snippet?",
+    "choices": {
+      "A": "A. get_wt_fraction",
+      "B": "B. _get_hhi_el",
+      "C": "C. symbol",
+      "D": "D. get_hhi"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/aims/parsers.py",
+    "question": "In pymatgen/io/aims/parsers.py, the code handles gzipped files differently. Which module is used to open and read gzipped files: with [MASK].open(path, mode=\"rt\") as file:",
+    "choices": {
+      "A": "A. zipfile",
+      "B": "B. gzip",
+      "C": "C. bz2",
+      "D": "D. tarfile"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/cp2k/sets.py",
+    "question": "Given the code snippet from pymatgen/io/cp2k/sets.py:\n\n```python\n    def activate_polar(self, **kwargs) -> None:\n        \"\"\"Calculate polarizations (including raman).\"\"\"\n        if not self.check(\"force_eval/properties\"):\n            self[\"FORCE_EVAL\"].insert(Section(\"PROPERTIES\"))\n        if not self.check(\"force_eval/properties/linres\"):\n            self[\"FORCE_EVAL\"][\"PROPERTIES\"].[MASK](\"LINRES\")\n        self[\"FORCE_EVAL\"][\"PROPERTIES\"][\"LINRES\"].insert(Section(\"POLAR\", **kwargs))\n```\n\nWhat is the correct function to replace [MASK]?",
+    "choices": {
+      "A": "A. append",
+      "B": "B. insert",
+      "C": "C. replace",
+      "D": "D. delete"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/res.py",
+    "question": "In the file pymatgen/io/res.py, consider the following code snippet:\n def [MASK](self):\n        raise NotImplementedError\nWhat is the correct replacement for [MASK]?",
+    "choices": {
+      "A": "A. _get_rng_states",
+      "B": "B. _get_rng_seeds",
+      "C": "C. get_rng_seeds",
+      "D": "D. get_states"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/graphs.py",
+    "question": "Code Source File: pymatgen/analysis/graphs.py\nWhat attribute of `self.structure` is being accessed using the indices `u` and `v`?\n```python\n        def get_label(u, v):\n            u_label = self.[MASK][u].species_string\n            v_label = self.structure[v].species_string\n            return \"-\".join(sorted((u_label, v_label)))\n\n```",
+    "choices": {
+      "A": "A. self.lattice",
+      "B": "B. self.sites",
+      "C": "C. self.structure",
+      "D": "D. self.energy"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/voronoi.py",
+    "question": "Code Source File: pymatgen/analysis/chemenv/coordination_environments/voronoi.py\n```python\n        self.minimum_angle_factor = minimum_angle_factor\n        indices = list(range(len(structure))) if isites is None else isites\n        self.structure = structure\n        logging.debug(\"Setting Voronoi list\")\n        if voronoi_list2 is not None:\n            self.voronoi_list2 = voronoi_list2\n        else:\n            self.setup_voronoi_list(indices=indices, voronoi_cutoff=voronoi_cutoff)\n        logging.debug(\"Setting neighbors distances and angles\")\n        t1 = time.process_time()\n        self.[MASK](indices=indices)\n\n```\nWhat is the correct method to call to set up the neighbors distances and angles?",
+    "choices": {
+      "A": "A. compute_neighbors",
+      "B": "B. setup_neighbors_distances_and_angles",
+      "C": "C. calculate_neighbors",
+      "D": "D. initialize_neighbors"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/cp2k/inputs.py",
+    "question": "From pymatgen/io/cp2k/inputs.py:\n```python\n    def get_keyword(self) -> Keyword:\n        \"\"\"Get keyword object for the potential.\"\"\"\n        if self.name is None:\n            raise [MASK](\"Cannot get keyword without name attribute\")\n\n        return Keyword(\"POTENTIAL\", self.name)\n\n```\nWhat should replace [MASK]?",
+    "choices": {
+      "A": "A. print",
+      "B": "B. Exception",
+      "C": "C. ValueError",
+      "D": "D. TypeError"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/surface_analysis.py",
+    "question": "In pymatgen/analysis/surface_analysis.py, which keyword is used to unpack the dictionary values into the return of the class?\n    def from_dict(cls, dct: dict) -> Self:\n        \"\"\"Get a SlabEntry by reading in an dictionary.\"\"\"\n        structure = SlabEntry.from_dict(dct[\"structure\"])\n        energy = SlabEntry.from_dict(dct[\"energy\"])\n        miller_index = dct[\"miller_index\"]\n        label = dct[\"label\"]\n        adsorbates = dct[\"adsorbates\"]\n        clean_entry = dct[\"clean_entry\"]\n\n        return [MASK](\n            structure,\n            energy,\n            miller_index,\n            label=label,\n            adsorbates=adsorbates,\n            clean_entry=clean_entry,\n        )",
+    "choices": {
+      "A": "A. dct",
+      "B": "B. self",
+      "C": "C. super",
+      "D": "D. cls"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/transformations/site_transformations.py",
+    "question": "Code Source File: pymatgen/transformations/site_transformations.py\n```python\n            for manipulation in output[1]:\n                if manipulation[1] is None:\n                    del_indices.append(manipulation[0])\n                else:\n                    struct.[MASK](manipulation[0], manipulation[1])\n            struct.remove_sites(del_indices)\n            struct = struct.get_sorted_structure()\n```\nWhat should replace [MASK] in the code snippet?",
+    "choices": {
+      "A": "A. remove_sites",
+      "B": "B. replace",
+      "C": "C. append",
+      "D": "D. insert"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/vasp/inputs.py",
+    "question": "From pymatgen/io/vasp/inputs.py, consider the following code:\nclass Orbital(NamedTuple):\n    n: int\n    l: int  # noqa: E741\n    j: [MASK]\n    E: float\n    occ: float\nWhat is the type annotation for the j field in the Orbital NamedTuple?",
+    "choices": {
+      "A": "A. str",
+      "B": "B. int",
+      "C": "C. bool",
+      "D": "D. float"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/analysis/eos.py",
+    "question": "In the pymatgen/analysis/eos.py file, what method is used to make a deep copy of the energy-volume pairs?\n```python\n        # index of minimum energy tuple in the volume sorted list\n        e_min_idx = e_v.index(e_min)\n        # the volume lower than the volume corresponding to minimum energy\n        v_before = e_v[e_min_idx - 1][1]\n        # the volume higher than the volume corresponding to minimum energy\n        v_after = e_v[e_min_idx + 1][1]\n        e_v_work = [MASK](e_v)\n```",
+    "choices": {
+      "A": "A. copy",
+      "B": "B. deepcopy",
+      "C": "C. shallowcopy",
+      "D": "D. copy.copy"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/abinit/netcdf.py",
+    "question": "Code source file: pymatgen/io/abinit/netcdf.py\n```python\n    def walk_tree(self, top=None):\n        \"\"\"\n        Navigate all the groups in the file starting from top.\n        If top is None, the root group is used.\n        \"\"\"\n        if top is None:\n            top = self.[MASK]\n\n        values = top.groups.values()\n        yield values\n        for value in top.groups.values():\n            yield from self.walk_tree(value)\n\n```\nWhat attribute does [MASK] represent?",
+    "choices": {
+      "A": "A. subgrp",
+      "B": "B. rootgroup",
+      "C": "C. rootgrp",
+      "D": "D. topgrp"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/cp2k/outputs.py",
+    "question": "Code Source File: pymatgen/io/cp2k/outputs.py\nThe stress tensor for each ionic step is conditionally added based on what condition?\n```python\n    def parse_ionic_steps(self):\n        \"\"\"Parse the ionic step info. If already parsed, this will just assimilate.\"\"\"\n        if not self.structures:\n            self.parse_structures()\n        if not self.data.get(\"total_energy\"):\n            self.parse_energies()\n        if not self.data.get(\"forces\"):\n            self.parse_forces()\n        if not self.data.get(\"stress_tensor\"):\n            self.parse_stresses()\n\n        for i, (structure, energy) in enumerate(zip(self.structures, self.data.get(\"total_energy\"))):\n            self.ionic_steps.append(\n                {\n                    \"structure\": structure,\n                    \"E\": energy,\n                    \"forces\": self.data[\"forces\"][i] if self.data.get(\"forces\") else None,\n                    \"stress_tensor\": self.data[\"stress_tensor\"][i] if [MASK] else None,\n                }\n            )\n\n        return self.ionic_steps\n```",
+    "choices": {
+      "A": "A. not self.data.get(\"stress_tensor\")",
+      "B": "B. self.data[\"stress_tensor\"][i]",
+      "C": "C. self.data.get(\"stress_tensor\")",
+      "D": "D. i > 0"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/util/provenance.py",
+    "question": "Code Source File: pymatgen/util/provenance.py\n```python\n    def as_dict(self):\n        \"\"\"Get MSONable dict.\"\"\"\n        dct = self.structure.as_dict()\n        dct[\"@module\"] = type(self).__module__\n        dct[\"@class\"] = type(self).__name__\n        dct[\"about\"] = {\n            \"authors\": [a.as_dict() for a in self.authors],\n            \"projects\": self.projects,\n            \"references\": self.references,\n            \"remarks\": self.remarks,\n            \"history\": [h.as_dict() for h in self.history],\n            \"created_at\": json.loads(json.dumps(self.created_at, cls=MontyEncoder)),\n        }\n        dct[\"about\"].[MASK](json.loads(json.dumps(self.data, cls=MontyEncoder)))\n        return dct\n```\nWhat function should replace [MASK] in the code above?",
+    "choices": {
+      "A": "A. update",
+      "B": "B. append",
+      "C": "C. extend",
+      "D": "D. insert"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "pymatgen/core/spectrum.py",
+    "question": "In the `pymatgen/core/spectrum.py` file, what is the name of the attribute used to store the shape of the y data?\n```python\n        self.x = np.array(x)\n        self.y = np.array(y)\n        self.[MASK] = self.y.shape\n        if self.x.shape[0] != self.ydim[0]:\n            raise ValueError(\"x and y values have different first dimension!\")\n        self._args = args\n        self._kwargs = kwargs\n\n```",
+    "choices": {
+      "A": "A. yshape",
+      "B": "B. ysize",
+      "C": "C. ydim",
+      "D": "D. ydata_shape"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/cli/pmg.py",
+    "question": "In the `pymatgen/cli/pmg.py` file, given the code snippet:\n```python\n    from pymatgen.vis.structure_vtk import StructureVis\n\n    excluded_bonding_elements = args.exclude_bonding[0].split(\",\") if args.exclude_bonding else []\n    struct = Structure.from_file(args.filename[0])\n    vis = StructureVis(excluded_bonding_elements=excluded_bonding_elements)\n    vis.set_structure(struct)\n    [MASK]()\n    return 0\n```\nWhat should replace [MASK]?",
+    "choices": {
+      "A": "A. vis.display",
+      "B": "B. vis.render",
+      "C": "C. vis.show",
+      "D": "D. vis.draw"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/local_env.py",
+    "question": "Code Source File: pymatgen/analysis/local_env.py\n```python\ndef _get_fictive_ionic_radius(site: Site, neighbor: PeriodicNeighbor) -> float:\n    \"\"\"Get fictive ionic radius.\n    ...\n    \"\"\"\n    r_h = _get_radius(site)\n    if r_h == 0:\n        r_h = [MASK](site)\n\n    r_i = _get_radius(neighbor)\n    if r_i == 0:\n        r_i = _get_default_radius(neighbor)\n\n    return neighbor.nn_distance * (r_h / (r_h + r_i))\n```\nWhat function should replace [MASK] to get the default radius of the site if the initial radius is 0?",
+    "choices": {
+      "A": "A. _get_radius",
+      "B": "B. _get_fictive_ionic_radius",
+      "C": "C. _get_default_radius",
+      "D": "D. neighbor.nn_distance"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/vasp/inputs.py",
+    "question": "From pymatgen/io/vasp/inputs.py, the `automatic` method returns an instance of the class using `[MASK]`. What is the correct method to create an instance of the class?\n```python\n        return cls(\n            \"Fully automatic kpoint scheme\",\n            0,\n            style=cls.supported_modes.Automatic,\n            kpts=[\n                (subdivisions,),\n            ],\n        )\n```",
+    "choices": {
+      "A": "A. cls",
+      "B": "B. self",
+      "C": "C. super",
+      "D": "D. Kpoints"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "pymatgen/core/surface.py",
+    "question": "In pymatgen/core/surface.py, within the `build_slabs` method, what attribute stores the transformation matrix?\n```python\nslab.recon_trans_matrix = self.[MASK]\n```",
+    "choices": {
+      "A": "A. reconstruction",
+      "B": "B. transformation",
+      "C": "C. trans_matrix",
+      "D": "D. lattice"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/babel.py",
+    "question": "In pymatgen/io/babel.py, which class is used to wrap the Open Babel molecule object?\n```python\ndef localopt(self, forcefield: str = \"mmff94\", steps: int = 500) -> None:\n        pybelmol = [MASK](self._ob_mol)\n        pybelmol.localopt(forcefield=forcefield, steps=steps)\n        self._ob_mol = pybelmol.OBMol\n```",
+    "choices": {
+      "A": "A. babel.Molecule",
+      "B": "B. pybel.Molecule",
+      "C": "C. Molecule",
+      "D": "D. OpenBabel.OBMol"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/abinit/inputs.py",
+    "question": "Given the code from pymatgen/io/abinit/inputs.py:\ndef __iter__(self):\n    return [MASK](self.vars)\nWhat is the correct replacement for [MASK]?",
+    "choices": {
+      "A": "A. list",
+      "B": "B. dict",
+      "C": "C. iter",
+      "D": "D. str"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/defects/thermo.py",
+    "question": "In pymatgen/analysis/defects/thermo.py, which method of the FormationEnergyDiagram object is used to obtain the lines for charge and VBM formation energy:\ndef _get_chg(fd: FormationEnergyDiagram, ef: float) -> float:\n    lines = fd.[MASK](chempots=chempots)\n    return sum(\n        fd.defect.multiplicity\n        * charge\n        * fermi_dirac(vbm_fe + charge * ef, temperature)\n        for charge, vbm_fe in lines\n    )",
+    "choices": {
+      "A": "A. get_energies",
+      "B": "B. _get_lines",
+      "C": "C. calculate_lines",
+      "D": "D. get_charges"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/core/structure.py",
+    "question": "Given the code snippet from pymatgen/core/structure.py:\n```python\n    def remove_sites(self, indices: Sequence[int]) -> Self:\n        \"\"\"Delete sites with at indices.\n\n        Args:\n            indices: Sequence of indices of sites to delete.\n\n        Returns:\n            Molecule: self with sites removed.\n        \"\"\"\n        self.sites = [self[idx] for idx in range(len(self)) if idx [MASK] indices]\n        return self\n\n```\nWhich keyword should replace [MASK]?",
+    "choices": {
+      "A": "A. in",
+      "B": "B. not in",
+      "C": "C. is",
+      "D": "D. is not"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/core/sites.py",
+    "question": "Code Source File: pymatgen/core/sites.py\n```python\n    def __lt__(self, other: Self) -> bool:\n        \"\"\"Set a default sort order for atomic species by electronegativity. Very\n        useful for getting correct formulas. For example, FeO4PLi is\n        automatically sorted in LiFePO4.\n        \"\"\"\n        if self.species.average_electroneg < other.species.average_electroneg:\n            return True\n        if self.species.average_electroneg > other.species.average_electroneg:\n            return False\n        return self.[MASK] < other.species_string\n\n```\nWhat is the correct replacement for [MASK]?",
+    "choices": {
+      "A": "A. species_string",
+      "B": "B. species.name",
+      "C": "C. site_id",
+      "D": "D. coords"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/chemenv_strategies.py",
+    "question": "Consider the following code snippet from pymatgen/analysis/chemenv/coordination_environments/chemenv_strategies.py:\n```python\n    def as_dict(self):\n        \"\"\"MSONable dict.\"\"\"\n        return {\n            \"[MASK]\": type(self).__module__,\n            \"@class\": type(self).__name__,\n            \"aa\": self.aa,\n        }\n\n```\nWhat should replace [MASK]?",
+    "choices": {
+      "A": "A. @package",
+      "B": "B. @module",
+      "C": "C. @file",
+      "D": "D. @path"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/lmto.py",
+    "question": "Code Source File: pymatgen/io/lmto.py\nWhat is the correct method to replace [MASK] in the following code snippet?\n\n    def __str__(self):\n        \"\"\"String representation of the CTRL file.\"\"\"\n        return [MASK]()",
+    "choices": {
+      "A": "A. self.get_int",
+      "B": "B. get_str",
+      "C": "C. self.get_float",
+      "D": "D. self.get_str"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/transformations/standard_transformations.py",
+    "question": "In the file pymatgen/transformations/standard_transformations.py, what is the type of the oxidation_states argument in the __init__ method?\n```python\nclass OxidationStateDecorationTransformation(AbstractTransformation):\n    def __init__(self, oxidation_states):\n        self.oxidation_states = oxidation_states\n\n    def apply_transformation(self, structure):\n        struct = structure.copy()\n        struct.add_oxidation_state_by_element(self.oxidation_states)\n        return struct\n```\n        Args:\n            oxidation_states ([MASK]): Oxidation states supplied as a dict,\n            e.g. {\"Li\":1, \"O\":-2}.",
+    "choices": {
+      "A": "A. list",
+      "B": "B. tuple",
+      "C": "C. dict",
+      "D": "D. set"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/chemenv_strategies.py",
+    "question": "Code Source File: pymatgen/analysis/chemenv/coordination_environments/chemenv_strategies.py\n```python\n    def weight(self, nb_set, structure_environments, cn_map=None, additional_info=None):\n        \"\"\"Get the weight of a given neighbors set.\n\n        Args:\n            nb_set: Neighbors set.\n            structure_environments: Structure environments used to estimate weight.\n            cn_map: Mapping index for this neighbors set.\n            additional_info: Additional information.\n\n        Returns:\n            float: Weight of the neighbors set.\n        \"\"\"\n        cn = cn_map[0]\n        isite = nb_set.isite\n        voronoi = structure_environments.voronoi.voronoi_list2[isite]\n        if self.nbs_source == \"nb_sets\":\n            all_nbs_voro_indices = set()\n            for cn2, nb_sets in structure_environments.neighbors_sets[isite].items():\n                for nb_set2 in nb_sets:\n                    if cn == cn2:\n                        continue\n                    all_nbs_voro_indices.update(nb_set2.site_voronoi_indices)\n        elif self.nbs_source == \"voronoi\":\n            all_nbs_voro_indices = set(range(len(voronoi)))\n        else:\n            raise ValueError('\"nbs_source\" should be one of [\"nb_sets\", \"voronoi\"]')\n        all_nbs_indices_except_nb_set = all_nbs_voro_indices - nb_set.site_voronoi_indices\n        normalized_distances = [voronoi[inb][\"normalized_distance\"] for inb in all_nbs_indices_except_nb_set]\n        if len(normalized_distances) == 0:\n            return 1\n        return self.weight_rf.[MASK](min(normalized_distances))\n\n```\nWhat is the correct function name for [MASK]?",
+    "choices": {
+      "A": "A. compute",
+      "B": "B. calculate",
+      "C": "C. eval",
+      "D": "D. get_value"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/reaction_calculator.py",
+    "question": "From Code Source File: pymatgen/analysis/reaction_calculator.py, which method is used to reconstitute a ComputedReaction object from a dictionary?\n```python\n    @classmethod\n    def from_dict(cls, dct: dict) -> Self:\n        \"\"\"\n        Args:\n            dct (dict): from as_dict().\n\n        Returns:\n            A ComputedReaction object.\n        \"\"\"\n        reactants = [MontyDecoder().process_decoded(entry) for entry in dct[\"reactants\"]]\n        products = [MontyDecoder().process_decoded(entry) for entry in dct[\"products\"]]\n        return cls([MASK], products)\n```",
+    "choices": {
+      "A": "A. reactants",
+      "B": "B. dct[\"reactants\"]",
+      "C": "C. cls(reactants)",
+      "D": "D. reactants, products"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/io/vasp/inputs.py",
+    "question": "In pymatgen/io/vasp/inputs.py, which function is used to search for the pattern \"parameters from PSCTR are:.*?END of PSCTR-controll parameters\" within the input data? `match = re.[MASK](r\"(?s)(parameters from PSCTR are:.*?END of PSCTR-controll parameters)\", data)`",
+    "choices": {
+      "A": "A. findall",
+      "B": "B. sub",
+      "C": "C. match",
+      "D": "D. search"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/io/res.py",
+    "question": "Code Source File: pymatgen/io/res.py\nWhat attribute of `self._res` is being iterated over in the `for` loop?\n\n```python\n    def get_pspots(self) -> dict[str, str]:\n        \"\"\"\n        Retrieves the OTFG pseudopotential string that can be used to generate the\n        pseudopotentials used in the calculation.\n\n        Returns:\n            dict[specie, potential]\n        \"\"\"\n        pseudo_pots: dict[str, str] = {}\n        for rem in self._res.[MASK]:\n            srem = rem.split()\n            if len(srem) == 2 and Element.is_valid_symbol(srem[0]):\n                k, v = srem\n                pseudo_pots[k] = v\n        return pseudo_pots\n```",
+    "choices": {
+      "A": "A. POTENTIALS",
+      "B": "B. ELEMENTS",
+      "C": "C. REMS",
+      "D": "D. PSeudos"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/phonon/plotter.py",
+    "question": "In pymatgen/phonon/plotter.py, what type of object is the expected input `bs` in the `__init__` method?\n```python\n    def __init__(self, bs: GruneisenPhononBandStructureSymmLine) -> None:\n        \"\"\"\n        Args:\n            bs: A GruneisenPhononBandStructureSymmLine object.\n        \"\"\"\n        if not isinstance(bs, GruneisenPhononBandStructureSymmLine):\n            raise TypeError(\n                \"GruneisenPhononBSPlotter only works with GruneisenPhononBandStructureSymmLine objects. \"\n                \"A GruneisenPhononBandStructure object (on a uniform grid for instance and \"\n                \"not along symmetry lines won't work)\"\n            )\n        super().__init__(bs)\n```",
+    "choices": {
+      "A": "A. GruneisenPhononBandStructure",
+      "B": "B. PhononBandStructure",
+      "C": "C. GruneisenPhononBandStructureSymmLine",
+      "D": "D. BandStructure"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/abinit/inputs.py",
+    "question": "In pymatgen/io/abinit/inputs.py, what keyword is used to define the method that supports iteration?\n```python\n    [MASK] __iter__(self):\n        return iter(self._inputs)\n```",
+    "choices": {
+      "A": "A. class",
+      "B": "B. for",
+      "C": "C. def",
+      "D": "D. while"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/quasiharmonic.py",
+    "question": "In pymatgen/analysis/quasiharmonic.py, the Debye temperature calculation uses the bulk modulus and average mass. Which attribute stores the bulk modulus?\n```python\n        debye = (\n            2.9772e-11 * (volume / self.natoms) ** (-1.0 / 6.0) * f_sigma * np.sqrt(self.[MASK] / self.avg_mass)\n        )\n```",
+    "choices": {
+      "A": "A. bulk_energy",
+      "B": "B. bulk_volume",
+      "C": "C. bulk_modulus",
+      "D": "D. modulus"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/abinit/pseudos.py",
+    "question": "Code Source File: pymatgen/io/abinit/pseudos.py\nWhat function is used to parse the GTH abinit header in the following code snippet?\n\n    def [MASK](filename, ppdesc):\n        \"\"\"Parse the GTH abinit header. Example:\n\n        Goedecker-Teter-Hutter  Wed May  8 14:27:44 EDT 1996\n        1   1   960508                     zatom,zion,pspdat\n        2   1   0    0    2001    0.       pspcod,pspxc,lmax,lloc,mmax,r2well\n        0.2000000 -4.0663326  0.6778322 0 0     rloc, c1, c2, c3, c4\n        0 0 0                              rs, h1s, h2s\n        0 0                                rp, h1p\n          1.36 .2   0.6                    rcutoff, rloc\n        \"\"\"\n        lines = _read_nlines(filename, 7)\n\n        header = _dict_from_lines(lines[:3], [0, 3, 6])\n        summary = lines[0]\n\n        return NcAbinitHeader(summary, **header)",
+    "choices": {
+      "A": "A. read_gth_header",
+      "B": "B. parse_gth_header",
+      "C": "C. gth_header",
+      "D": "D. get_gth_header"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/abinit/abitimer.py",
+    "question": "Code Source File: pymatgen/io/abinit/abitimer.py\n```python\n    def plot_all(self, show=True, **kwargs):\n        \"\"\"Call all plot methods provided by the parser.\"\"\"\n        figs = []\n        app = figs.[MASK]\n        app(self.plot_stacked_hist(show=show))\n        app(self.plot_efficiency(show=show))\n        app(self.plot_pie(show=show))\n        return figs\n\n```\nWhat should replace [MASK] to make the code valid?",
+    "choices": {
+      "A": "A. extend",
+      "B": "B. insert",
+      "C": "C. append",
+      "D": "D. add"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/structure_environments.py",
+    "question": "From pymatgen/analysis/chemenv/coordination_environments/structure_environments.py, what value is assigned to `plateau` if the index `idx` is 0 in the loop and the distances are close?\n```python\n        def distance_plateau(self):\n            \"\"\"Get the distances plateau's for this NeighborsSet.\"\"\"\n            all_nbs_normalized_distances_sorted = sorted(\n                (nb[\"normalized_distance\"] for nb in self.voronoi), reverse=True\n            )\n            max_dist = np.max(self.normalized_distances)\n            plateau = None\n            abs_tol = self.detailed_voronoi.normalized_distance_tolerance\n            for idx, dist in enumerate(all_nbs_normalized_distances_sorted):\n                if np.isclose(dist, max_dist, rtol=0.0, atol=abs_tol):\n                    plateau = [MASK] if idx == 0 else all_nbs_normalized_distances_sorted[idx - 1] - max_dist\n                    break\n            if plateau is None:\n                raise ValueError(\"Plateau not found ...\")\n            return plateau\n```",
+    "choices": {
+      "A": "A. 0.0",
+      "B": "B. max_dist",
+      "C": "C. np.inf",
+      "D": "D. None"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/ext/matproj_legacy.py",
+    "question": "In pymatgen/ext/matproj_legacy.py, what function is used to process entries when `compatible_only` is True?\n```python\n        if compatible_only:\n            # suppress the warning about missing oxidation states\n            with warnings.catch_warnings():\n                warnings.filterwarnings(\"ignore\", message=\"Failed to guess oxidation states.*\")\n                entries = [MASK]().process_entries(entries, clean=True)\n```",
+    "choices": {
+      "A": "A. MaterialsProjectCompatibility",
+      "B": "B. MaterialsProject2020Compatibility",
+      "C": "C. Compatibility",
+      "D": "D. MPCompatibility"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/core/composition.py",
+    "question": "From pymatgen/core/composition.py: What is the return type of the `__str__` method?\n    def __str__(self) -> [MASK]:\n        return \" \".join(f\"{key}{formula_double_format(val, ignore_ones=False)}\" for key, val in self.as_dict().items())",
+    "choices": {
+      "A": "A. dict",
+      "B": "B. list",
+      "C": "C. int",
+      "D": "D. str"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/analysis/elasticity/elastic.py",
+    "question": "In pymatgen/analysis/elasticity/elastic.py, the `directional_elastic_mod` method calculates the directional elastic modulus for a specific [MASK].\n```python\n    def directional_elastic_mod(self, n) -> float:\n        \"\"\"Calculate directional elastic modulus for a specific vector.\"\"\"\n        n = get_uvec(n)\n        return self.einsum_sequence([n] * 4)\n```",
+    "choices": {
+      "A": "A. point",
+      "B": "B. matrix",
+      "C": "C. vector",
+      "D": "D. scalar"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/utils/graph_utils.py",
+    "question": "In pymatgen/analysis/chemenv/utils/graph_utils.py, what function is used to sum the cycles combinations?\n```python\n    for cycle_idx in range(1, len(cycle_basis) + 1):\n        for cycles_combination in itertools.combinations(cycles_matrix, cycle_idx):\n            edges_counts = np.array(np.mod(np.[MASK](cycles_combination, axis=0), 2), dtype=bool)\n```",
+    "choices": {
+      "A": "A. sum",
+      "B": "B. add",
+      "C": "C. prod",
+      "D": "D. mean"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "pymatgen/analysis/chempot_diagram.py",
+    "question": "In pymatgen/analysis/chempot_diagram.py, the loop `for idx, limit in [MASK]:` iterates over what attribute of the class?\n```python\n    def _get_border_hyperplanes(self) -> np.ndarray:\n        \"\"\"Get an array of the bounding hyperplanes given by elemental limits.\"\"\"\n        border_hyperplanes = np.array([[0] * (self.dim + 1)] * (2 * self.dim))\n\n        for idx, limit in [MASK]:\n            border_hyperplanes[2 * idx, idx] = -1\n            border_hyperplanes[2 * idx, -1] = limit[0]\n            border_hyperplanes[(2 * idx) + 1, idx] = 1\n            border_hyperplanes[(2 * idx) + 1, -1] = limit[1]\n\n        return border_hyperplanes\n\n```",
+    "choices": {
+      "A": "A. self.dim",
+      "B": "B. self.lims",
+      "C": "C. self.hyperplanes",
+      "D": "D. self.idx"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/symmetry/analyzer.py",
+    "question": "According to pymatgen/symmetry/analyzer.py, after creating the symmetry operation 'op', what method is called to determine if the operation is valid?\n```python\n        for v in self.principal_axes:\n            op = SymmOp.from_axis_angle_and_translation(v, 180)\n            if self.[MASK](op):\n                self.symmops.append(op)\n                self.rot_sym.append((v, 2))\n\n```",
+    "choices": {
+      "A": "A. validate_op",
+      "B": "B. is_valid",
+      "C": "C. is_valid_op",
+      "D": "D. check_op"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/vasp/inputs.py",
+    "question": "From pymatgen/io/vasp/inputs.py, what is the name of the dictionary key that stores the k-points shift information?\n```python\n            \"generation_style\": self.style.name,\n            \"kpoints\": self.kpts,\n            \"[MASK]\": self.kpts_shift,\n            \"kpts_weights\": self.kpts_weights,\n            \"coord_type\": self.coord_type,\n            \"labels\": self.labels,\n            \"tet_number\": self.tet_number,\n            \"tet_weight\": self.tet_weight,\n```",
+    "choices": {
+      "A": "A. k_shift",
+      "B": "B. kpts_shift",
+      "C": "C. usershift",
+      "D": "D. shift_kpts"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/ext/cod.py",
+    "question": "Code Source File: pymatgen/ext/cod.py\n```python\n    def get_structure_by_id(self, cod_id: int, timeout: int = 600, **kwargs) -> Structure:\n        \"\"\"Query the COD for a structure by id.\n\n        Args:\n            cod_id (int): COD id.\n            timeout (int): Timeout for the request in seconds. Default = 600.\n            kwargs: All kwargs supported by Structure.from_str.\n\n        Returns:\n            A Structure.\n        \"\"\"\n        response = requests.[MASK](f\"http://{self.url}/cod/{cod_id}.cif\", timeout=timeout)\n        return Structure.from_str(response.text, fmt=\"cif\", **kwargs)\n```\nWhat is the correct function to use for retrieving data from the COD?",
+    "choices": {
+      "A": "A. post",
+      "B": "B. get",
+      "C": "C. put",
+      "D": "D. delete"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/coordination_geometries.py",
+    "question": "Given the code from pymatgen/analysis/chemenv/coordination_environments/coordination_geometries.py:\ndef get_coordination_number(self) -> [MASK]:\n        \"\"\"Get the coordination number of this coordination geometry.\"\"\"\n        return self.coordination\nWhat is the correct return type annotation?",
+    "choices": {
+      "A": "A. str",
+      "B": "B. float",
+      "C": "C. int",
+      "D": "D. None"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/lobster/outputs.py",
+    "question": "Code Source File: pymatgen/io/lobster/outputs.py\nThe following code snippet is from the __init__ method of a class:\nwith [MASK](filename, mode=\"rt\") as file:\n    data = file.read().split(\"\\n\")\nWhat is the correct function to use here?",
+    "choices": {
+      "A": "A. xopen",
+      "B": "B. fopen",
+      "C": "C. zopen",
+      "D": "D. open"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/core/structure.py",
+    "question": "Given the code snippet from pymatgen/core/structure.py:\n```python\n    def from_dict(cls, dct: dict) -> Self:\n        \"\"\"Get a PeriodicNeighbor from a dict.\n\n        Args:\n            dct: MSONable dict format.\n\n        Returns:\n            PeriodicNeighbor\n        \"\"\"\n        return super(Site, cls).[MASK](dct)\n```\nWhat should replace [MASK] to correctly deserialize the object from a dictionary?",
+    "choices": {
+      "A": "A. to_dict",
+      "B": "B. as_dict",
+      "C": "C. from_dict",
+      "D": "D. convert_dict"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/chemenv_strategies.py",
+    "question": "From pymatgen/analysis/chemenv/coordination_environments/chemenv_strategies.py, which of the following arguments is explicitly set to `None` as a default value in the `weight` function definition?\n```python\n    def weight(self, nb_set, structure_environments, cn_map=[MASK], additional_info=None):\n        \"\"\"Get the weight of a given neighbors set.\n\n        Args:\n            nb_set: Neighbors set.\n            structure_environments: Structure environments used to estimate weight.\n            cn_map: Mapping index for this neighbors set.\n            additional_info: Additional information.\n\n        Returns:\n            float: Weight of the neighbors set.\n        \"\"\"\n        fda_list = self.fda(nb_set=nb_set)\n        return self.eval(fda_list=fda_list)\n```",
+    "choices": {
+      "A": "A. nb_set",
+      "B": "B. structure_environments",
+      "C": "C. additional_info",
+      "D": "D. None"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/core/tensors.py",
+    "question": "From pymatgen/core/tensors.py:\n```python\ndef voigt_symmetrized(self) -> Self:\n    \"\"\"TensorCollection where all tensors are voigt symmetrized.\"\"\"\n    return type(self)([tensor.[MASK] for tensor in self])\n```\nWhat is the correct replacement for [MASK]?",
+    "choices": {
+      "A": "A. voigt_unsymmetrized",
+      "B": "B. as_dict",
+      "C": "C. voigt_symmetrized",
+      "D": "D. from_list"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/feff/outputs.py",
+    "question": "In the pymatgen/io/feff/outputs.py file, which numpy array column represents the total eels spectrum?\n```python\n    @property\n    def total_spectrum(self):\n        \"\"\"The total eels spectrum.\"\"\"\n        return self.data[:, [MASK]]\n```",
+    "choices": {
+      "A": "A. 0",
+      "B": "B. 1",
+      "C": "C. 2",
+      "D": "D. 3"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/vasp/outputs.py",
+    "question": "From pymatgen/io/vasp/outputs.py, consider the following code snippet:\n            def [MASK](results, match):\n                results.born_ion = int(match[1]) - 1\n                results.born.append(np.zeros((3, 3)))\nWhat should replace [MASK]?",
+    "choices": {
+      "A": "A. dielectric_constant",
+      "B": "B. born_ion",
+      "C": "C. read_ion",
+      "D": "D. parse_ion"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/ext/matproj_legacy.py",
+    "question": "Code Source File: pymatgen/ext/matproj_legacy.py\n```python\n    def [MASK](self, formula):\n        \"\"\"Get a list of ThermoData objects associated with a formula using the\n        Materials Project REST interface.\n\n        Args:\n            formula (str): A formula to search for.\n\n        Returns:\n            List of ThermoData objects.\n        \"\"\"\n        return self.get_data(formula, data_type=\"exp\")\n```\nWhat is the correct function name to replace [MASK]?",
+    "choices": {
+      "A": "A. get_data",
+      "B": "B. get_exp_thermo_data",
+      "C": "C. find_thermo",
+      "D": "D. retrieve_data"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/core/structure.py",
+    "question": "From pymatgen/core/structure.py:\n```python\n    def get_sites_in_sphere(self, pt: ArrayLike, r: float) -> list[Neighbor]:\n        \"\"\"Find all sites within a sphere from a point.\n        Args:\n            pt (3x1 array): Cartesian coordinates of center of sphere\n            r (float): Radius of sphere.\n        Returns:\n            Neighbor\n        \"\"\"\n        neighbors = []\n        for idx, site in [MASK](self._sites):\n            dist = site.distance_from_point(pt)\n            if dist <= r:\n                neighbors.append(Neighbor(site.species, site.coords, site.properties, dist, idx, label=site.label))\n        return neighbors\n\n```\nWhat should replace [MASK]?",
+    "choices": {
+      "A": "A. iterate",
+      "B": "B. enumerate",
+      "C": "C. loop",
+      "D": "D. map"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/structure_environments.py",
+    "question": "Code Source File: pymatgen/analysis/chemenv/coordination_environments/structure_environments.py\nWhat is the name of the function that performs a linear transformation on the input array 'wa'?\n```python\ndef [MASK](wa):\n    return (yamax - yamin) * np.array(wa) + yamin\n```",
+    "choices": {
+      "A": "A. yin",
+      "B": "B. yang",
+      "C": "C. zen",
+      "D": "D. yan"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/feff/outputs.py",
+    "question": "Given the code from pymatgen/io/feff/outputs.py:\n```python\n    def relative_energies(self):\n        \"\"\"Energy with respect to the Fermi level E - E_f.\"\"\"\n        return self.data[:, [MASK]]\n```\nWhat is the correct replacement for [MASK]?",
+    "choices": {
+      "A": "A. 0",
+      "B": "B. 2",
+      "C": "C. 1",
+      "D": "D. -1"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/structure_environments.py",
+    "question": "Code Source File: pymatgen/analysis/chemenv/coordination_environments/structure_environments.py\nWhat should replace [MASK] in the following code snippet to correctly format the neighbors sites indices?\n\n        def __str__(self):\n            return (\n                f\"Neighbors Set for site #{self.isite} :\\n\"\n                f\" - Coordination number : {len(self)}\\n\"\n                f\" - Neighbors sites indices : {', '.join([MASK] for nb_idxs in self.all_nbs_sites_indices)}\\n\"\n            )",
+    "choices": {
+      "A": "A. nb_idxs",
+      "B": "B.  str(nb_idxs)",
+      "C": "C.  f'{nb_idxs}'",
+      "D": "D.  int(nb_idxs)"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/electronic_structure/plotter.py",
+    "question": "In pymatgen/electronic_structure/plotter.py, what method is used to display the plot using matplotlib, given the code:\n```python\n        self.get_plot(xlim, ylim)\n        plt.savefig(filename)\n\n    def [MASK](self, xlim=None, ylim=None) -> None:\n        \"\"\"Show the plot using matplotlib.\n\n        Args:\n            xlim: Specifies the x-axis limits. Defaults to None for\n                automatic determination.\n            ylim: Specifies the y-axis limits. Defaults to None for\n                automatic determination.\n        \"\"\"\n        self.get_plot(xlim, ylim)\n        plt.show()\n```",
+    "choices": {
+      "A": "A. display_plot",
+      "B": "B. get_plot",
+      "C": "C. show",
+      "D": "D. save_plot"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/vasp/outputs.py",
+    "question": "From pymatgen/io/vasp/outputs.py: What should replace [MASK] to access the total number of electronic steps?\n```python\n    def converged_electronic(self) -> bool:\n        \"\"\"Whether electronic step converged in the final ionic step.\"\"\"\n        final_elec_steps = (\n            self.ionic_steps[-1][\"electronic_steps\"] if self.incar.get(\"ALGO\", \"\").lower() != \"chi\" else 0\n        )\n        # In a response function run there is no ionic steps, there is no scf step\n        if self.incar.get(\"LEPSILON\"):\n            idx = 1\n            to_check = {\"e_wo_entrp\", \"e_fr_energy\", \"e_0_energy\"}\n            while set(final_elec_steps[idx]) == to_check:\n                idx += 1\n            return idx + 1 != self.parameters[\"NELM\"]\n        return len(final_elec_steps) < self.parameters[[MASK]]\n```",
+    "choices": {
+      "A": "A. NIONS",
+      "B": "B. NELM",
+      "C": "C. NSW",
+      "D": "D. EDIFF"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/cli/pmg_config.py",
+    "question": "Code Source File: pymatgen/cli/pmg_config.py\nWhat function is used to copy the POTCAR file from the source to the destination in the following code snippet?\n```python\n                    base_dir = os.path.join(target_dir, basename)\n                    os.makedirs(base_dir, exist_ok=True)\n                    fname = filenames[0]\n                    dest = os.path.join(base_dir, os.path.basename(fname))\n                    shutil.[MASK](fname, dest)\n```",
+    "choices": {
+      "A": "A. move",
+      "B": "B. copy",
+      "C": "C. link",
+      "D": "D. replicate"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/prototypes.py",
+    "question": "In pymatgen/analysis/prototypes.py, which class is used to perform structure matching within the `_match_single_prototype` method?\n```python\n    def _match_single_prototype(self, structure: Structure):\n        sm = [MASK](\n            ltol=self.initial_ltol,\n            stol=self.initial_stol,\n            angle_tol=self.initial_angle_tol,\n        )\n        tags = self._match_prototype(sm, structure)\n```",
+    "choices": {
+      "A": "A. AflowPrototypeMatcher",
+      "B": "B. Structure",
+      "C": "C. StructureMatcher",
+      "D": "D. dict"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/util/provenance.py",
+    "question": "Code Source File: pymatgen/util/provenance.py\nWhat is the correct method name to represent the object as a string?\n```python\n    def [MASK](self):\n        return \"\\n\".join(\n            [\n                f\"{key}\\n{getattr(self, key)}\"\n                for key in (\n                    \"structure\",\n                    \"authors\",\n                    \"projects\",\n                    \"references\",\n                    \"remarks\",\n                    \"data\",\n                    \"history\",\n                    \"created_at\",\n                )\n            ]\n        )\n```",
+    "choices": {
+      "A": "A. __repr__",
+      "B": "B. __str__",
+      "C": "C. to_string",
+      "D": "D. stringify"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/molecule_matcher.py",
+    "question": "In pymatgen/analysis/molecule_matcher.py, which function orders, rotates, and transforms a molecule according to the best match with the target molecule?\n```python\n    def [MASK](self, p: Molecule):\n        \"\"\"Order, rotate and transform `p` molecule according to the best match.\n```",
+    "choices": {
+      "A": "A. match",
+      "B": "B. fit",
+      "C": "C. permutations",
+      "D": "D. get_principal_axis"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/diffraction/core.py",
+    "question": "Code Source File: pymatgen/analysis/diffraction/core.py\n```python\n            DiffractionPattern\n        \"\"\"\n        raise [MASK]\n```\nWhat keyword should replace [MASK] in the code snippet above?",
+    "choices": {
+      "A": "A. Exception",
+      "B": "B. NotImplementedError",
+      "C": "C. ValueError",
+      "D": "D. TypeError"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/util/string.py",
+    "question": "Code Source File: pymatgen/util/string.py\n\ndef to_html_string(self) -> str:\n    \"\"\"Generate a HTML formatted string. This uses the output from to_latex_string to generate a HTML output.\n\n    Returns:\n        HTML formatted string.\n    \"\"\"\n    str_ = [MASK](r\"\\$_\\{([^}]+)\\}\\$\", r\"&lt;sub&gt;\\1&lt;/sub&gt;\", self.to_latex_string())\n    str_ = re.sub(r\"\\$\\^\\{([^}]+)\\}\\$\", r\"&lt;sup&gt;\\1&lt;/sup&gt;\", str_)\n    return re.sub(r\"\\$\\\\overline\\{([^}]+)\\}\\$\", r'&lt;span style=\"text-decoration:overline\"&gt;\\1&lt;/span&gt;', str_)\n\nWhat function should replace [MASK]?",
+    "choices": {
+      "A": "A. re.match",
+      "B": "B. re.search",
+      "C": "C. re.findall",
+      "D": "D. re.sub"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/io/aims/sets/bs.py",
+    "question": "Code Source File: pymatgen/io/aims/sets/bs.py\nGiven the following code:\nclass _SegmentDict(TypedDict):\n    [MASK]: list[list[float]]\n    labels: list[str]\n    length: int\n\nWhat is the correct replacement for [MASK]?",
+    "choices": {
+      "A": "A. positions",
+      "B": "B. coordinates",
+      "C": "C. coords",
+      "D": "D. points"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/vasp/outputs.py",
+    "question": "Code Source File: pymatgen/io/vasp/outputs.py\nIn the method `read_nmr_efg`, which regular expression pattern is used to define the structure of each row containing the data for Cq, eta, and nuclear quadrupole moment?\n        row_pattern = (\n            [MASK]\n        )",
+    "choices": {
+      "A": "A. r\"^\\s+NMR quadrupolar parameters\\s+$\\n\"",
+      "B": "B. r\"\\d+\\s+(?P&lt;cq&gt;[-]?\\d+.\\d+)\\s+(?P&lt;eta&gt;[-]?\\d+.\\d+)\\s+(?P&lt;nuclear_quadrupole_moment&gt;[-]?\\d+.\\d+)\"",
+      "C": "C. r\"-{50,}\\s*$\"",
+      "D": "D. r\"^\\s+ion\\s+Cq\\(MHz\\)\\s+eta\\s+Q \\(mb\\)\\s+$\\n\""
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/abinit/inputs.py",
+    "question": "From pymatgen/io/abinit/inputs.py, consider the following code snippet:\ndef [MASK](self, *args, **kwargs):\n        \"\"\"Set the value of the variables.\n        Return dict with the variables added to the input.\n\n        Example:\n            input.set_vars(ecut=10, ionmov=3)\n        \"\"\"\n        kwargs.update(dict(*args))\n        for varname, varvalue in kwargs.items():\n            self[varname] = varvalue\n        return kwargs\nWhat is the correct function name for [MASK]?",
+    "choices": {
+      "A": "A. get_vars",
+      "B": "B. set_vars",
+      "C": "C. update_vars",
+      "D": "D. modify_vars"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/coordination_geometries.py",
+    "question": "From pymatgen/analysis/chemenv/coordination_environments/coordination_geometries.py, what is the correct numpy function to find the maximum value in the dists list?\n```python\n    def distfactor_max(self):\n        \"\"\"The maximum distfactor for the perfect CoordinationGeometry (usually 1.0 for symmetric polyhedrons).\"\"\"\n        dists = [np.linalg.norm(pp - self.central_site) for pp in self.points]\n        return np.[MASK](dists) / np.min(dists)\n```",
+    "choices": {
+      "A": "A. max",
+      "B": "B. min",
+      "C": "C. average",
+      "D": "D. sum"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "pymatgen/analysis/molecule_matcher.py",
+    "question": "In pymatgen/analysis/molecule_matcher.py, what method is used to group molecules based on structural equality?\n```python\n    def group_molecules(self, mol_list):\n        \"\"\"\n        Group molecules by structural equality.\n\n        Args:\n            mol_list: List of OpenBabel OBMol or pymatgen objects\n\n        Returns:\n            A list of lists of matched molecules\n            Assumption: if s1=s2 and s2=s3, then s1=s3\n            This may not be true for small tolerances.\n        \"\"\"\n        mol_hash = [(idx, self._mapper.get_molecule_hash(mol)) for idx, mol in enumerate(mol_list)]\n        mol_hash.sort(key=lambda x: x[1])\n```",
+    "choices": {
+      "A": "A. cluster_molecules",
+      "B": "B. match_molecules",
+      "C": "C. [MASK]_molecules",
+      "D": "D. sort_molecules"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/command_line/critic2_caller.py",
+    "question": "Code Source File: pymatgen/command_line/critic2_caller.py\nWhat is the correct method for adding edges to the struct_graph object, given the following context?\n\n```python\n                    struct_graph.[MASK](\n                        struct_from_idx,\n                        struct_to_idx,\n                        from_jimage=from_lvec,\n                        to_jimage=to_lvec,\n                        weight=weight,\n                        edge_properties=edge_properties,\n                    )\n```",
+    "choices": {
+      "A": "A. add_node",
+      "B": "B. create_edge",
+      "C": "C. add_edge",
+      "D": "D. set_edge"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/electronic_structure/core.py",
+    "question": "In pymatgen/electronic_structure/core.py, what is the purpose of the `if saxis is None` condition in the following line?\n```python\n        _magmoms: list[Magmom] = [Magmom(magmom) for magmom in magmoms]\n        _saxis: NDArray = Magmom.[MASK](_magmoms) if saxis is None else saxis / np.linalg.norm(saxis)\n        moments: list[NDArray] = [magmom.get_moment(saxis=_saxis) for magmom in _magmoms]\n        return moments, _saxis\n```",
+    "choices": {
+      "A": "A. To normalize the saxis if it is provided.",
+      "B": "B. To calculate the magmoms if they are not provided.",
+      "C": "C. To get a suggested spin axis from the magmoms if no spin axis is given as input.",
+      "D": "D. To raise an error if saxis is None."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/transformations/advanced_transformations.py",
+    "question": "From pymatgen/transformations/advanced_transformations.py, what should replace [MASK] in the following code snippet?\n    def is_one_to_many(self) -> bool:\n        \"\"\"Transform one structure to many.\"\"\"\n        return [MASK]",
+    "choices": {
+      "A": "A. False",
+      "B": "B. 0",
+      "C": "C. None",
+      "D": "D. True"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/core/sites.py",
+    "question": "In the pymatgen/core/sites.py file, after the species dictionary is created, which key is added to the dictionary to represent the occupancy of the species?\n```python\n        for spec, occu in self.species.items():\n            spec_dct = spec.as_dict()\n            del spec_dct[\"@module\"]\n            del spec_dct[\"@class\"]\n            spec_dct[[MASK]] = occu\n            species.append(spec_dct)\n```",
+    "choices": {
+      "A": "A. \"occupancy\"",
+      "B": "B. \"occupation\"",
+      "C": "C. \"occu\"",
+      "D": "D. \"occ\""
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/pourbaix_diagram.py",
+    "question": "Given the code from pymatgen/analysis/pourbaix_diagram.py:\n```python\n    def normalized_energy(self):\n        \"\"\"Energy normalized by number of non H or O atoms, e.g.\n        for Zn2O6, energy / 2 or for AgTe3(OH)3, energy / 4.\n        \"\"\"\n        return [MASK] * self.normalization_factor\n```\nWhat should replace [MASK] in the above code snippet?",
+    "choices": {
+      "A": "A. self.normalized_energy",
+      "B": "B. self.potential",
+      "C": "C. self.energy",
+      "D": "D. self.corrected_energy"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/adsorption.py",
+    "question": "Code Source File: pymatgen/analysis/adsorption.py\nThe following code snippet is given:\n```python\n            slab = self.slab.copy()\n            props = self.slab.site_properties\n            if sub_both_sides:\n                # Find an equivalent site on the other surface\n                eq_indices = next(indices for indices in sym_slab.equivalent_indices if idx in indices)\n                for ii in eq_indices:\n                    if f\"{sym_slab[ii].frac_coords[2]:.6f}\" != f\"{site.frac_coords[2]:.6f}\":\n                        props[\"surface_properties\"][ii] = \"substitute\"\n                        slab.[MASK](ii, atom)\n                        break\n```\nWhat method should replace [MASK] to substitute an atom at a specific site?",
+    "choices": {
+      "A": "A. insert",
+      "B": "B. append",
+      "C": "C. replace",
+      "D": "D. remove"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/hhi.py",
+    "question": "In the pymatgen/analysis/hhi.py file, which argument name is used in the `get_hhi_production` method to represent either a Composition object or a string formula?\n```python\n    def get_hhi_production(self, [MASK]):\n        \"\"\"Get the production HHI for a compound.\n\n        Args:\n            comp_or_form (Composition or String): A Composition or String formula\n\n        Returns:\n            The HHI production value\n        \"\"\"\n        return self.get_hhi(comp_or_form)[0]\n```",
+    "choices": {
+      "A": "A. composition",
+      "B": "B. formula",
+      "C": "C. comp_or_form",
+      "D": "D. material"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/aims/parsers.py",
+    "question": "In the `pymatgen/io/aims/parsers.py` file, the `get_header_chunk` function returns what type of object: return [MASK](header)?",
+    "choices": {
+      "A": "A. list",
+      "B": "B. dict",
+      "C": "C. AimsOutHeaderChunk",
+      "D": "D. str"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/core/structure.py",
+    "question": "In pymatgen/core/structure.py, what function is used to calculate the greatest common divisor (GCD) of the number of sites in each group?\n```python\n        num_fu = functools.reduce([MASK], map(len, grouped_sites))\n        for size, ms in get_hnf(num_fu):\n```",
+    "choices": {
+      "A": "A. math.sqrt",
+      "B": "B. math.factorial",
+      "C": "C. math.gcd",
+      "D": "D. math.prod"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/vasp/sets.py",
+    "question": "In pymatgen/io/vasp/sets.py, if `potcar_spec` is True, what is used to generate the `potcar` argument for the `VaspInput` object?\n```python\n        return VaspInput(\n            incar=self.incar,\n            kpoints=self.kpoints,\n            poscar=self.poscar,\n            potcar=\"\\n\".join(self.[MASK]) if potcar_spec else self.potcar,\n            potcar_spec=potcar_spec,\n        )\n```",
+    "choices": {
+      "A": "A. potcar",
+      "B": "B. potcar_symbols",
+      "C": "C. potcar_spec",
+      "D": "D. potcar_data"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/vasp/inputs.py",
+    "question": "From pymatgen/io/vasp/inputs.py, after opening the file, what method is called to write the content:\n    def write_file(self, filename: str) -> None:\n        \"\"\"Write PotcarSingle to a file.\n\n        Args:\n            filename (str): Filename to write to.\n        \"\"\"\n        with zopen(filename, mode=\"wt\") as file:\n            file.[MASK](str(self))",
+    "choices": {
+      "A": "A. print",
+      "B": "B. dump",
+      "C": "C. write",
+      "D": "D. save"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/symmetry/kpath.py",
+    "question": "In pymatgen/symmetry/kpath.py, consider the following code snippet:\n```python\n    def _get_reciprocal_point_group(ops, R, A):\n        A_inv = np.linalg.inv(A)\n        # convert to reciprocal primitive basis\n        recip_point_group = [np.around(np.dot(A, np.dot(R, A_inv)), decimals=2)]\n        for op in ops:\n            recip = np.around(np.dot(A, np.dot(op, A_inv)), decimals=2)\n            new = True\n            new_coset = True\n            for thing in recip_point_group:\n                if (thing == recip).[MASK]():\n                    new = False\n                if (thing == np.dot(R, recip)).all():\n                    new_coset = False\n\n            if new:\n                recip_point_group.append(recip)\n            if new_coset:\n                recip_point_group.append(np.dot(R, recip))\n\n        return recip_point_group\n```\nWhat method is used to check if all elements in an array are true?",
+    "choices": {
+      "A": "A. any",
+      "B": "B. sum",
+      "C": "C. size",
+      "D": "D. [MASK]"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/analysis/magnetism/analyzer.py",
+    "question": "Code source file: pymatgen/analysis/magnetism/analyzer.py. Consider the following code snippet:\n```python\n    def get_ferromagnetic_structure(self, make_primitive: bool = True) -> Structure:\n        structure = self.structure.copy()\n        structure.[MASK](\"magmom\", [abs(m) for m in self.magmoms])\n```\nWhat should replace [MASK] to correctly add the magnetic moment as a site property?",
+    "choices": {
+      "A": "A. append",
+      "B": "B. add_site_property",
+      "C": "C. set_charge",
+      "D": "D. set_oxidation_states"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/entries/entry_tools.py",
+    "question": "Code Source File: pymatgen/entries/entry_tools.py\nThe `remove_non_ground_states` function removes entries that are not ground states. What is the criteria for considering an entry as a ground state?\n\ndef remove_non_ground_states(self):\n    \"\"\"Removes all non-ground state entries, i.e., only keep the lowest energy\n    per atom entry at each [MASK].\n    \"\"\"\n    self.entries = self.ground_states",
+    "choices": {
+      "A": "A. system",
+      "B": "B. volume",
+      "C": "C. composition",
+      "D": "D. temperature"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/wulff.py",
+    "question": "Code Source File: pymatgen/analysis/wulff.py\n```python\n    def [MASK](self) -> dict[tuple, float]:\n        \"\"\"\n        Returns:\n            dict: {hkl: area_hkl/total area on wulff}.\n        \"\"\"\n        return {hkl: area / self.surface_area for hkl, area in self.miller_area_dict.items()}\n\n```\nWhat is the missing function name?",
+    "choices": {
+      "A": "A. surface_area_dict",
+      "B": "B. area_fraction",
+      "C": "C. area_fraction_dict",
+      "D": "D. total_area_dict"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/ext/matproj_legacy.py",
+    "question": "Code Source File: pymatgen/ext/matproj_legacy.py.\nWhat method is used to retrieve a list of Structure objects corresponding to a chemical system, formula, or materials_id?\n```python\n    def [MASK](self, chemsys_formula_id, final=True):\n        \"\"\"Get a list of Structures corresponding to a chemical system, formula,\n        or materials_id.\n```",
+    "choices": {
+      "A": "A. get_data",
+      "B": "B. get_structures",
+      "C": "C. return_structures",
+      "D": "D. retrieve_structures"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/cp2k/sets.py",
+    "question": "In pymatgen/io/cp2k/sets.py, which method is called to insert the SPINSPIN section into the FORCE_EVAL/PROPERTIES/LINRES path?\n```python\n    def activate_spinspin(self, **kwargs) -> None:\n        \"\"\"Calculate spin-spin coupling tensor. Requires localize.\"\"\"\n        if not self.check(\"force_eval/properties/linres/localize\"):\n            self.activate_localize()\n        self[\"FORCE_EVAL\"][\"PROPERTIES\"][\"LINRES\"].[MASK](Section(\"SPINSPIN\", **kwargs))\n\n```",
+    "choices": {
+      "A": "A. append",
+      "B": "B. insert",
+      "C": "C. add",
+      "D": "D. replace"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/pourbaix_diagram.py",
+    "question": "In pymatgen/analysis/pourbaix_diagram.py, what numpy function is used to find the maximum values along the first axis (axis=0) of the `vecs` array (specifically the first three columns)?\n```python\n        vecs = self._convert_entries_to_points(min_entries)\n        maxes = np.[MASK](vecs[:, :3], axis=0)\n```",
+    "choices": {
+      "A": "A. sum",
+      "B": "B. min",
+      "C": "C. mean",
+      "D": "D. max"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/io/babel.py",
+    "question": "In pymatgen/io/babel.py, if the provided forcefield is not found, the code issues a warning and resets the forcefield type using `openbabel.OBForceField.[MASK](\"mmff94\")`. What should replace [MASK]?\n        ```python\n        if ff == 0:\n            warnings.warn(\n                f\"This input {forcefield=} is not supported \"\n                \"in openbabel. The forcefield will be reset as \"\n                \"default 'mmff94' for now.\"\n            )\n            ff = openbabel.OBForceField.FindType(\"mmff94\")\n        ```",
+    "choices": {
+      "A": "A. FindType",
+      "B": "B. GetConformers",
+      "C": "C. FindForcefield",
+      "D": "D. GetType"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "pymatgen/io/pwmat/outputs.py",
+    "question": "Code Source File: pymatgen/io/pwmat/outputs.py\nWithin the list comprehension, what key is used to extract the total energy from each ionic step?\n\n    def e_tots(self) -> np.ndarray:\n        \"\"\"Total energies of each ionic step structures contained in MOVEMENT.\n\n        Returns:\n            np.ndarray: Total energy of of each ionic step structure,\n                with shape of (n_ionic_steps,).\n        \"\"\"\n        return np.array([step[[MASK]] for step in self.ionic_steps])",
+    "choices": {
+      "A": "A. total_energy",
+      "B": "B. energy",
+      "C": "C. e_tot",
+      "D": "D. etot"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/graphs.py",
+    "question": "Code Source File: pymatgen/analysis/graphs.py\n```python\n        original = [MASK].deepcopy(self)\n```\nWhat should replace [MASK]?",
+    "choices": {
+      "A": "A. copy",
+      "B": "B. deepcopy",
+      "C": "C. self",
+      "D": "D. original"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "pymatgen/phonon/plotter.py",
+    "question": "In the pymatgen/phonon/plotter.py file, what argument specifies the y-axis limits of the plot?\n```python\n    def save_plot_gs(\n        self,\n        filename: str | PathLike,\n        img_format: str = \"eps\",\n        ylim: float | None = None,\n        plot_ph_bs_with_gruneisen: bool = False,\n        **kwargs,\n    ) -> None:\n        self.get_plot_gs([MASK]=ylim, plot_ph_bs_with_gruneisen=plot_ph_bs_with_gruneisen, **kwargs)\n        plt.savefig(filename, format=img_format)\n        plt.close()\n```",
+    "choices": {
+      "A": "A. filename",
+      "B": "B. img_format",
+      "C": "C. ylim",
+      "D": "D. plot_ph_bs_with_gruneisen"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/entries/compatibility.py",
+    "question": "Code Source File: pymatgen/entries/compatibility.py\n```python\nclass MITAqueousCompatibility(CorrectionsList):\n    def __init__(\n        self,\n        compat_type: Literal[\"GGA\", \"Advanced\"] = \"Advanced\",\n        correct_peroxide: bool = True,\n        check_potcar_hash: bool = False,\n    ) -> None:\n        self.compat_type = compat_type\n        self.correct_peroxide = correct_peroxide\n        self.check_potcar_hash = check_potcar_hash\n        fp = f\"{MODULE_DIR}/MITCompatibility.yaml\"\n        super().__init__(\n            [\n                PotcarCorrection(MITRelaxSet, check_hash=check_potcar_hash),\n                GasCorrection(fp),\n                AnionCorrection(fp, correct_peroxide=correct_peroxide),\n                [MASK](fp, MITRelaxSet, compat_type),\n                AqueousCorrection(fp),\n            ]\n        )\n```\nWhich correction class is initialized with the `fp`, `MITRelaxSet`, and `compat_type` arguments?",
+    "choices": {
+      "A": "A. PotcarCorrection",
+      "B": "B. GasCorrection",
+      "C": "C. AnionCorrection",
+      "D": "D. UCorrection"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/util/string.py",
+    "question": "Code Source File: pymatgen/util/string.py\n```python\ndef latexify_spacegroup(spacegroup_symbol):\n    r\"\"\"Generate a latex formatted spacegroup. e.g. P2_1/c is converted to\n    P2$_{1}$/c and P-1 is converted to P$\\\\overline{1}$.\n\n    Note that SymmetryGroup now has a to_latex_string() method that may\n    be called instead.\n\n    Args:\n        spacegroup_symbol (str): A spacegroup symbol\n\n    Returns:\n        A latex formatted spacegroup with proper subscripts and overlines.\n    \"\"\"\n    sym = re.sub(r\"_(\\d+)\", r\"$_{\\1}$\", spacegroup_symbol)\n    return re.sub([MASK], r\"$\\\\overline{\\1}$\", sym)\n```\nWhat regular expression pattern should replace [MASK] to achieve the desired behavior?",
+    "choices": {
+      "A": "A. r\"_(\\d+)\"",
+      "B": "B. r\"-(\\d)\"",
+      "C": "C. r\"(\\d+)\"",
+      "D": "D. r\"(\\d)\""
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/electronic_structure/boltztrap2.py",
+    "question": "Code Source File: pymatgen/electronic_structure/boltztrap2.py\nThe following code snippet is given:\n```python\n        if isinstance(obj, Vasprun):\n            structure = obj.final_structure\n            nelect = obj.parameters[\"NELECT\"]\n            bs_obj = obj.[MASK]()\n```\nWhat should replace [MASK]?",
+    "choices": {
+      "A": "A. get_structure",
+      "B": "B. get_bandstructure",
+      "C": "C. get_band_structure",
+      "D": "D. band_structure"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/structure_prediction/dopant_predictor.py",
+    "question": "Code Source File: pymatgen/analysis/structure_prediction/dopant_predictor.py\n```python\n        cn_roman = _int_to_roman(cn)\n\n        try:\n            species_radius = species.[MASK](cn_roman)\n        except KeyError:\n            warnings.warn(f\"Shannon radius not found for {species} with coordination number {cn}.\\nSkipping...\")\n```\nWhat method should replace [MASK] to complete the code?",
+    "choices": {
+      "A": "A. get_shannon_radius",
+      "B": "B. shannon_radius",
+      "C": "C. get_radius",
+      "D": "D. shannon_radii"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "pymatgen/command_line/bader_caller.py",
+    "question": "In the file pymatgen/command_line/bader_caller.py, what is the argument type hint for the input 'atom_index' in the get_charge method?\n```python\n    def get_charge(self, atom_index: [MASK]) -> float:\n        \"\"\"Convenience method to get the charge on a particular atom. This is the \"raw\"\n        charge generated by the Bader program, not a partial atomic charge. If the cube file\n        is a spin-density file, then this will return the spin density per atom with\n        positive being spin up and negative being spin down.\n\n        Args:\n            atom_index (int): Index of atom.\n\n        Returns:\n            float: Charge associated with atom from the Bader analysis.\n        \"\"\"\n        return self.data[atom_index][\"charge\"]\n\n```",
+    "choices": {
+      "A": "A. str",
+      "B": "B. float",
+      "C": "C. int",
+      "D": "D. list"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/structure_matcher.py",
+    "question": "Consider the pymatgen/analysis/structure_matcher.py code. What is the correct name for the method masked as [MASK]?\n```python\nclass OccupancyComparator(AbstractComparator):\n\n    def are_equal(self, sp1, sp2) -> bool:\n\n        return set(sp1.element_composition.values()) == set(sp2.element_composition.values())\n\n    def [MASK](self, composition):\n\n        return 1\n\n```",
+    "choices": {
+      "A": "A. get_value",
+      "B": "B. get_hash",
+      "C": "C. get_code",
+      "D": "D. calculate_hash"
+    },
+    "correct_answer": "B"
+  }
+]

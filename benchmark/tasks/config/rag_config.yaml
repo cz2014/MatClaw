@@ -1,0 +1,11 @@
+# Task benchmark RAG configuration
+# RAG disabled for initial pure-LLM baseline
+
+enabled: false
+
+corpus:
+  - pymatgen
+  - atomate2
+
+# Number of results to return
+top_k: 5

@@ -1,0 +1,1322 @@
+[
+  {
+    "source_file": "pymatgen/analysis/pourbaix_diagram.py",
+    "question": "In Pymatgen's `pymatgen.analysis.pourbaix_diagram.py`, what assumption does the `__repr__` function of the `IonEntry` class make about the `composition` and `energy` attributes?",
+    "choices": {
+      "A": "A. They are calculated within the `__repr__` function itself.",
+      "B": "B. They are only present for stable ions.",
+      "C": "C. They are properly initialized before calling the function.",
+      "D": "D. They are always in SI units."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/core/units.py",
+    "question": "In Pymatgen's `pymatgen.core.units.py`, what happens if the `supported_units` function is called on an `ArrayWithUnit` object where the `unit_type` attribute is `None`?",
+    "choices": {
+      "A": "A. It returns an empty dictionary.",
+      "B": "B. It returns a dictionary of default units.",
+      "C": "C. It raises a RuntimeError.",
+      "D": "D. It returns None."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/res.py",
+    "question": "Within Pymatgen's `pymatgen/io/res.py` module, if 'isd' (integrated spin density) is not present in the `entry.data` dictionary during the execution of `_res_from_entry`, what value is assigned to it?",
+    "choices": {
+      "A": "A. None",
+      "B": "B. An empty string \"\"",
+      "C": "C. 1.0",
+      "D": "D. 0.0"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/utils/chemenv_errors.py",
+    "question": "Why is it important to provide meaningful values for `cls`, `method`, and `msg` when raising a `ChemenvError` in the `pymatgen.analysis.chemenv.utils` module?",
+    "choices": {
+      "A": "A. To ensure the error is automatically corrected.",
+      "B": "B. To aid in debugging by clearly identifying the source and nature of the error.",
+      "C": "C. To prevent the program from crashing.",
+      "D": "D. To automatically generate a report for the developers."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/chemenv_strategies.py",
+    "question": "Within the `__str__` method of the `AbstractChemenvStrategy` class in `pymatgen.analysis.chemenv.coordination_environments.chemenv_strategies.py`, how are the values of the strategy's options accessed?",
+    "choices": {
+      "A": "A. Through direct access to the `_options` dictionary.",
+      "B": "B. Using the `get_option` method, which retrieves values from a protected attribute.",
+      "C": "C. By dynamically accessing the values using the `getattr` function.",
+      "D": "D. Through a database lookup based on the option name."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/molecule_matcher.py",
+    "question": "In the pymatgen.analysis.molecule_matcher module, the GeneticOrderMatcher class requires what condition to be met before generating permutations of atom order?",
+    "choices": {
+      "A": "A. The molecules must have the same number of atoms.",
+      "B": "B. The molecules must have the same number of atoms from the same species.",
+      "C": "C. The molecules must have the same number of atoms and a similar overall charge.",
+      "D": "D. The molecules must have the same number of atoms and be of the same symmetry group."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/surface_analysis.py",
+    "question": "In Pymatgen's `pymatgen.analysis.surface_analysis` module, what is the role of the `**kwargs` parameter in the `from_computed_structure_entry` function?",
+    "choices": {
+      "A": "A. To specify the output file format for the SlabEntry.",
+      "B": "B. To pass additional arguments to the SlabEntry constructor.",
+      "C": "C. To define the convergence criteria for the energy calculation.",
+      "D": "D. To control the verbosity of the function's output."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/transformations/advanced_transformations.py",
+    "question": "In Pymatgen's `pymatgen/transformations/advanced_transformations.py`, what is the purpose of the `_add_dummy_species` function?",
+    "choices": {
+      "A": "A. To remove disordered species from a structure.",
+      "B": "B. To add disordered DummySpecies to a structure based on provided order parameter constraints.",
+      "C": "C. To order the species in a structure.",
+      "D": "D. To calculate the magnetic ordering of a structure."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/aims/parsers.py",
+    "question": "Within Pymatgen's `pymatgen/io/aims/parsers.py`, if the `get_lines` function receives a string containing \"  line1\\nline2   \\n line3 \", what will be the content of the returned list?",
+    "choices": {
+      "A": "A. [\"  line1\", \"line2   \", \" line3 \"]",
+      "B": "B. [\"line1\", \"line2\", \"line3\"]",
+      "C": "C. [\" line1\", \"line2 \", \"line3\"]",
+      "D": "D. [\"line1\\n\", \"line2\\n\", \"line3\"]"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/core/tensors.py",
+    "question": "In Pymatgen's `pymatgen/core/tensors.py`, what data type is expected as the output of the `voigt` method?",
+    "choices": {
+      "A": "A. A single NumPy array representing the combined Voigt forms.",
+      "B": "B. A dictionary mapping tensor indices to their corresponding Voigt forms.",
+      "C": "C. A list of NumPy arrays, where each array represents the Voigt form of a tensor.",
+      "D": "D. A string representation of the Voigt forms."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/core/tensors.py",
+    "question": "Consider a tensor `A` and a tolerance `tol`. If `pymatgen.core.tensors.is_symmetric(A, tol)` returns `False`, what does this indicate?",
+    "choices": {
+      "A": "A. The tensor `A` is perfectly anti-symmetric.",
+      "B": "B. The tensor `A` is not symmetric within the specified tolerance `tol`.",
+      "C": "C. The tensor `A` has a determinant of zero.",
+      "D": "D. The tolerance `tol` value is too large."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/fragmenter.py",
+    "question": "In pymatgen.analysis.fragmenter, which scenario would warrant setting the `assume_previous_thoroughness` parameter to False when initializing a Fragmenter object?",
+    "choices": {
+      "A": "A. When the `prev_unique_frag_dict` contains all possible fragments, including the parent molecule.",
+      "B": "B. When dealing with a large number of molecules that share common fragments.",
+      "C": "C. When the `prev_unique_frag_dict` does not contain all subfragments of its molecules.",
+      "D": "D. When the molecule being fragmented does not contain any rings."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/coordination_geometries.py",
+    "question": "In Pymatgen's `pymatgen/analysis/chemenv/coordination_environments/coordination_geometries.py`, what does the `get_name` function primarily return?",
+    "choices": {
+      "A": "A. A numerical representation of the coordination environment's symmetry.",
+      "B": "B. The string representing the name of the coordination geometry.",
+      "C": "C. A list of all possible coordination geometries.",
+      "D": "D. The number of atoms coordinated to the central atom."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/chemenv_strategies.py",
+    "question": "In pymatgen.analysis.chemenv.coordination_environments.chemenv_strategies.py, what is the recommended approach for implementing the `get_site_neighbors` method in a class that inherits from `WeightedNbSetChemenvStrategy`?",
+    "choices": {
+      "A": "A. Directly modify the `WeightedNbSetChemenvStrategy` class.",
+      "B": "B. Override the method in the subclass to provide a specific implementation.",
+      "C": "C. Use the default implementation provided by `WeightedNbSetChemenvStrategy`.",
+      "D": "D. Import the `get_site_neighbors` method from another module."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/electronic_structure/bandstructure.py",
+    "question": "Within the context of the `apply_scissor` function in Pymatgen's `pymatgen/electronic_structure/bandstructure.py`, what role does the `as_dict` method play in modifying the band structure?",
+    "choices": {
+      "A": "A. It calculates the scissor operator needed to adjust the band gap.",
+      "B": "B. It creates a modifiable dictionary representation of the band structure for energy adjustment.",
+      "C": "C. It directly modifies the `BandStructureSymmLine` object, applying the scissor operator in place.",
+      "D": "D. It visualizes the band structure before and after the scissor operator is applied."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/core/ion.py",
+    "question": "The `reduced_formula` method in `pymatgen.core.ion` relies on another method named `get_reduced_formula_and_factor`. What is the purpose of the 'factor' returned by this method?",
+    "choices": {
+      "A": "A. It represents the ionic radius of the ion.",
+      "B": "B. It is a multiplicative factor used for normalizing the charge and formula.",
+      "C": "C. It indicates the number of atoms in the ion.",
+      "D": "D. It is the electronegativity of the ion."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/defects/corrections/kumagai.py",
+    "question": "In `pymatgen.analysis.defects.corrections.kumagai`, what is the primary purpose of the `get_efnv_correction` function?",
+    "choices": {
+      "A": "A. To calculate the ground state energy of a defect.",
+      "B": "B. To correct for the finite size effects in defect calculations.",
+      "C": "C. To determine the charge state of a defect.",
+      "D": "D. To optimize the geometry of a defect structure."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/aims/parsers.py",
+    "question": "In Pymatgen's `pymatgen/io/aims/parsers.py`, what is the return value of the `stress` function if neither \"Analytical stress tensor - Symmetrized\" nor \"Numerical stress tensor\" is found in the aims.out file?",
+    "choices": {
+      "A": "A. An empty NumPy array.",
+      "B": "B. A NumPy array filled with zeros.",
+      "C": "C. None.",
+      "D": "D. An error message string."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/coordination_geometries.py",
+    "question": "In Pymatgen's `pymatgen/analysis/chemenv/coordination_environments/coordination_geometries.py`, what is the data type of the `name` parameter expected by the `get_geometry_from_name` function?",
+    "choices": {
+      "A": "A. List",
+      "B": "B. Integer",
+      "C": "C. String",
+      "D": "D. Tuple"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/phonon/ir_spectra.py",
+    "question": "In Pymatgen's `pymatgen.phonon.ir_spectra` module, which input parameter is NOT required when initializing an `IRDielectricTensor` object?",
+    "choices": {
+      "A": "A. The electronic susceptibility (epsilon infinity).",
+      "B": "B. The oscillator strengths.",
+      "C": "C. The phonon frequencies at the Gamma point.",
+      "D": "D. The reciprocal lattice vectors."
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/io/res.py",
+    "question": "When using the `structure_to_str` function from `pymatgen.io.res`, what is the ultimate data type of the output?",
+    "choices": {
+      "A": "A. A pymatgen Res object.",
+      "B": "B. A Python dictionary.",
+      "C": "C. A string representing the RES file content.",
+      "D": "D. A file object."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/entries/computed_entries.py",
+    "question": "In Pymatgen's `computed_entries.py`, what does the `correction` attribute represent in the context of the `energy` function?",
+    "choices": {
+      "A": "A. The total energy of the constituent elements.",
+      "B": "B. The error associated with the calculation method.",
+      "C": "C. The energy adjustments applied to the uncorrected energy.",
+      "D": "D. The kinetic energy of the atoms in the structure."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/transition_state.py",
+    "question": "In Pymatgen's `pymatgen/analysis/transition_state.py`, which method is used to combine two `CubicSpline` objects when the `\"saddle_point\"` option is set to `\"zero_slope\"` in the `setup_spline` function?",
+    "choices": {
+      "A": "A. `concatenate`",
+      "B": "B. `merge`",
+      "C": "C. `extend`",
+      "D": "D. `join`"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/aims/inputs.py",
+    "question": "Within Pymatgen's `pymatgen/io/aims/inputs.py`, what is the purpose of creating a `site_props` dictionary in the `from_str` method?",
+    "choices": {
+      "A": "A. To store the total charge and magnetic moment of the entire structure.",
+      "B": "B. To store the lattice vectors of the structure.",
+      "C": "C. To store properties associated with each atomic site, such as magnetic moment and charge.",
+      "D": "D. To store the species and coordinates of the atoms."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/cp2k/sets.py",
+    "question": "In Pymatgen's `pymatgen.io.cp2k.sets.HybridRelaxSet`, what is the primary purpose of this class?",
+    "choices": {
+      "A": "A. To perform molecular dynamics simulations using CP2K.",
+      "B": "B. To simplify the creation of CP2K input sets for hybrid DFT geometry relaxation calculations.",
+      "C": "C. To analyze the output files generated by CP2K calculations.",
+      "D": "D. To create pseudopotentials for CP2K calculations."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/res.py",
+    "question": "Within the `as_dict` method of Pymatgen's `AirssProvider` class in `pymatgen/io/res.py`, how is the structure information incorporated into the resulting dictionary when `verbose` is `False`?",
+    "choices": {
+      "A": "A. By directly assigning the `structure` attribute to the 'structure' key.",
+      "B": "B. By calling the `__str__` method of the `structure` attribute and assigning the result to the 'structure' key.",
+      "C": "C. By calling the `as_dict` method of the `structure` attribute and assigning the result to the 'structure' key.",
+      "D": "D. By accessing the `lattice` attribute of the structure and converting it to a dictionary."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/graphs.py",
+    "question": "In `pymatgen.analysis.graphs.StructureGraph`, what information, besides the structure itself, is included in the string representation generated by `__repr__`?",
+    "choices": {
+      "A": "A. The total energy of the structure.",
+      "B": "B. The graph's name and a formatted representation of its edges.",
+      "C": "C. The structure's space group symmetry operations.",
+      "D": "D. The CPU time used to generate the StructureGraph."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/voronoi.py",
+    "question": "In the pymatgen.analysis.chemenv.coordination_environments.voronoi module, what is the primary purpose of the `__eq__` method in the `DetailedVoronoiContainer` class?",
+    "choices": {
+      "A": "A. To calculate the Voronoi polyhedra of a structure.",
+      "B": "B. To determine if two `DetailedVoronoiContainer` objects are equivalent based on predefined attributes.",
+      "C": "C. To normalize the distances and angles within a Voronoi polyhedron.",
+      "D": "D. To validate the crystal structure associated with the Voronoi container."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/cp2k/utils.py",
+    "question": "In Pymatgen's `pymatgen/io/cp2k/utils.py`, how are the lines within each identified chunk combined by the `chunk` function?",
+    "choices": {
+      "A": "A. They are concatenated directly without any separator.",
+      "B": "B. They are joined using a comma (',') as a separator.",
+      "C": "C. They are joined using a newline character ('\\n') as a separator.",
+      "D": "D. They are joined using a space (' ') as a separator."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/surface_analysis.py",
+    "question": "In Pymatgen's `surface_analysis` module, how is the surface area of a slab calculated using the `surface_area` function?",
+    "choices": {
+      "A": "A. By summing the areas of all the facets exposed on the surface.",
+      "B": "B. By calculating the magnitude of the sum of the first two lattice vectors.",
+      "C": "C. By calculating the magnitude of the cross product of the first two lattice vectors.",
+      "D": "D. By using the volume of the slab divided by its thickness."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/transformations/site_transformations.py",
+    "question": "What is the expected output of the `_enumerate_ordering` function in the pymatgen.transformations.site_transformations module?",
+    "choices": {
+      "A": "A. A single `Structure` object representing the lowest energy ordering.",
+      "B": "B. A list of `Structure` objects, each representing a unique possible ordering of the partially disordered structure along with the transformation applied.",
+      "C": "C. A dictionary containing the energies of all possible orderings.",
+      "D": "D. A report summarizing the symmetry analysis of the structure."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/vasp/inputs.py",
+    "question": "Within pymatgen.io.vasp.inputs, the OrbitalDescription NamedTuple is used within the PotcarSingle class. What is the primary purpose of including OrbitalDescription objects in the PotcarSingle instance?",
+    "choices": {
+      "A": "A. To optimize the electronic band structure calculation.",
+      "B": "B. To store and represent orbital information extracted from the POTCAR file.",
+      "C": "C. To define the symmetry operations of the crystal.",
+      "D": "D. To calculate the Madelung energy of the system."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/eos.py",
+    "question": "When utilizing the `get_rms` function in `pymatgen.analysis.eos`, what NumPy function is used to calculate the square root of the mean squared difference?",
+    "choices": {
+      "A": "A. np.mean()",
+      "B": "B. np.sum()",
+      "C": "C. np.sqrt()",
+      "D": "D. np.square()"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/abinit/inputs.py",
+    "question": "Which of the following best describes the nature of the `T` class within `pymatgen.io.abinit.inputs`?",
+    "choices": {
+      "A": "A. A standard Python list.",
+      "B": "B. A subclass of the Python `dict`.",
+      "C": "C. A `NamedTuple`.",
+      "D": "D. A custom-defined class for handling file I/O."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/cp2k/outputs.py",
+    "question": "Regarding the `band_structure` function from `pymatgen.io.cp2k.outputs`, which of the following statements is TRUE about its parameters?",
+    "choices": {
+      "A": "A. It requires the filename of the CP2K output file as a parameter.",
+      "B": "B. It requires the Fermi level as a parameter.",
+      "C": "C. It requires the symmetry operations of the crystal as a parameter.",
+      "D": "D. It takes no parameters."
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/util/testing/aims.py",
+    "question": "In the `pymatgen.util.testing.aims` module, the `check_band` function is primarily designed to compare lines that:",
+    "choices": {
+      "A": "A. Contain general text strings from different files.",
+      "B": "B. Represent atomic coordinates in crystal structures.",
+      "C": "C. Include band structure data with numerical values and trailing identifiers.",
+      "D": "D. Describe the computational resources used in a simulation."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/core/spectrum.py",
+    "question": "In the `pymatgen.core.spectrum` module, if `self.XLABEL` is \"Frequency\", what would be the result of calling `instance.FrEqUeNcY` on an instance of the class, assuming the attribute exists?",
+    "choices": {
+      "A": "A. Raises an AttributeError because of the capitalization.",
+      "B": "B. Returns the value of `self.x`.",
+      "C": "C. Returns the string \"Frequency\".",
+      "D": "D. Returns the value of `self.y`."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/symmetry/analyzer.py",
+    "question": "In pymatgen's `symmetry.analyzer.SpacegroupAnalyzer`, what is the primary purpose of the `symprec` parameter?",
+    "choices": {
+      "A": "A. To define the maximum allowed deviation in atomic positions when determining symmetry.",
+      "B": "B. To define the precision with which fractional coordinates are stored.",
+      "C": "C. To define the precision with which bond lengths are calculated.",
+      "D": "D. To define the tolerance for determining if two sites are symmetrically equivalent."
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "pymatgen/analysis/local_env.py",
+    "question": "How is the `NNData` class, found in Pymatgen's `pymatgen.analysis.local_env` module, designed in terms of mutability?",
+    "choices": {
+      "A": "A. It is mutable, allowing for dynamic modification of near-neighbor data.",
+      "B": "B. It is immutable, ensuring that the near-neighbor data remains consistent after computation.",
+      "C": "C. It is partially mutable, allowing modification of certain attributes but not others.",
+      "D": "D. Its mutability depends on the specific algorithm used for near-neighbor determination."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/vasp/inputs.py",
+    "question": "In Pymatgen's `pymatgen/io/vasp/inputs.py` module, what role does the `from_str` method of the `Kpoints` class play in relation to the `automatic` function?",
+    "choices": {
+      "A": "A. It directly calculates the number of subdivisions based on the input structure.",
+      "B": "B. It calls the `automatic` function after parsing the KPOINTS file to extract the number of subdivisions.",
+      "C": "C. It defines the default values for the `Kpoints` object if the `automatic` function is not used.",
+      "D": "D. It optimizes the k-point grid generated by the `automatic` function for specific materials."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/core/surface.py",
+    "question": "In the `pymatgen.core.surface.hkl_transformation` function, what is the role of the greatest common divisor (GCD) in the transformation process?",
+    "choices": {
+      "A": "A. It is used to normalize the transformation matrix before applying it to the Miller index.",
+      "B": "B. It is used to find the smallest possible integer representation of the transformed Miller index by dividing each element by the GCD.",
+      "C": "C. It is used to determine the reciprocal lattice vectors needed for the transformation.",
+      "D": "D. It is used to identify symmetrically equivalent Miller indices."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/common.py",
+    "question": "Within the VolumetricData class in pymatgen.io.common.py, how is the total number of grid points (ngridpts) calculated?",
+    "choices": {
+      "A": "A. It is read directly from the structure object.",
+      "B": "B. It is calculated as the sum of the dimensions of the volumetric data.",
+      "C": "C. It is determined by the length of the xpoints, ypoints, and zpoints arrays.",
+      "D": "D. It is calculated as the product of the dimensions of the volumetric data."
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/io/abinit/inputs.py",
+    "question": "In Pymatgen's `pymatgen/io/abinit/inputs.py`, what data structure does the `to_abivars` method of an AbiVariable object ideally return?",
+    "choices": {
+      "A": "A. A string containing the Abinit input code.",
+      "B": "B. A list of AbiVariable objects.",
+      "C": "C. A dictionary of variables.",
+      "D": "D. A boolean value indicating success or failure."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/defects/thermo.py",
+    "question": "In Pymatgen's `pymatgen.analysis.defects.thermo` module, what type of object is expected as the 'entry' parameter for the `get_interp_en` function?",
+    "choices": {
+      "A": "A. Structure object",
+      "B": "B. ComputedEntry object",
+      "C": "C. PeriodicSite object",
+      "D": "D. Lattice object"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/core/structure.py",
+    "question": "When using the `operate_site` function in pymatgen.core.structure, what happens to the properties of the input `Site` object?",
+    "choices": {
+      "A": "A. The properties are discarded and not included in the new Site object.",
+      "B": "B. The properties are modified based on the symmetry operation applied.",
+      "C": "C. The properties are passed directly to the new Site object without modification.",
+      "D": "D. The properties are only passed to the new Site object if they are relevant to the symmetry operation."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/core/sites.py",
+    "question": "What is the primary purpose of the `cast` function (from the `typing` module) used within the `species` function in `pymatgen.core.sites`?",
+    "choices": {
+      "A": "A. To convert the site coordinates to a different coordinate system.",
+      "B": "B. To ensure the returned value is of the expected type (`Composition`).",
+      "C": "C. To calculate the composition of the surrounding atoms.",
+      "D": "D. To validate the input parameters of the `species` function."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/chemenv_strategies.py",
+    "question": "In Pymatgen's `pymatgen/analysis/chemenv/coordination_environments/chemenv_strategies.py`, under what condition is the `angninvndist` function used to calculate weights in the `NormalizedAngleDistanceNbSetWeight` class?",
+    "choices": {
+      "A": "A. When both `aa` and `bb` are equal to 0.",
+      "B": "B. When either `aa` or `bb` is equal to 1.",
+      "C": "C. When both `aa` and `bb` are neither 0 nor 1.",
+      "D": "D. When `aa` is greater than `bb`."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/packmol.py",
+    "question": "In Pymatgen's `pymatgen.io.packmol.PackmolBoxGen`, if the `box` argument is not provided to the `get_input_set` method, how does the code determine the box dimensions?",
+    "choices": {
+      "A": "A. It uses a default box size of 10x10x10 \u00c5\u00b3.",
+      "B": "B. It raises an error, requiring the user to provide box dimensions.",
+      "C": "C. It estimates the required box size based on the volumes of the provided molecules.",
+      "D": "D. It reads the box dimensions from a configuration file."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/transformations/standard_transformations.py",
+    "question": "Pymatgen's `OxidationStateRemovalTransformation` (from `pymatgen/transformations/standard_transformations.py`) would affect which aspect of the structure output shown in the example?",
+    "choices": {
+      "A": "A. The space group of the structure.",
+      "B": "B. The lattice parameters (abc and angles).",
+      "C": "C. The fractional coordinates of the sites.",
+      "D": "D. It would not change the output itself as the output does not show oxidation states."
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/chemenv_strategies.py",
+    "question": "In pymatgen.analysis.chemenv.coordination_environments.chemenv_strategies.py, which of the following attributes are compared by the `__eq__` method of the `WeightedNbSetChemenvStrategy` class to determine equality?",
+    "choices": {
+      "A": "A. `_additional_condition`, `symmetry_measure_type`, `nb_set_weights`, and `ce_estimator`",
+      "B": "B. Only `nb_set_weights` and `ce_estimator`",
+      "C": "C. Only `symmetry_measure_type`",
+      "D": "D. Only `_additional_condition`"
+    },
+    "correct_answer": "A"
+  },
+  {
+    "source_file": "pymatgen/analysis/reaction_calculator.py",
+    "question": "What is the purpose of the `all_entries` property within the `ComputedReaction` class in Pymatgen's `reaction_calculator.py` module?",
+    "choices": {
+      "A": "A. To return a list of all unique chemical species involved in the reaction, without duplicates.",
+      "B": "B. To return a list of all `ComputedEntry` objects in the reaction, maintaining the same order as the coefficients in the underlying `Reaction` object.",
+      "C": "C. To return a dictionary mapping each chemical species to its corresponding `ComputedEntry` object.",
+      "D": "D. To return a list of chemical formulas for all reactants and products."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/vasp/inputs.py",
+    "question": "In `pymatgen.io.vasp.inputs.PotcarSingle`, what warning is issued if the POTCAR data is not recognized as valid?",
+    "choices": {
+      "A": "A. InvalidPotcarError",
+      "B": "B. PotcarWarning",
+      "C": "C. UnknownPotcarWarning",
+      "D": "D. DeprecatedPotcarWarning"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/res.py",
+    "question": "When using Pymatgen's `pymatgen/io/res.py` to convert a `ComputedStructureEntry` to a res file format string and back, what aspects of the original entry are NOT guaranteed to be perfectly preserved?",
+    "choices": {
+      "A": "A. The lattice parameters.",
+      "B": "B. The atomic positions.",
+      "C": "C. Whitespace, float precision, and REM entries.",
+      "D": "D. The chemical symbols of the atoms."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/phonon/bandstructure.py",
+    "question": "In Pymatgen's phonon.bandstructure module, what is the primary purpose of the `eigenvectors_from_displacements` function?",
+    "choices": {
+      "A": "A. To calculate the dynamical matrix from atomic displacements and masses.",
+      "B": "B. To scale atomic displacements by the square root of atomic masses to prepare for band connection estimation.",
+      "C": "C. To directly compute phonon frequencies from atomic displacements.",
+      "D": "D. To normalize the atomic displacements to unit vectors."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/abinit/pseudos.py",
+    "question": "Within pymatgen's io.abinit.pseudos module, if `_l2str = {1: \"p\", 2: \"d\", 3: \"f\"}`, what will `l2str(0)` return?",
+    "choices": {
+      "A": "A. \"s\"",
+      "B": "B. 0",
+      "C": "C. \"Unknown angular momentum, received l_ang_mom = 0\"",
+      "D": "D. An empty string"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/chempot_diagram.py",
+    "question": "In Pymatgen's `pymatgen/analysis/chempot_diagram.py`, how does the `_get_domains` function handle the calculation of the interior point for the `HalfspaceIntersection`?",
+    "choices": {
+      "A": "A. It uses a random number generator to select a point within the space.",
+      "B": "B. It calculates the average of all hyperplane intersections.",
+      "C": "C. It uses the minimum values from the `self.lims` array, offset by a small value to ensure it lies within the feasible region.",
+      "D": "D. It defaults to the origin (0, 0, ...) as the interior point."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/abinit/pseudos.py",
+    "question": "In pymatgen.io.abinit.pseudos, what are the supported formats for the `ppdesc.format` attribute that `paw_header` function accepts?",
+    "choices": {
+      "A": "A. \"paw1\", \"paw2\", \"paw3\"",
+      "B": "B. \"paw3\", \"paw4\", \"paw5\"",
+      "C": "C. \"paw5\", \"paw6\", \"paw7\"",
+      "D": "D. \"paw1\", \"paw3\", \"paw5\""
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/abinit/abitimer.py",
+    "question": "In Pymatgen's `pymatgen/io/abinit/abitimer.py`, what data structure is expected for `self.sections` within the `get_values` method?",
+    "choices": {
+      "A": "A. A dictionary where keys are section names and values are lists of attributes.",
+      "B": "B. A list of dictionaries or objects, where each element represents a section with associated attributes (or keys).",
+      "C": "C. A string containing comma-separated key-value pairs representing sections.",
+      "D": "D. A NumPy array where each row represents a section and each column represents an attribute."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/structure_environments.py",
+    "question": "In pymatgen.analysis.chemenv.coordination_environments.structure_environments, which of the following best describes the return type of the `get_csms` function?",
+    "choices": {
+      "A": "A. A single float representing the continuous symmetry measure.",
+      "B": "B. A dictionary mapping coordination environments to their continuous symmetry measures.",
+      "C": "C. A list of pymatgen.analysis.chemenv.utils.chemenv_errors.CSM objects.",
+      "D": "D. A string representation of the coordination environment."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/ext/matproj_legacy.py",
+    "question": "The `pymatgen.ext.matproj_legacy.submit_structures` function submits data using which intermediate data format?",
+    "choices": {
+      "A": "A. CIF (Crystallographic Information File)",
+      "B": "B. JSON (JavaScript Object Notation)",
+      "C": "C. StructureNL (Structure Notation Language)",
+      "D": "D. POSCAR (VASP input file format)"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/core/composition.py",
+    "question": "In Pymatgen's `Composition` class within the `pymatgen.core.composition` module, what is the primary purpose of the `copy` method?",
+    "choices": {
+      "A": "A. To create a deep copy of the element amounts, ensuring complete independence between the original and the copy.",
+      "B": "B. To generate a string representation of the composition.",
+      "C": "C. To create a new `Composition` object that duplicates the current instance, preserving its type and `allow_negative` attribute.",
+      "D": "D. To modify the original `Composition` object by adding or removing elements."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/elasticity/elastic.py",
+    "question": "In Pymatgen's elasticity module, the `homogeneous_poisson` function calculates the Poisson's ratio based on an assumption of which material property?",
+    "choices": {
+      "A": "A. Anisotropic behavior.",
+      "B": "B. Isotropic behavior.",
+      "C": "C. Plastic deformation.",
+      "D": "D. Temperature dependence."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/utils/chemenv_errors.py",
+    "question": "When does Python automatically call the `__str__` method defined in the `SolidAngleError` class in the `pymatgen.analysis.chemenv.utils.chemenv_errors` module?",
+    "choices": {
+      "A": "A. When the `SolidAngleError` object is created.",
+      "B": "B. Only when a specific error-handling function is called.",
+      "C": "C. When the `str()` function is used on a `SolidAngleError` object or the object is printed.",
+      "D": "D. When the `cosinus` attribute of the `SolidAngleError` object is accessed."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/chempot_diagram.py",
+    "question": "In Pymatgen's `pymatgen/analysis/chempot_diagram.py`, what happens when the input coordinates in `draw_domains` for `_get_3d_formula_lines` do not form a convex shape?",
+    "choices": {
+      "A": "A. The function automatically adjusts the coordinates to create a convex shape.",
+      "B": "B. The function uses a different algorithm to handle non-convex shapes.",
+      "C": "C. The ConvexHull calculation may fail.",
+      "D": "D. The function returns an empty list of Scatter3d objects."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/symmetry/analyzer.py",
+    "question": "In Pymatgen's symmetry.analyzer module, when the `_proc_sph_top` method determines that the main rotation axis of a spherical top molecule has an order of 3 and no mirror plane perpendicular to the main axis is found, what Schoenflies symbol is assigned?",
+    "choices": {
+      "A": "A. Td",
+      "B": "B. Th",
+      "C": "C. T",
+      "D": "D. O"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/vasp/inputs.py",
+    "question": "In Pymatgen's `pymatgen/io/vasp/inputs.py` module, what data type is the \"generation_style\" value cast to when creating a `Kpoints` object using the `from_dict` method?",
+    "choices": {
+      "A": "A. str",
+      "B": "B. int",
+      "C": "C. KpointsSupportedModes",
+      "D": "D. tuple"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/ext/optimade.py",
+    "question": "Within the `_get_snls_from_resource` function in Pymatgen's `pymatgen/ext/optimade.py`, how are custom or non-mandatory fields from the \"attributes\" section of the JSON data handled?",
+    "choices": {
+      "A": "A. They are discarded to reduce memory usage.",
+      "B": "B. They are stored in a separate database table.",
+      "C": "C. They are extracted into a `namespaced_data` dictionary within the `StructureNL` object.",
+      "D": "D. They are used to calculate derived properties of the structure."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/coordination_geometries.py",
+    "question": "Within the `AllCoordinationGeometries` class of `pymatgen.analysis.chemenv.coordination_environments.coordination_geometries`, what does the `get_implemented_geometries` method return when the `returned` argument is not specified and the `coordination` argument is set to `None`?",
+    "choices": {
+      "A": "A. An empty list.",
+      "B": "B. A list of mp_symbols of all implemented CoordinationGeometry objects.",
+      "C": "C. A list of all implemented CoordinationGeometry objects.",
+      "D": "D. A dictionary mapping coordination numbers to implemented geometries."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/cp2k/inputs.py",
+    "question": "In the `pymatgen.io.cp2k.inputs` module, if a `Keyword` object's `units` attribute is set to `None`, what will be the corresponding value for the \"units\" key in the dictionary returned by the `as_dict` method?",
+    "choices": {
+      "A": "A. An empty string: \"\"",
+      "B": "B. The string \"None\"",
+      "C": "C. The Python value `None`",
+      "D": "D. A default unit based on the keyword's `name`."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/core/structure.py",
+    "question": "In Pymatgen's `structure.py`, if `sites` is an instance of `SiteCollection`, how would you typically iterate through the `PeriodicSite` objects within it?",
+    "choices": {
+      "A": "A. `for site in sites.sites:`",
+      "B": "B. `for i in range(len(sites)): sites[i]`",
+      "C": "C. `for site in sites:`",
+      "D": "D. `sites.iterate(function(site) {})`"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/chemenv_strategies.py",
+    "question": "Within Pymatgen's `pymatgen/analysis/chemenv/coordination_environments/chemenv_strategies.py`, if both `delta_csm_mins` and `delta_csm_maxs` are set to `None` in the `delta_cn_specifics` function, how are the default `delta_csm_min` and `delta_csm_max` values calculated?",
+    "choices": {
+      "A": "A. They are set to a fixed constant value regardless of the coordination number.",
+      "B": "B. They are calculated based on a linear relationship with the coordination number (dcn), where delta_csm_min = 0.25 + dcn * 0.25 and delta_csm_max = 5.0 + dcn * 0.25.",
+      "C": "C. They are randomly generated within a predefined range.",
+      "D": "D. They are derived from a lookup table based on the element type of the central atom."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/core/tensors.py",
+    "question": "In Pymatgen's `pymatgen/core/tensors.py`, what is the primary function of the `round` method within the `TensorCollection` class?",
+    "choices": {
+      "A": "A. To modify the existing `TensorCollection` by rounding its tensors in place.",
+      "B": "B. To create a new `TensorCollection` containing rounded versions of the tensors in the original collection.",
+      "C": "C. To calculate the average value of all tensors within the `TensorCollection` and return a single rounded value.",
+      "D": "D. To apply a custom rounding function provided by the user to each tensor in the collection."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/lobster/inputs.py",
+    "question": "In Pymatgen's `pymatgen/io/lobster/inputs.py`, what type of method is `from_dict`?",
+    "choices": {
+      "A": "A. An instance method.",
+      "B": "B. A static method.",
+      "C": "C. A class method.",
+      "D": "D. An abstract method."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/vasp/outputs.py",
+    "question": "In `pymatgen.io.vasp.outputs`, what value is the `piezo_index` attribute of the `results` object set to by the `piezo_section_stop` function?",
+    "choices": {
+      "A": "A. 0",
+      "B": "B. 1",
+      "C": "C. False",
+      "D": "D. None"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/ext/matproj_legacy.py",
+    "question": "In Pymatgen's `pymatgen/ext/matproj_legacy.py`, what happens if a specific Miller index is provided to the `get_surface_data` function that is not found among the available surface data for the given material ID?",
+    "choices": {
+      "A": "A. The function returns an empty dictionary.",
+      "B": "B. The function returns data for all available surfaces.",
+      "C": "C. The function raises a ValueError.",
+      "D": "D. The function returns None."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/core/structure.py",
+    "question": "When using the `to` method in pymatgen.core.structure.Molecule, which argument takes precedence in determining the output format?",
+    "choices": {
+      "A": "A. The default format defined in the Pymatgen configuration file.",
+      "B": "B. The format specified by the `fmt` parameter.",
+      "C": "C. The format inferred from the filename extension, if provided.",
+      "D": "D. The format determined by the type of atoms in the molecule."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/structure_environments.py",
+    "question": "In `pymatgen.analysis.chemenv.coordination_environments.structure_environments`, if `self.all_nbs_sites` is a list and `self.all_nbs_sites_indices_unsorted` contains the integer `5`, what is the expected structure of `self.all_nbs_sites[5]`?",
+    "choices": {
+      "A": "A. A pymatgen Site object directly",
+      "B": "B. A list of pymatgen Site objects",
+      "C": "C. A dictionary with a \"site\" key pointing to a pymatgen Site object",
+      "D": "D. A tuple containing the site and its distance"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/feff/outputs.py",
+    "question": "In the `pymatgen.io.feff.outputs` module, what is the primary purpose of the `as_dict` method within the `Eels` class?",
+    "choices": {
+      "A": "A. To perform a calculation of the Electron Energy Loss Spectrum.",
+      "B": "B. To generate a string representation of the `Eels` object for human readability.",
+      "C": "C. To convert the `Eels` object into a dictionary suitable for serialization or data representation.",
+      "D": "D. To validate the data contained within the `Eels` object."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/structure_environments.py",
+    "question": "In Pymatgen's `pymatgen/analysis/chemenv/coordination_environments/structure_environments.py`, what is the direct output type of the `uniquely_determines_coordination_environments` method?",
+    "choices": {
+      "A": "A. A list of coordination environments.",
+      "B": "B. A string describing the coordination environment.",
+      "C": "C. A boolean value indicating uniqueness.",
+      "D": "D. A dictionary containing coordination environment information."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/electronic_structure/plotter.py",
+    "question": "Within the `pymatgen.electronic_structure.plotter` module, if `xlim` is not specified when calling the `save_plot` function, how are the x-axis limits determined?",
+    "choices": {
+      "A": "A. The x-axis limits are set to a default range of 0 to 1.",
+      "B": "B. The x-axis limits are determined by the `get_plot` method.",
+      "C": "C. The x-axis limits are determined automatically by matplotlib.",
+      "D": "D. The function will raise an error, requiring the user to define the limits."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/vasp/outputs.py",
+    "question": "In Pymatgen's `pymatgen/io/vasp/outputs.py` module, what is the significance of the `LEPSILON` tag in the INCAR file when used in conjunction with the `converged_electronic` method?",
+    "choices": {
+      "A": "A. It indicates a standard DFT run and allows the method to directly compare the number of electronic steps to the `NELM` parameter.",
+      "B": "B. It indicates a response function calculation, requiring a different approach to determine electronic convergence.",
+      "C": "C. It signifies that the calculation is spin-polarized, requiring a separate convergence check for each spin channel.",
+      "D": "D. It specifies the dielectric constant of the material, impacting the energy convergence criteria."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/cli/pmg.py",
+    "question": "Which pymatgen object is primarily used within the `pymatgen.cli.pmg.parse_view` function to read the crystal structure from a file?",
+    "choices": {
+      "A": "A. Lattice",
+      "B": "B. Structure",
+      "C": "C. Molecule",
+      "D": "D. Site"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/xps.py",
+    "question": "In the pymatgen.analysis.xps module, what data is used to weight the partial DOS (PDOS) when constructing the XPS spectrum using the `from_dos` function?",
+    "choices": {
+      "A": "A. The atomic masses of the elements.",
+      "B": "B. The Fermi energy of the material.",
+      "C": "C. Cross-sections for different elements and orbitals.",
+      "D": "D. The number of atoms of each element in the structure."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/ext/matproj_legacy.py",
+    "question": "Within Pymatgen's `pymatgen.ext.matproj_legacy` module, what does the `TaskType.GGAU_OPT` represent?",
+    "choices": {
+      "A": "A. GGA Static calculation.",
+      "B": "B. GGA+U Structure Optimization.",
+      "C": "C. GGA NSCF Line calculation.",
+      "D": "D. GGA+U Static Dielectric calculation."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/molecule_matcher.py",
+    "question": "Within the `pymatgen.analysis.molecule_matcher.GeneticOrderMatcher` class, the `__init__` method stores the number of atoms in the target molecule. Which attribute is used to store this value?",
+    "choices": {
+      "A": "A. target_size",
+      "B": "B. num_atoms",
+      "C": "C. N",
+      "D": "D. atom_count"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/diffraction/tem.py",
+    "question": "The `bragg_angles` function in Pymatgen's `pymatgen.analysis.diffraction.tem` module calculates Bragg angles. What is the order of diffraction (n) assumed in the calculation?",
+    "choices": {
+      "A": "A. n is determined by the wavelength of the X-rays.",
+      "B": "B. n = 2",
+      "C": "C. n = 0",
+      "D": "D. n = 1"
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/util/string.py",
+    "question": "If a `disordered_formula` function in `pymatgen.util.string` is used on a disordered structure containing two types of disordered sites, what will happen?",
+    "choices": {
+      "A": "A. The function will generate a formula string, combining both types of sites into one variable.",
+      "B": "B. The function will raise a ValueError.",
+      "C": "C. The function will generate a formula string for only the first disordered site encountered.",
+      "D": "D. The function will try to separate two disordered sites and generate two formula strings."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/aims/sets/bs.py",
+    "question": "In pymatgen.io.aims.sets.bs, what is the primary purpose of the `get_parameter_updates` function?",
+    "choices": {
+      "A": "A. To perform a full GW calculation.",
+      "B": "B. To generate the initial structure for the calculation.",
+      "C": "C. To determine and return updated parameters specifically for a GW calculation in FHI-aims.",
+      "D": "D. To visualize the band structure results after a GW calculation."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/vasp/outputs.py",
+    "question": "In pymatgen's `pymatgen/io/vasp/outputs.py`, what is the primary function of the regular expression defined by `header_pattern`?",
+    "choices": {
+      "A": "A. To extract the numerical values of the elastic tensor components.",
+      "B": "B. To validate the format of each row in the elastic tensor table.",
+      "C": "C. To locate the beginning of the elastic tensor data block within the OUTCAR file.",
+      "D": "D. To identify the units in which the elastic tensor is reported."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/abinit/inputs.py",
+    "question": "Within Pymatgen's `pymatgen/io/abinit/inputs.py`, where is the actual inclusion of the comment string into the output file handled?",
+    "choices": {
+      "A": "A. Directly within the `set_comment` method itself.",
+      "B": "B. In a separate validation routine that checks the comment for errors.",
+      "C": "C. Elsewhere in the class, likely during the file generation process.",
+      "D": "D. By a dedicated function that automatically translates the comment into a specific language."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/chemenv/coordination_environments/coordination_geometries.py",
+    "question": "In Pymatgen's `pymatgen/analysis/chemenv/coordination_environments/coordination_geometries.py` module, what data type is expected as the final result of the `edges` function?",
+    "choices": {
+      "A": "A. A list of tuples, where each tuple contains the indices of the vertices forming an edge.",
+      "B": "B. A list of lists, where each inner list represents an edge and contains the coordinates (NumPy arrays) of its end vertices.",
+      "C": "C. A dictionary where keys are edge indices and values are lists of coordinate pairs representing the edge.",
+      "D": "D. A NumPy array representing the adjacency matrix of the coordination geometry."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/molecule_matcher.py",
+    "question": "When using the `as_dict` method in `pymatgen.analysis.molecule_matcher`, what is the purpose of including the `\"version\"` key in the resulting dictionary?",
+    "choices": {
+      "A": "A. To indicate the version of the molecule being matched.",
+      "B": "B. To specify the version of the operating system being used.",
+      "C": "C. To track the revision number of the molecule matching algorithm.",
+      "D": "D. To record the version of the software used to perform the serialization."
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/command_line/critic2_caller.py",
+    "question": "Within the `pymatgen/command_line/critic2_caller.py` module, what is the role of the `zpsp` parameter in the `_annotate_structure_with_yt` function?",
+    "choices": {
+      "A": "A. It specifies the path to the pseudopotential files used in the Bader analysis.",
+      "B": "B. It maps element symbols to the number of valence electrons, enabling the calculation of charge transfer.",
+      "C": "C. It defines the k-point grid used for the electronic structure calculation.",
+      "D": "D. It provides information about the basis set used in the DFT calculation."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/electronic_structure/plotter.py",
+    "question": "Using Pymatgen's `pymatgen/electronic_structure/plotter.py`, what effect does setting the `stack` attribute to `True` in the `DosPlotter` have on the resulting plot?",
+    "choices": {
+      "A": "A. It normalizes the DOS plots to have the same area.",
+      "B": "B. It plots the DOS as a stacked area graph, showing the cumulative DOS.",
+      "C": "C. It sorts the DOS plots by their maximum value.",
+      "D": "D. It plots each DOS on a separate subplot."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/transformations/advanced_transformations.py",
+    "question": "Within `pymatgen/transformations/advanced_transformations.py`, how does the `rattle_std` parameter influence the atomic displacements in the `MonteCarloRattleTransformation`?",
+    "choices": {
+      "A": "A. It directly defines the maximum displacement allowed for any atom.",
+      "B": "B. It represents the average displacement of all atoms after the transformation.",
+      "C": "C. It specifies the standard deviation of the normal distribution from which random displacements are sampled.",
+      "D": "D. It sets the minimum displacement required for an atom to be considered \"rattled\"."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/core/sites.py",
+    "question": "In pymatgen.core.sites, what is the primary purpose of the `to_unit_cell` parameter within the `PeriodicSite`'s `__init__` method?",
+    "choices": {
+      "A": "A. To convert Cartesian coordinates to fractional coordinates.",
+      "B": "B. To ensure all fractional coordinates are within the range [0, 1), effectively translating them into the basic unit cell.",
+      "C": "C. To validate the species type provided as input.",
+      "D": "D. To assign properties to the site, such as magnetic moment."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/pourbaix_diagram.py",
+    "question": "In the `pymatgen.analysis.pourbaix_diagram` module, what is the role of `self.npH` in the `energy_at_conditions` function?",
+    "choices": {
+      "A": "A. It represents the standard free energy at pH=0 and V=0.",
+      "B": "B. It determines the voltage-dependent contribution to the free energy.",
+      "C": "C. It determines the pH-dependent contribution to the free energy.",
+      "D": "D. It is a normalization factor for the free energy."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/graphs.py",
+    "question": "In Pymatgen's `pymatgen.analysis.graphs.ConnectedSite`, what is the purpose of the `weight` attribute?",
+    "choices": {
+      "A": "A. To store the distance between connected sites, normalized by bond order.",
+      "B": "B. To represent the strength or probability of the connection between sites.",
+      "C": "C. To indicate whether the connection is covalent or ionic.",
+      "D": "D. To store the angle between three connected sites."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/transition_state.py",
+    "question": "What is the relationship between the `from_dir` and `from_outcars` methods in Pymatgen's `pymatgen.analysis.transition_state` module?",
+    "choices": {
+      "A": "A. `from_outcars` is used to determine the reaction coordinate, while `from_dir` constructs the NEBAnalysis object.",
+      "B": "B. `from_dir` calls `from_outcars` after collecting data to construct the `NEBAnalysis` object.",
+      "C": "C. `from_dir` and `from_outcars` are interchangeable methods that perform the same function.",
+      "D": "D. `from_outcars` calls `from_dir` to locate the OUTCAR files needed for the NEB analysis."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/aims/parsers.py",
+    "question": "In the pymatgen.io.aims.parsers module, how does the `converged` property of an `AimsOutCalcChunk` determine if the calculation has finished successfully?",
+    "choices": {
+      "A": "A. By checking if the total energy has reached a minimum value.",
+      "B": "B. By verifying that the forces on all atoms are below a certain threshold.",
+      "C": "C. By analyzing the band structure to confirm the electronic structure is stable.",
+      "D": "D. By searching for the \"Have a nice day.\" message in the output file chunk."
+    },
+    "correct_answer": "D"
+  },
+  {
+    "source_file": "pymatgen/core/structure.py",
+    "question": "Which module's adaptor is used when the `mode` parameter in `pymatgen.core.structure.get_orderings` starts with \"enum\"?",
+    "choices": {
+      "A": "A. `pymatgen.command_line.mcsqs_caller`",
+      "B": "B. `pymatgen.command_line.enumlib_caller`",
+      "C": "C. `pymatgen.core.structure`",
+      "D": "D. `pymatgen.analysis.structure_matcher`"
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/vasp/sets.py",
+    "question": "In the `pymatgen.io.vasp.sets` module, what is the primary purpose of the `get_vasp_input` function?",
+    "choices": {
+      "A": "A. To modify an existing VASP input file.",
+      "B": "B. To generate a complete set of VASP input files represented as a `VaspInput` object.",
+      "C": "C. To extract energy data from a VASP output file.",
+      "D": "D. To visualize the crystal structure defined in a VASP POSCAR file."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/vasp/inputs.py",
+    "question": "In Pymatgen's `pymatgen/io/vasp/inputs.py`, what type of copy does the `copy` method of the `PotcarSingle` object perform on the `data` attribute?",
+    "choices": {
+      "A": "A. Deep copy, creating completely independent copies of all nested objects.",
+      "B": "B. Shallow copy, where changes to mutable objects within `data` affect both the original and copied objects.",
+      "C": "C. No copy is performed; the `data` attribute is passed by reference.",
+      "D": "D. A new copy is created only if the `data` attribute is modified after the copy operation."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/symmetry/kpath.py",
+    "question": "In Pymatgen's `pymatgen.symmetry.kpath.py`, what factor might influence the final set of key points included in the IRBZ when using the `_get_IRBZ` function?",
+    "choices": {
+      "A": "A. The specific crystal structure being analyzed.",
+      "B": "B. The order in which rotation operations are processed in the `find_face_center` function.",
+      "C": "C. The total number of atoms in the unit cell.",
+      "D": "D. The temperature at which the crystal structure was determined."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/magnetism/analyzer.py",
+    "question": "Within the `_sanitize_input_structure` function in Pymatgen's `pymatgen.analysis.magnetism.analyzer` module, why is a copy of the input structure created before any modifications are made?",
+    "choices": {
+      "A": "A. To improve the performance of the sanitization process by operating on a temporary structure.",
+      "B": "B. To ensure the original input structure remains unchanged, preserving the user's initial data.",
+      "C": "C. To allow for parallel processing of multiple structure sanitizations simultaneously.",
+      "D": "D. To facilitate error recovery in case the sanitization process fails."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/entries/entry_tools.py",
+    "question": "In the context of `pymatgen.entries.entry_tools`, what is the primary purpose of the `ground_states` method, which is related to the `is_ground_state` method?",
+    "choices": {
+      "A": "A. To calculate the formation energy of an entry.",
+      "B": "B. To sort entries by their energy.",
+      "C": "C. To obtain the set of ground state entries, used to determine if a given entry is a ground state.",
+      "D": "D. To optimize the structure of an entry."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/wulff.py",
+    "question": "In the `pymatgen.analysis.wulff.py` module, what data structure is directly used by the `surface_area` method to accumulate the areas associated with different Miller indices?",
+    "choices": {
+      "A": "A. A list of tuples containing Miller indices and their corresponding areas.",
+      "B": "B. A NumPy array where each element represents the area of a specific Miller index.",
+      "C": "C. A dictionary mapping Miller indices to their respective areas.",
+      "D": "D. A set of Miller indices, where the area is implicitly stored as a property of each index."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/ext/matproj_legacy.py",
+    "question": "In pymatgen's `pymatgen.ext.matproj_legacy` module, what type of object does the `get_exp_entry` function primarily return?",
+    "choices": {
+      "A": "A. A dictionary containing experimental data.",
+      "B": "B. An `ExpEntry` object representing experimental data.",
+      "C": "C. A `ComputedEntry` object derived from experimental data.",
+      "D": "D. A list of `ThermoData` objects."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/io/cp2k/sets.py",
+    "question": "In the `pymatgen/io/cp2k/sets.py` module, what is the primary purpose of initializing the `HybridStaticSet` class?",
+    "choices": {
+      "A": "A. To perform a geometry optimization on the provided structure.",
+      "B": "B. To set up and execute a hybrid DFT calculation for energy and force determination.",
+      "C": "C. To create a standard DFT calculation without hybrid functionals.",
+      "D": "D. To generate a visual representation of the crystal structure."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/pourbaix_diagram.py",
+    "question": "In Pymatgen's `pourbaix_diagram.py` module, under what condition is the `_preprocess_pourbaix_entries` method called within the `__init__` method of the `PourbaixDiagram` class?",
+    "choices": {
+      "A": "A. When filter_solids is set to False.",
+      "B": "B. When a conc_dict is provided.",
+      "C": "C. When the comp_dict contains more than one element.",
+      "D": "D. When the input entries are MultiEntry objects."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/common.py",
+    "question": "In Pymatgen's `pymatgen/io/common.py`, if `vol1` and `vol2` are VolumetricData objects, what operation effectively occurs when executing `vol3 = vol1 - vol2`?",
+    "choices": {
+      "A": "A. `vol3.data[k] = vol2.data[k] - vol1.data[k]` for each key k.",
+      "B": "B. `vol3.data[k] = abs(vol1.data[k] - vol2.data[k])` for each key k.",
+      "C": "C. `vol3.data[k] = vol1.data[k] - vol2.data[k]` for each key k.",
+      "D": "D. `vol3.data[k] = vol1.data[k] + vol2.data[k]` for each key k."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/io/pwmat/outputs.py",
+    "question": "Within the `OutFermi` class in `pymatgen.io.pwmat.outputs`, how is the Fermi energy value stored after being extracted from the file?",
+    "choices": {
+      "A": "A. As a string in the `fermi_energy` attribute.",
+      "B": "B. As a float in the `_e_fermi` attribute, rounded to three decimal places.",
+      "C": "C. As an integer in the `e_fermi_int` attribute.",
+      "D": "D. As a complex number in the `fermi_complex` attribute."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/graphs.py",
+    "question": "When the `as_dict` function is called on a `MoleculeGraph` object (from `pymatgen.analysis.graphs`), what specific information about the molecular structure is included in the resulting dictionary?",
+    "choices": {
+      "A": "A. Only the atomic symbols of the constituent atoms.",
+      "B": "B. The complete molecular information, obtained by calling the `as_dict` method of the internal `molecule` object.",
+      "C": "C. Only the bond angles between atoms.",
+      "D": "D. The space group symmetry of the molecule."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/phonon/bandstructure.py",
+    "question": "Within Pymatgen's `pymatgen.phonon.bandstructure` module, how does the `get_gamma_point` method determine if a q-point is close to the Gamma point (0, 0, 0)?",
+    "choices": {
+      "A": "A. It uses a simple equality check (==) to compare the fractional coordinates.",
+      "B": "B. It calculates the Euclidean distance between the q-point and (0, 0, 0) and compares it to a tolerance.",
+      "C": "C. It uses the `np.allclose` function to compare the fractional coordinates, accounting for numerical inaccuracies.",
+      "D": "D. It checks if the label of the q-point is equal to '$\\\\Gamma$'."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/entries/compatibility.py",
+    "question": "The `MITAqueousCompatibility` class in `pymatgen.entries.compatibility` uses data from a specific file for certain corrections. What is the name of this file?",
+    "choices": {
+      "A": "A. MITRelaxSet.yaml",
+      "B": "B. AqueousCorrectionData.json",
+      "C": "C. MITCompatibility.yaml",
+      "D": "D. CorrectionParameters.txt"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/util/provenance.py",
+    "question": "In pymatgen.util.provenance, what is the primary purpose of the `from_dict` function?",
+    "choices": {
+      "A": "A. To convert an Author object into a dictionary.",
+      "B": "B. To validate if a dictionary contains author information.",
+      "C": "C. To create an Author object from a dictionary containing author's name and email.",
+      "D": "D. To parse a string representation of an author into an Author object."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/electronic_structure/boltztrap2.py",
+    "question": "Within the `BandstructureLoader` class in Pymatgen's `boltztrap2.py` module, which method is used to filter bands based on a specified energy range?",
+    "choices": {
+      "A": "A. `filter_bands`",
+      "B": "B. `set_energy_range`",
+      "C": "C. `bandana`",
+      "D": "D. `cut_bands`"
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/analysis/defects/finder.py",
+    "question": "In the `pymatgen.analysis.defects.finder` module, what type of object does the `get_defect_fpos` function return?",
+    "choices": {
+      "A": "A. A dictionary containing defect information.",
+      "B": "B. A `Structure` object representing the defect position.",
+      "C": "C. An `ArrayLike` object representing the fractional coordinates of the defect.",
+      "D": "D. A list of possible defect sites."
+    },
+    "correct_answer": "C"
+  },
+  {
+    "source_file": "pymatgen/command_line/bader_caller.py",
+    "question": "Within the `pymatgen.command_line.bader_caller` module's `from_path` function, what is the consequence of not finding the POTCAR file in the specified directory?",
+    "choices": {
+      "A": "A. The function raises a ValueError, halting the Bader analysis.",
+      "B": "B. The function proceeds with the Bader analysis but without the ability to perform charge transfer calculations.",
+      "C": "C. The function automatically downloads a POTCAR file from a default online repository.",
+      "D": "D. The function uses a generic POTCAR file included in the Pymatgen library."
+    },
+    "correct_answer": "B"
+  },
+  {
+    "source_file": "pymatgen/analysis/structure_matcher.py",
+    "question": "In Pymatgen's `pymatgen/analysis/structure_matcher.py`, what aspect of site comparison does the `OccupancyComparator` primarily focus on?",
+    "choices": {
+      "A": "A. The oxidation states of the elements present on the sites.",
+      "B": "B. The coordination environment of the sites.",
+      "C": "C. The elemental composition and their occupancies on the sites, irrespective of species.",
+      "D": "D. The magnetic moments of the atoms on the sites."
+    },
+    "correct_answer": "C"
+  }
+]

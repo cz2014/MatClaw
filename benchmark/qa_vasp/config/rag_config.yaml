@@ -1,0 +1,10 @@
+# QA VASP benchmark RAG configuration
+
+# Enable/disable RAG for benchmark
+enabled: true
+
+corpus:
+  - vasp
+
+# Number of results to return
+top_k: 5

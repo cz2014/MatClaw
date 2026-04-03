@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "matclaw"
+version = "0.1.0"
+description = "Code-first LLM agent for computational materials science"
+readme = "project_intro.md"
+requires-python = ">=3.10"
+dependencies = [
+    "smolagents[litellm]",
+    "pymatgen",
+    "pyyaml",
+    "bm25s>=0.2",
+    "tiktoken>=0.5",
+    "astchunk",
+    "faiss-cpu>=1.7",
+    "google-genai>=0.3",
+    "pymupdf>=1.24",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+]
+workflow = [
+    "jobflow",
+    "fireworks",
+]
+telemetry = [
+    "arize-phoenix",
+    "openinference-instrumentation-smolagents",
+]
+
+[project.scripts]
+matclaw = "core.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["core*"]
+
+[tool.ruff]
+line-length = 100

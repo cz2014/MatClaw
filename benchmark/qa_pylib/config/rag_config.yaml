@@ -1,0 +1,8 @@
+# QA Python library benchmark RAG configuration
+
+enabled: true
+
+corpus:
+  - jobflow_remote
+
+top_k: 5

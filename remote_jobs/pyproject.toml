@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "remote_jobs"
+version = "0.1.0"
+dependencies = [
+    "jobflow==0.2.1",
+    "jobflow-remote==0.1.8",
+    "atomate2==0.0.23",
+    "pymatgen==2025.10.7",
+    "emmet-core==0.86.3",
+    "custodian==2025.12.14",
+    "maggma==0.72.0",
+    "monty==2025.3.3",
+    "pydantic==2.12.5",
+    "dpdata==1.0.0",
+    "numpy==2.2.6",
+]
+
+[tool.setuptools]
+packages = ["remote_jobs"]
+package-dir = {"remote_jobs" = "."}

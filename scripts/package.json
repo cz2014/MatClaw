@@ -1,0 +1,7 @@
+{
+  "name": "matclaw-chunker",
+  "type": "module",
+  "dependencies": {
+    "code-chunk": "^0.1.0"
+  }
+}

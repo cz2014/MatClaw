@@ -1,0 +1,13 @@
+# VASP INCAR benchmark RAG configuration
+# Uses VASP wiki + atomate2 + pymatgen corpora
+# Enabled at runtime via --rag flag
+
+enabled: false
+
+corpus:
+  - vasp
+  - atomate2
+  - pymatgen
+
+# Number of results to return
+top_k: 5

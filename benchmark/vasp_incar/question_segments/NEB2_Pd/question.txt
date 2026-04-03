@@ -1,0 +1,37 @@
+I need to use VASP to calculate the transition state energy barrier for the
+hydrogenation of ethylene on single-metal or alloy surfaces, using the NEB
+(Nudged Elastic Band) method. The process consists of five steps, and I would
+like you to provide the corresponding INCAR files for the steps where they are
+needed.
+
+Step 1: Optimize the initial state (IS) structure of the reaction. Please
+provide an INCAR file for this calculation.
+
+Step 2: Optimize the final state (FS) structure of the reaction. Please provide
+an INCAR file for this calculation.
+
+Step 3: Use ASE to interpolate four intermediate images between the initial and
+final states. You do not need to do anything here - no INCAR file is needed.
+
+Step 4: Perform the NEB calculation using the interpolated images. Interpolate 4
+images in between, for a total of 6 folders from 00 to 05. Please provide an
+INCAR file for this calculation.
+
+Step 5: Extract the energies of all structures and determine the reaction energy
+barrier. You do not need to do anything here - no INCAR file is needed.
+
+- Structure files (in your workspace):
+    - Step 1 POSCAR: `IS1POSCAR`
+    - Step 2 POSCAR: `FS1POSCAR`
+
+- Return format: Write each INCAR to disk using write_text(), then return the paths:
+    ```python
+    step1_path = write_text("step1/INCAR", step1_content)
+    step2_path = write_text("step2/INCAR", step2_content)
+    step4_path = write_text("step4/INCAR", step4_content)
+    final_answer({
+        "step1_incar": step1_path,
+        "step2_incar": step2_path,
+        "step4_incar": step4_path,
+    })
+    ```

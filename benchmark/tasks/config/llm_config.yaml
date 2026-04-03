@@ -1,0 +1,60 @@
+# Task benchmark LLM configuration
+# Uses same providers as main config, with task-specific agent settings
+
+default_provider: gemini
+
+providers:
+  openai:
+    model_id: gpt-4o
+    api_key: ${OPENAI_API_KEY}
+    timeout: 120
+
+  gemini:
+    model_id: gemini/gemini-3-flash-preview
+    api_key: ${GEMINI_API_KEY}
+    timeout: 120
+
+  deepseek:
+    model_id: deepseek/deepseek-chat
+    api_key: ${DEEPSEEK_API_KEY}
+
+# Agent execution settings (task-specific: higher max_steps, pymatgen.* imports)
+agent:
+  max_steps: 20
+  instructions: |-
+    ## Error handling rules
+    Do NOT wrap your entire solution in a single broad try/except that catches all
+    exceptions and returns None for every property. This hides real bugs (TypeError,
+    KeyError, AttributeError) and prevents you from seeing the traceback and fixing
+    the code.
+
+    Instead:
+    - Let errors surface naturally so you can read the traceback and fix the bug.
+    - If you must handle errors, isolate each independent property in its own small
+      try/except so one failure does not wipe out all outputs.
+    - Only set a value to None when the failure is truly unavoidable (e.g. missing
+      optional data), and print a brief reason why.
+    - TypeError, KeyError, and AttributeError are almost always fixable bugs. Let
+      them raise so you can retry with the correct code.
+  additional_authorized_imports:
+    - pathlib
+    - math
+    - copy
+    - json
+    - numpy
+    - numpy.*
+    - scipy
+    - scipy.*
+    - pymatgen
+    - pymatgen.*
+    - monty
+    - monty.*
+    - matplotlib
+    - matplotlib.*
+    - pandas
+    - pandas.*
+    - ase
+    - ase.*
+    - dscribe
+    - dscribe.*
+

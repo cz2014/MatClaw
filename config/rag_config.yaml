@@ -1,0 +1,37 @@
+# RAG Configuration for MatClaw
+# Central registry: defines all available corpora under data/corpus/
+
+# Per-corpus configuration (each subdir under data/corpus/)
+corpus:
+  pymatgen:
+    retriever_method: bm25
+    description: "pymatgen source code (Python)"
+  atomate2:
+    retriever_method: bm25
+    description: "atomate2 source code (Python)"
+  jobflow:
+    retriever_method: bm25
+    description: "jobflow source code (Python)"
+  jobflow_remote:
+    retriever_method: bm25
+    description: "jobflow-remote source code (Python)"
+  vasp:
+    retriever_method: bm25
+    description: "VASP wiki documentation (Markdown)"
+  dpdata:
+    retriever_method: bm25
+    description: "dpdata source code (Python)"
+  dpgen:
+    retriever_method: bm25
+    description: "dpgen source code (Python)"
+  deepmd:
+    retriever_method: bm25
+    description: "DeePMD-kit documentation (Markdown)"
+  dpgen_docs:
+    retriever_method: bm25
+    description: "dpgen documentation (Markdown)"
+
+# Defaults (used when per-corpus config omits a field)
+defaults:
+  retriever_method: bm25
+  top_k: 5
