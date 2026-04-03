@@ -1,0 +1,36 @@
+# Easy install the latest development version
+
+DeePMD-kit is actively developed in the `master` branch. The documentation of the [`latest`](https://docs.deepmodeling.com/projects/deepmd/en/latest/) version matches the `master` branch.
+
+The following is the way to install the pre-compiled packages without [building from source](./install-from-source.md). All of them are built with [GitHub Actions](../development/cicd.md).
+
+## Install with docker
+
+The `master` tag is used to mark the latest development version with CUDA 12.2 support:
+
+```bash
+docker pull ghcr.io/deepmodeling/deepmd-kit:master
+```
+
+## Install with pip
+
+Follow [the documentation for the stable version](easy-install.md#install-python-interface-with-pip), but add `--pre` and `--extra-index-url` options like below:
+
+```sh
+pip install -U --pre deepmd-kit[gpu,cu12,lmp,torch] --extra-index-url https://deepmodeling.github.io/deepmd-kit/simple
+```
+
+## Download pre-compiled C Library [TensorFlow]
+
+**Supported backends**: TensorFlow [TensorFlow]
+
+The [pre-compiled C library](./install-from-c-library.md) can be downloaded from [here](https://nightly.link/deepmodeling/deepmd-kit/workflows/package_c/master/libdeepmd_c-0-libdeepmd_c.tar.gz.zip), or via a shell command:
+
+```sh
+wget https://nightly.link/deepmodeling/deepmd-kit/workflows/package_c/master/libdeepmd_c-0-libdeepmd_c.tar.gz.zip && unzip libdeepmd_c-0-libdeepmd_c.tar.gz.zip
+```
+
+## Pre-release conda-forge packages
+
+Pre-release conda-forge packages are in `conda-forge/label/deepmd-kit_dev` or `conda-forge/label/deepmd-kit_rc` channels, other than the `conda-forge` channel.
+See [conda-forge documentation](https://conda-forge.org/docs/maintainer/knowledge_base/#pre-release-builds) for more information.

@@ -1,0 +1,100 @@
+# Runtime environment variables
+
+For build-time environment variables, see [Install from source code](./install/install-from-source.md).
+
+## All interfaces
+
+
+**Alias**: `TF_INTER_OP_PARALLELISM_THREADS`
+**Default**: `0`
+
+Control parallelism within TensorFlow (when TensorFlow is built against Eigen) and PyTorch native OPs for CPU devices.
+See [How to control the parallelism of a job](./troubleshooting/howtoset_num_nodes.md) for details.
+
+
+**Alias**: `TF_INTRA_OP_PARALLELISM_THREADS`\*\*
+**Default**: `0`
+
+Control parallelism within TensorFlow (when TensorFlow is built against Eigen) and PyTorch native OPs.
+See [How to control the parallelism of a job](./troubleshooting/howtoset_num_nodes.md) for details.
+
+## Environment variables of dependencies
+
+- If OpenMP is used, [OpenMP environment variables](https://www.openmp.org/spec-html/5.0/openmpch6.html) can be used to control OpenMP threads, such as [`OMP_NUM_THREADS`](https://www.openmp.org/spec-html/5.0/openmpse50.html#x289-20540006.2).
+- If CUDA is used, [CUDA environment variables](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#cuda-environment-variables) can be used to control CUDA devices, such as `CUDA_VISIBLE_DEVICES`.
+- If ROCm is used, [ROCm environment variables](https://rocm.docs.amd.com/en/latest/conceptual/gpu-isolation.html#environment-variables) can be used to control ROCm devices.
+- [TensorFlow] If TensorFlow is used, TensorFlow environment variables can be used.
+- [PyTorch] If PyTorch is used, [PyTorch environment variables](https://pytorch.org/docs/stable/torch_environment_variables.html) can be used.
+- [JAX] [`JAX_PLATFORMS`](https://jax.readthedocs.io/en/latest/faq.html#controlling-data-and-computation-placement-on-devices) and [`XLA_FLAGS`](https://jax.readthedocs.io/en/latest/gpu_performance_tips.html#xla-performance-flags) are commonly used.
+
+## Python interface only
+
+
+**Choices**: `high`, `low`; **Default**: `high`
+
+Control high (double) or low (float) precision of training.
+
+
+**Choices**: `0`, `1`; **Default**: `0`
+
+[TensorFlow] Enable auto parallelization for CPU operators.
+
+
+**Choices**: `0`, `1`; **Default**: `0`
+
+[TensorFlow] Enable JIT. Note that this option may either improve or decrease the performance. Requires TensorFlow to support JIT.
+
+
+**Default**: `1024` on CPUs and as maximum as possible until out-of-memory on GPUs
+
+Inference batch size, calculated by multiplying the number of frames with the number of atoms.
+
+
+**Default**: `tensorflow`
+
+Default backend.
+
+
+**Default**: 4 or the number of cores (whichever is smaller)
+
+[PyTorch] Number of subprocesses to use for data loading in the PyTorch backend.
+See [PyTorch documentation](https://pytorch.org/docs/stable/data.html) for details.
+
+## C++ interface only
+
+These environment variables also apply to third-party programs using the C++ interface, such as [LAMMPS](./third-party/lammps-command.md).
+
+
+**Type**: List of paths, split by ` on Unix and ;` on Windows
+
+List of customized OP plugin libraries to load, such as `/path/to/plugin1.so:/path/to/plugin2.so` on Linux and `/path/to/plugin1.dll;/path/to/plugin2.dll` on Windows.
+
+
+[PyTorch] Enable the built-in PyTorch Kineto profiler for the PyTorch C++ (inference) backend.
+
+**Type**: string (output file stem)
+
+**Default**: unset (disabled)
+
+When set to a non-empty value, profiling is enabled for the lifetime of the loaded PyTorch model (e.g. during LAMMPS runs). A JSON trace file is created on finish. The final file name is constructed as:
+
+- `<ENV_VALUE>_gpu<ID>.json` if running on GPU
+- `<ENV_VALUE>.json` if running on CPU
+
+The trace can be examined with [Chrome trace viewer](https://ui.perfetto.dev/) (alternatively chrome://tracing). It includes:
+
+- CPU operator activities
+- CUDA activities (if available)
+
+Example:
+
+```bash
+export DP_PROFILER=result
+mpirun -np 4 lmp -in in.lammps
+# Produces result_gpuX.json, where X is the GPU id used by each MPI rank.
+```
+
+Tips:
+
+- Large runs can generate sizable JSON files; consider limiting numbers of MD steps, like 20.
+- Currently this feature only supports single process, or multi-process runs where each process uses a distinct GPU on the same node.
