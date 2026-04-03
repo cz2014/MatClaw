@@ -17,7 +17,7 @@ import yaml
 from smolagents import CodeAgent, LiteLLMModel, LocalPythonExecutor
 
 from core.context import _get_content_str, _get_role
-from core.tools import batch_static_eval, efield_md, rag_search, train_deepmd, wait_for_jobflow
+from core.tools import batch_static_eval, efield_md, train_deepmd, wait_for_jobflow
 from smolagents.agents import (
     FinalAnswerPromptTemplate,
     ManagedAgentPromptTemplate,
@@ -884,8 +884,12 @@ def create_agent(
     exp_cfg = experience_file or agent_cfg.get("experience_file")
     experience_path = None
     if exp_cfg:
-        p = Path(exp_cfg)
-        experience_path = p if p.is_absolute() else PROJECT_ROOT / p
+        p = Path(os.path.expanduser(exp_cfg))
+        if p.is_absolute():
+            experience_path = p
+        else:
+            # Relative to config_dir (e.g., "../experience.md" -> workspace/experience.md)
+            experience_path = config_dir / p
         if not experience_path.exists():
             logger.warning("experience_file not found: %s", experience_path)
             experience_path = None
@@ -935,7 +939,9 @@ def create_agent(
 
     # Tools: use custom list or default (includes rag_search for main agent)
     if tools is None:
-        tools = [wait_for_jobflow, train_deepmd, batch_static_eval, efield_md, rag_search]
+        from core.tools import RagSearchTool
+        rag_tool = RagSearchTool(rag_config_path=config_dir / "rag_config.yaml")
+        tools = [wait_for_jobflow, train_deepmd, batch_static_eval, efield_md, rag_tool]
 
     # I/O and remote transfer tools are always added (workspace-bound)
     from core.tools import (

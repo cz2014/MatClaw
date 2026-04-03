@@ -48,13 +48,14 @@ _DEFAULT_CORPUS_DIR = _PROJECT_ROOT / "data" / "corpus"
 _RAG_CONFIG_PATH = _PROJECT_ROOT / "config" / "rag_config.yaml"
 
 
-def _load_rag_config() -> dict:
+def _load_rag_config(config_path: Path | None = None) -> dict:
     """Load RAG configuration from rag_config.yaml."""
-    if not _RAG_CONFIG_PATH.exists():
+    path = config_path or _RAG_CONFIG_PATH
+    if not path.exists():
         return {}
     import yaml
 
-    with open(_RAG_CONFIG_PATH) as f:
+    with open(path) as f:
         return yaml.safe_load(f) or {}
 
 
@@ -371,12 +372,13 @@ def _load_chunks_from_paths(paths: list[Path]) -> list:
 def _build_rag_description(
     corpus: list[str] | None = None,
     corpus_path: Path | None = None,
+    rag_config_path: Path | None = None,
 ) -> tuple[str, str]:
     """Build dynamic rag_search description from rag_config.yaml.
 
     Returns (tool_description, software_input_description).
     """
-    config = _load_rag_config()
+    config = _load_rag_config(rag_config_path)
     corpus_registry = config.get("corpus", {})
 
     # Determine which packages are available
@@ -458,6 +460,7 @@ class RagSearchTool(Tool):
         corpus_dir: Path | None = None,
         top_k: int | None = None,
         retriever_method: str | None = None,
+        rag_config_path: Path | None = None,
     ):
         """Initialize RAG search tool.
 
@@ -468,6 +471,7 @@ class RagSearchTool(Tool):
             corpus_dir: Base directory for per-package subdirs. Defaults to data/corpus.
             top_k: Number of results to return. Overrides config value.
             retriever_method: Override retriever method (bm25/gemini). Defaults to config value.
+            rag_config_path: Path to rag_config.yaml. Defaults to PROJECT_ROOT/config/rag_config.yaml.
         """
         super().__init__()
         self._corpus = corpus
@@ -475,11 +479,14 @@ class RagSearchTool(Tool):
         self._corpus_dir = corpus_dir or _DEFAULT_CORPUS_DIR
         self._top_k_override = top_k
         self._retriever_method = retriever_method
+        self._rag_config_path = rag_config_path or _RAG_CONFIG_PATH
         self._index = None
         self._top_k = 5  # default, overridden in _load_index
 
         # Build dynamic description from rag_config.yaml
-        desc, software_desc = _build_rag_description(corpus, corpus_path)
+        desc, software_desc = _build_rag_description(
+            corpus, corpus_path, rag_config_path=self._rag_config_path
+        )
         self.description = desc
         self.inputs = {
             **self.inputs,
@@ -491,7 +498,7 @@ class RagSearchTool(Tool):
         if self._index is not None:
             return
 
-        config = _load_rag_config()
+        config = _load_rag_config(self._rag_config_path)
         defaults = config.get("defaults", {})
 
         if self._corpus_path:
@@ -1521,4 +1528,3 @@ Introspection:
 train_deepmd = TrainDeePMDTool()
 batch_static_eval = BatchStaticEvalTool()
 efield_md = EFieldMDTool()
-rag_search = RagSearchTool()

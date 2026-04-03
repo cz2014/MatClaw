@@ -34,6 +34,9 @@ telemetry = [
     "openinference-instrumentation-smolagents",
 ]
 
+[project.scripts]
+matclaw = "core.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["core*"]
