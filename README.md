@@ -8,7 +8,9 @@ An autonomous code-first LLM agent for end-to-end materials computations. Built 
 
 MoS2 lattice relaxation on Perlmutter — from natural language task to VASP results in a single command:
 
-<video src="https://github.com/user-attachments/assets/d81f1400-e43c-4f2a-9a52-62bd1a1ad66e" controls width="700"></video>
+<p align="center">
+  <video src="https://github.com/user-attachments/assets/d81f1400-e43c-4f2a-9a52-62bd1a1ad66e" controls width="700"></video>
+</p>
 
 ## How It Works
 
