@@ -51,10 +51,7 @@ benchmark/qa_vasp/workspace/
 benchmark/qa_vasp/raw/
 benchmark/tasks/workspace/
 
-# RAG data (copied sources, doc files, and index; rebuild with scripts/build_corpus.py)
-data/corpus/
-data/docs/
-data/sources/
+# RAG legacy benchmark corpus (now unified under data/)
 benchmark/qa/corpus/
 benchmark/qa/sources/
 

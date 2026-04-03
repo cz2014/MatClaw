@@ -98,7 +98,7 @@ remote_jobs/            # Jobflow job definitions for remote execution
   _deepmd.py            # DeePMD training implementation (multi-source: VASP, ForceField MD, deepmd/npy)
   _batch_eval.py        # Batch static evaluation implementation (inline dicts or remote .traj/.xyz/.extxyz)
 workspace/              # Agent runtime outputs (required, gitignored)
-data/                   # RAG data (gitignored)
+data/                   # RAG data (tracked in git, shared across all branches)
   sources/              # Copied Python package source files
   docs/                 # Documentation source files (vasp/, deepmd-kit/, dpgen/)
   corpus/               # Built retriever indices (one subdir per corpus)
@@ -270,7 +270,7 @@ Each workspace is self-contained with its own `config/` directory. The `matclaw 
 - `llm_config.yaml` and `prompts.yaml`: resolved from `config_dir` parameter in `create_agent()`
 - `rag_config.yaml`: resolved from `config_dir` via `RagSearchTool(rag_config_path=config_dir / "rag_config.yaml")`
 - `experience_file`: relative paths in `llm_config.yaml` resolve against `config_dir`; absolute paths (including `~/...`) used as-is
-- RAG corpus data (`data/corpus/`): stays in the package install location (shared, not per-workspace)
+- RAG corpus data (`data/`): tracked in git, shared across all branches. Rebuild with `scripts/build_corpus.py`
 
 Old test scripts (test1-test10) use `tests/main.py` which explicitly passes `config_dir=PROJECT_ROOT / "config"` to read from the repo's config directory.
 
@@ -389,51 +389,69 @@ Currently on v1 with RAG and experience log enabled.
 ### Branch Layout
 
 ```
-main ← (far behind, initial state, not actively used)
-  ↓
-dev ← active development: all source, full test suite, dev docs, benchmark results
-  ↓
-report ← paper writing on top of dev: LaTeX, demo workspaces, figures
-  ↓
-release ← public-facing: sanitized code + demos, no personal info, orphan branch
+dev ── active development (all source, tests, dev docs, benchmark results)
+ ├── main ── clean latest on GitHub (no tests, no demos, no personal info, orphan)
+ ├── report ── paper writing (LaTeX, demo workspaces, figures)
+ └── prod ── local worktree for stable production installs
+release ── FROZEN (paper release with demos, not updated)
 ```
 
-Plus locally: `prod` branch (git worktree at `~/Work/MatClaw_prod/`) for stable production installs. Shares `.git` with `~/Work/MLFF_agent/` so commits are immediately visible across worktrees.
+- **dev** (`~/Work/MLFF_agent/`): The central branch. All development happens here.
+- **main** (GitHub, orphan): Clean latest runnable version. Updated from dev via selective checkout. No tests, no demos, no personal info.
+- **report**: Paper writing on top of dev. Has LaTeX source, demo scripts, demo workspaces for paper.
+- **prod** (`~/Work/MatClaw_prod/`, git worktree): Mirrors dev for stable production installs. Shares `.git` so commits are visible across worktrees.
+- **release** (GitHub, orphan, FROZEN): Paper release with demo scripts and workspace outputs. No longer updated. README on main points here for examples.
 
 ### File Classification by Purpose
 
 Every file belongs to a category. When a new file appears, match its purpose to decide which branches it belongs on.
 
-| Category | Description | dev | report | release |
-|----------|-------------|-----|--------|---------|
-| Core source code | Agent source, configs, job definitions, scripts, pyproject.toml, .gitignore | YES | YES | YES |
-| Reference data | Crystal structures, reference papers for agent input (.ref/) | YES | YES | YES |
-| Project documentation | CLAUDE.md, README, benchmark methodology docs (porting_notes.md, model_comparison.md) | YES | YES | YES |
-| Benchmark infrastructure | QA JSONs, task segments, evaluation scripts, per-benchmark configs | YES | YES | YES |
-| Benchmark raw results | Per-run .jsonl output files, .tar.gz result archives | YES | YES | NO |
-| Benchmark runner/plot scripts | Cross-benchmark runners, plotting scripts, shell launchers | YES | YES | NO |
-| Full test suite | Unit tests, integration tests, test utilities, legacy entry point | YES | YES | NO |
-| Demo scripts | Curated run scripts for paper demonstrations (simplified from test suite) | NO | YES | YES |
-| Demo workspaces | Complete agent run outputs for paper reproducibility (workspace_demo*/) | NO | YES | YES |
-| Paper source | LaTeX files, bibliography, style files, figures, headers | NO | YES | NO |
-| Paper PDF | Compiled paper (paper/paper.pdf only) | NO | YES | YES |
-| Paper planning docs | Outlines, reviews, reference notes for writing the paper | NO | YES | NO |
-| Arxiv submission | Arxiv tarball and related submission artifacts | NO | YES | NO |
-| Dev planning notes | Implementation plans, targets, to-do lists, known issues | YES | NO | NO |
-| Personal HPC credentials | SSH paths, usernames, VASP binary locations, MongoDB configs, cluster setup guides | YES | NO | NO |
-| Release process docs | How-to-release instructions | YES | NO | NO |
-| Claude Code local config | .claude/ directory (skills, settings) | YES | NO | NO |
+| Category | Description | dev | main | report | release |
+|----------|-------------|-----|------|--------|---------|
+| Core source code | Agent source, configs, job definitions, scripts, pyproject.toml, .gitignore | YES | YES | YES | YES |
+| Reference data | Crystal structures, reference papers for agent input (.ref/) | YES | YES | YES | YES |
+| Project documentation | CLAUDE.md, README, benchmark methodology docs (porting_notes.md, model_comparison.md) | YES | YES | YES | YES |
+| RAG corpus data | Source files, documentation, built BM25 indices (data/) | YES | YES | YES | YES |
+| Benchmark infrastructure | QA JSONs, task segments, evaluation scripts, per-benchmark configs | YES | YES | YES | YES |
+| Benchmark raw results | Per-run .jsonl output files, .tar.gz result archives | YES | NO | YES | NO |
+| Benchmark runner/plot scripts | Cross-benchmark runners, plotting scripts, shell launchers | YES | NO | YES | NO |
+| Full test suite | Unit tests, integration tests, test utilities, legacy entry point | YES | NO | YES | NO |
+| Demo scripts | Curated run scripts for paper demonstrations (simplified from test suite) | NO | NO | YES | YES |
+| Demo workspaces | Complete agent run outputs for paper reproducibility (workspace_demo*/) | NO | NO | YES | YES |
+| Paper source | LaTeX files, bibliography, style files, figures, headers | NO | NO | YES | NO |
+| Paper PDF | Compiled paper (paper/paper.pdf only) | NO | NO | YES | YES |
+| Paper planning docs | Outlines, reviews, reference notes for writing the paper | NO | NO | YES | NO |
+| Arxiv submission | Arxiv tarball and related submission artifacts | NO | NO | YES | NO |
+| Dev planning notes | Implementation plans, targets, to-do lists, known issues | YES | NO | NO | NO |
+| Personal HPC credentials | SSH paths, usernames, VASP binary locations, MongoDB configs, cluster setup guides | YES | NO | NO | NO |
+| Release process docs | How-to-release instructions | YES | NO | NO | NO |
+| Claude Code local config | .claude/ directory (skills, settings) | YES | NO | NO | NO |
 
-**Decision rule for new files**: Ask "what is this file's purpose?" and match it to a category above. If it doesn't fit, the default is: dev=YES, report=only if paper-relevant, release=only if useful to an external user with no personal/internal information.
+**Decision rule for new files**: Ask "what is this file's purpose?" and match it to a category above. If it doesn't fit, the default is: dev=YES, main=only if useful to an external user with no personal/internal information, report=only if paper-relevant.
 
 ### Merge Rules
 
 | From | To | Method | When |
 |------|----|--------|------|
+| dev | main | Selective `git checkout dev -- <dirs>` + unstage excluded + commit | When updating GitHub with latest code |
 | dev | prod | `git merge dev` + `pip install -e .` | After code changes, before production runs |
 | dev | report | `git merge dev` (resolve conflicts) | When report needs new code/features |
-| dev | release | Selective `git checkout dev -- <dirs>` + unstage excluded | When updating public release |
-| report | release | `git checkout report -- paper/paper.pdf` | When updating paper PDF |
+
+Release is frozen -- no more updates.
+
+### Dev → Main Push
+
+```bash
+git checkout main
+git checkout dev -- core/ config/ scripts/ remote_jobs/ .ref/ pyproject.toml .gitignore CLAUDE.md README.md
+git checkout dev -- benchmark/
+# Unstage excluded benchmark files (raw results, archives, runner/plot scripts, figures)
+git reset HEAD -- $(git diff --cached --name-only | grep -E '\.(jsonl|tar\.gz)$')
+git reset HEAD -- $(git diff --cached --name-only | grep -E 'benchmark/(plot_|run_|figures/)')
+git commit --author="cz2014 <zcmben2014@gmail.com>" -m "Update: <description>"
+git push origin main
+git checkout dev
+```
 
 ### Dev → Prod Sync
 
@@ -451,35 +469,12 @@ git merge dev
 git checkout dev
 ```
 
-### Dev → Release Push
-
-```bash
-git checkout release
-git checkout dev -- core/ config/ benchmark/ scripts/ remote_jobs/ \
-    .ref/ pyproject.toml .gitignore CLAUDE.md
-# Unstage any excluded files that crept in via directory adds
-git reset HEAD -- <excluded files>
-git commit --author="cz2014 <zcmben2014@gmail.com>" -m "Release update: <description>"
-git push origin release
-git checkout dev
-```
-
-### Report → Release (Paper PDF Update)
-
-```bash
-git checkout release
-git checkout report -- paper/paper.pdf
-git commit --author="cz2014 <zcmben2014@gmail.com>" -m "Update paper PDF"
-git push origin release
-git checkout dev
-```
-
-### Release Commit Rules
+### Main/Release Commit Rules
 
 - **Author/committer**: only `cz2014 <zcmben2014@gmail.com>` -- no Co-Authored-By trailers
-- **Orphan branch**: release has no parent relationship to dev/report. `git log --all` from release shows only release commits.
-- **No personal information**: HPC credentials, usernames, SSH key paths must never appear on release
-- **Full execution details**: `dev_notes/how_to_release.md`
+- **Orphan branches**: main and release have no parent relationship to dev/report. `git log --all` from these branches shows only their own commits.
+- **No personal information**: HPC credentials, usernames, SSH key paths must never appear on main or release
+- **Full release execution details**: `dev_notes/how_to_release.md`
 
 ## Known Issues
 
