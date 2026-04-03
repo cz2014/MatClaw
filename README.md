@@ -76,24 +76,42 @@ python scripts/build_corpus.py
 
 RAG is configured via `config/rag_config.yaml`. Set `enabled: true/false` to control whether the `rag_search` tool is available to the agent.
 
-## Benchmarks
+### Rebuilding the RAG Corpus
+
+Pre-built retrieval indices ship in `data/corpus/` and work out of the box. Rebuild if your installed package versions differ from those used to build the shipped index (e.g., a newer pymatgen with added/changed APIs):
 
 ```bash
-# Pymatgen source code QA (300 questions)
-python benchmark/qa/run_qa.py
+# Rebuild for specific packages:
+python scripts/build_corpus.py --packages pymatgen atomate2
 
-# VASP wiki QA (500 questions)
-python benchmark/qa_vasp/run_qa.py
-
-# jobflow-remote source code QA (300 questions)
-python benchmark/qa_pylib/run_qa.py
-
-# Real-world coding tasks (pymatgen-analysis-defects)
-python benchmark/tasks/run_tasks.py
-
-# VASP INCAR generation
-python benchmark/vasp_incar/run_incar.py
+# Rebuild all registered packages:
+python scripts/build_corpus.py
 ```
+
+This copies source from your installed packages into `data/sources/` and rebuilds the BM25 index in `data/corpus/`.
+
+To index a new package not yet in the corpus:
+
+**1. Build the index:**
+
+```bash
+# For an installed Python package:
+python scripts/build_corpus.py --packages newpackage
+
+# For markdown documentation:
+python scripts/build_corpus.py --docs-dir data/docs/newpackage --software newpackage
+```
+
+**2. Register in `config/rag_config.yaml`:**
+
+```yaml
+corpus:
+  newpackage:
+    retriever_method: bm25
+    description: "newpackage source code (Python)"
+```
+
+The agent will automatically see the new corpus in its `rag_search` tool and can query it with `software=["newpackage"]`.
 
 ## License
 
