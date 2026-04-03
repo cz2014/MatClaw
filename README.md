@@ -2,6 +2,8 @@
 
 An autonomous code-first LLM agent for end-to-end materials computations. Built on HuggingFace's [smolagents](https://github.com/huggingface/smolagents), MatClaw writes and executes Python directly in a sandboxed interpreter, composing any installed domain library (pymatgen, ASE, atomate2, jobflow, DeePMD-kit) to orchestrate multi-code workflows on remote HPC clusters without predefined tool functions.
 
+> **Looking for examples?** The [`release`](https://github.com/cz2014/MatClaw/tree/release) branch contains demo scripts and complete workspace outputs from the paper demonstrations.
+
 ## How It Works
 
 <p align="center">
@@ -37,17 +39,17 @@ export CLAUDE_API_KEY=...       # for Claude models
 
 2. Configure the default provider in `config/llm_config.yaml` (edit `default_provider`).
 
-3. Run the agent:
+3. Run the agent from your workspace directory:
 
 ```bash
-python main.py
+cd ~/Work/matclaw_runs/my_task/
+matclaw run --task task.txt --project perlmutter
 ```
 
-To run with a custom task, call `main()` programmatically:
+Or resume a crashed run:
 
-```python
-from main import main
-main(task="Your task description here", workspace_dir=Path("workspace"))
+```bash
+matclaw run --resume
 ```
 
 ## HPC Setup
