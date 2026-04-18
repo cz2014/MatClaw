@@ -121,6 +121,23 @@ corpus:
 
 The agent will automatically see the new corpus in its `rag_search` tool and can query it with `software=["newpackage"]`.
 
+## Citation
+
+Zhang, C., & Yakobson, B. I. (2026). *MatClaw: An Autonomous Code-First LLM Agent for End-to-End Materials Exploration.* arXiv:2604.02688. https://arxiv.org/abs/2604.02688
+
+```bibtex
+@misc{zhang2026matclaw,
+  title         = {MatClaw: An Autonomous Code-First {LLM} Agent for End-to-End Materials Exploration},
+  author        = {Zhang, Chenmu and Yakobson, Boris I.},
+  year          = {2026},
+  eprint        = {2604.02688},
+  archivePrefix = {arXiv},
+  primaryClass  = {cond-mat.mtrl-sci},
+  doi           = {10.48550/arXiv.2604.02688},
+  url           = {https://arxiv.org/abs/2604.02688}
+}
+```
+
 ## License
 
 MIT
