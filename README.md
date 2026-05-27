@@ -29,6 +29,14 @@ The researcher provides a task description in natural language. The agent genera
 
 ## Install
 
+Recommended — reproducible env from the committed lockfile (installs Python 3.12 + exact pinned deps):
+
+```bash
+uv sync
+```
+
+Or with pip:
+
 ```bash
 pip install -e .
 ```
