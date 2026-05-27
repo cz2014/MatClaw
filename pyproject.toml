@@ -6,11 +6,17 @@ build-backend = "setuptools.build_meta"
 name = "matclaw"
 version = "0.1.0"
 description = "Code-first LLM agent for computational materials science"
-readme = "project_intro.md"
-requires-python = ">=3.10"
+readme = "README.md"
+requires-python = ">=3.12"
 dependencies = [
-    "smolagents[litellm]",
-    "pymatgen",
+    # Pinned to the proven ~/ag2 working set (also keeps the prebuilt RAG corpus
+    # in data/corpus/ aligned with these API versions).
+    "smolagents[litellm]==1.24.0",
+    "pymatgen==2025.10.7",
+    "ase==3.27.0",
+    "atomate2==0.0.23",
+    "dpdata==1.0.0",
+    "jobflow-remote==0.1.8",
     "pyyaml",
     "bm25s>=0.2",
     "tiktoken>=0.5",
@@ -24,10 +30,6 @@ dependencies = [
 dev = [
     "pytest",
     "ruff",
-]
-workflow = [
-    "jobflow",
-    "fireworks",
 ]
 telemetry = [
     "arize-phoenix",
