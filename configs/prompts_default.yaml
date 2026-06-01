@@ -1,0 +1,30 @@
+# Custom prompt templates for MatClaw
+# Follows smolagents PromptTemplates structure (v1.23.0)
+# Set any field to null to use smolagents default
+# See: https://huggingface.co/docs/smolagents/en/tutorials/building_good_agents
+
+# Main system prompt - set to null to use default
+system_prompt: null
+
+# Planning prompts - used when planning_interval is set
+planning:
+  # Initial plan prompt
+  initial_plan: null
+  # Messages before updating the plan
+  update_plan_pre_messages: null
+  # Messages after updating the plan
+  update_plan_post_messages: null
+
+# Managed agent prompts - used for sub-agents
+managed_agent:
+  # Task prompt for managed agent
+  task: null
+  # Report prompt for managed agent
+  report: null
+
+# Final answer prompts
+final_answer:
+  # Messages before the final answer
+  pre_messages: null
+  # Messages after the final answer
+  post_messages: null

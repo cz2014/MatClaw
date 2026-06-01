@@ -1,0 +1,34 @@
+# Build context trimming for docker/Dockerfile (build from the repo root).
+# Only code/ is COPYied into the image; everything heavy or secret is excluded.
+
+.git
+.gitignore
+
+# virtualenvs / caches
+code/.venv
+.venv
+**/__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.ruff_cache
+.mypy_cache
+
+# big runtime / data dirs (mounted at runtime, never baked)
+workspace
+corpus
+ref
+benchmark
+writing
+docs
+
+# secrets -- must never enter the image
+.env
+.env.*
+**/*.pem
+**/*.key
+
+# misc
+.DS_Store
+*.log
+node_modules

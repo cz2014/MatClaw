@@ -1,0 +1,99 @@
+# LLM configuration for MatClaw
+# API keys use ${ENV_VAR} syntax - expanded at runtime
+
+default_provider: claude
+
+providers:
+  openai:
+    model_id: gpt-5.4
+    api_key: ${OPENAI_API_KEY}
+    context_window: 200000     # GPT-5.2: near-perfect at 256K (MRCR v2)
+    reasoning_effort: high
+
+  gemini:
+    model_id: gemini/gemini-3.5-flash
+    api_key: ${GEMINI_API_KEY}
+    context_window: 100000     # Gemini 3.5 Flash (GA, Google I/O 2026); steep decay above 128K
+
+  claude:
+    model_id: anthropic/claude-opus-4-8
+    api_key: ${CLAUDE_API_KEY}
+    context_window: 200000
+    timeout: 600
+    thinking:
+      type: adaptive
+    output_config:
+      effort: high
+
+  deepseek:
+    model_id: deepseek/deepseek-chat
+    api_key: ${DEEPSEEK_API_KEY}
+    context_window: 100000     # conservative default (no MRCR data)
+
+# Agent execution settings
+agent:
+  max_steps: 100
+  context_pruning: true         # enable zone-based context management (default: true)
+  experience_file: experience.md   # resolved relative to config dir (configs/); cross-session lessons
+  # exec_timeout_s: 600         # optional best-effort per-step SIGALRM watchdog (exec executor); off when unset.
+  additional_authorized_imports:
+    - "*"   # P4: full access. The exec executor enforces no import policy (the P3 container is the
+            # boundary); CodeAgent still renders this into {{authorized_imports}} and logs a one-time
+            # "*" caution (benign). Roll back by listing modules here AND setting executor: ast.
+  instructions: |
+    Native open()/pathlib/subprocess are available. Convenience helpers are also provided:
+    read_file/write_file/edit_file (workspace-relative IO), glob (find files), grep (ripgrep
+    content search, defaults to the corpus knowledge base), and bash (captured shell). Use
+    whichever you prefer.
+
+    If real computations are requested, use jobflow-remote to submit jobs to remote HPC:
+    - Prefer to use atomate2 Makers (e.g., RelaxMaker) to create jobs if possible, otherwise define custom jobs
+    - Use submit_flow() to submit, then wait_for_jobflow() to block until completion
+    - Output is a dict: e.g., output["output"]["energy"], output["output"]["structure"]
+
+    BATCHING STRATEGY: Each SLURM job submission costs ~1-2 min overhead
+    (queue registration, node allocation, environment setup). The batch worker
+    reduces this overhead:
+
+    BATCH WORKER (multiple Jobs -> one SLURM submission):
+       Packs all Jobs in a Flow into one SLURM allocation (up to 4 parallel
+       per node). Pays the ~1-2 min overhead once instead of N times.
+       Without batch worker, N jobs also compete for the shared queue's
+       concurrent submission limit, causing 30-60+ min wait per job.
+       Rule: use the batch worker for any Flow with 2+ independent Jobs.
+
+    Use the STANDARD worker for single long-running Jobs or sequential chains.
+
+    Queue selection: debug queue waits <10 min but caps at 27 min walltime.
+    Shared queue waits 30-60+ min but allows up to 14h. Use debug when job
+    runtime is under 27 min.
+
+# Worker descriptions injected into agent instructions when project is specified.
+# Keys are "{project}.{worker}" identifiers.
+# description: Human-written text explaining when to use this worker.
+# The raw jfremote worker config is also injected automatically.
+
+workers:
+  perlmutter.perlmutter_debug:
+    description: >
+      DEFAULT. Use this unless you have a specific reason not to.
+      A100 GPU, debug queue. Queue wait: <5 minutes. Walltime limit: 27 min.
+      Most jobs finish well within 27 min. Always start here.
+
+  perlmutter.perlmutter_gpu:
+    description: >
+      DO NOT use this unless a single job absolutely requires >27 min walltime.
+      A100 GPU, shared queue. Queue wait: 1-4 HOURS. Walltime: 14h. Max 10 concurrent.
+      Using this for short jobs wastes hours waiting in queue. Think before choosing this.
+
+  perlmutter.perlmutter_batch:
+    description: >
+      DO NOT use for single jobs or small flows.
+      Batch worker: packs up to 5000 jobs into one SLURM submission (4 parallel).
+      A100 GPU, shared queue. Queue wait: 1-4 HOURS. Walltime: 14h.
+      ONLY use when a Flow has 2+ independent jobs to amortize the queue wait.
+
+  anvil.anvil_cpu:
+    description: >
+      Standard worker (one SLURM job per Job). 128-core CPU wholenode,
+      max 2 concurrent jobs. Use for VASP calculations and CPU-only tasks.

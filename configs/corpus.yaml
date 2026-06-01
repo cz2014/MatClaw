@@ -1,0 +1,15 @@
+# Reference-documentation corpora the agent can grep (P5c: replaces the removed rag_config.yaml).
+#
+# Each entry: a `path` relative to the repo `corpus/` directory + a 1-line `description`.
+# create_agent resolves each path, adds it to grep/glob's search roots, and injects the resolved
+# path + description into the system prompt. This is for reference docs that are NOT pip-installed;
+# source code for installed packages is searched directly under site-packages (no entry needed).
+#
+# Extend by dropping the docs under corpus/<...> and adding an entry here, e.g.:
+#   qe:
+#     path: docs/qe
+#     description: "Quantum ESPRESSO input documentation."
+corpus:
+  vasp:
+    path: docs/vasp
+    description: "VASP wiki documentation -- INCAR tags (ALGO, IBRION, NBANDS, ...), defaults, and recommended settings (one markdown file per tag)."
