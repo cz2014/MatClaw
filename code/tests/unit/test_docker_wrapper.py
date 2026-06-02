@@ -91,12 +91,18 @@ def test_run_sh_assembles_hardening_flags_and_mounts(stub_docker):
     assert "no-new-privileges" in argv        # --security-opt no-new-privileges
     assert "--read-only" not in argv          # disposable, not frozen
 
-    # mounts (read-only host data; rw workspace)
+    # mounts: corpus + ssh + jfremote ro; workspace + config rw. config is rw so the
+    # agent can append to experience.md, which lives INSIDE the config dir (no separate
+    # experience.md mount).
     assert any("/work/corpus:ro" in a for a in argv)
-    assert any("/work/configs:ro" in a for a in argv)
     assert any("/opt/ssh-host:ro" in a for a in argv)
     assert any("/opt/jfremote-host:ro" in a for a in argv)
     assert any(a.endswith("/work/workspace") for a in argv)
+    # config mounted rw (NOT :ro), and no nested experience.md mount
+    assert any(a.endswith("/work/configs") and ":" in a for a in argv), "config dir must be mounted"
+    assert not any("/work/configs:ro" in a for a in argv), "config is now rw (experience.md writable)"
+    assert not any("experience.md" in a for a in argv), \
+        "experience.md lives in the rw config dir, not a separate mount"
 
     # run defaults --config to the mounted repo configs
     assert "--config" in argv and "/work/configs" in argv
