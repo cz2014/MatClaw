@@ -17,6 +17,10 @@
 #                                              across runs; installs reinstall fast)
 #   MATCLAW_FORWARD_ENV="VAR1 VAR2"           extra env vars to forward beyond the ones the
 #                                             configs reference via ${VAR}
+#   MATCLAW_WORKSPACE=/path/to/run            host workspace dir (default: repo workspace/);
+#                                             point outside the repo to keep run data separate
+#   MATCLAW_CONFIGS=/path/to/config           host config dir (default: repo configs/);
+#                                             point outside the repo to keep run config separate
 #
 # Prerequisites on the host (shared singletons -- see the plan, topology):
 #   - MongoDB on 127.0.0.1:27017
@@ -29,6 +33,12 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${REPO_ROOT}"
+
+# Run data (workspace) and run config may live OUTSIDE the repo (e.g. under
+# /work/matclaw_runs) via these overrides; default to the repo dirs so existing
+# usage is unchanged.
+WORKSPACE_SRC="${MATCLAW_WORKSPACE:-${REPO_ROOT}/workspace}"
+CONFIGS_SRC="${MATCLAW_CONFIGS:-${REPO_ROOT}/configs}"
 
 IMAGE="${IMAGE:-matclaw:dev}"
 MEM="${MEM:-8g}"
@@ -45,10 +55,10 @@ if ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
         -t "${IMAGE}" .
 fi
 
-mkdir -p workspace
+mkdir -p "${WORKSPACE_SRC}"
 
 ARGS=(
-    --rm -it
+    --rm
     --init
     --user "$(id -u):$(id -g)"
     --cap-drop ALL
@@ -56,6 +66,13 @@ ARGS=(
     --memory "${MEM}" --cpus "${CPUS}" --pids-limit "${PIDS}"
     -e "MATCLAW_MONGO_HOST=${MONGO_HOST}"
 )
+
+# DETACH=1 -> dockerd-supervised background run (headless, no TTY); else interactive -it.
+if [ -n "${DETACH:-}" ]; then
+    ARGS+=(-d); [ -n "${NAME:-}" ] && ARGS+=(--name "$NAME")
+else
+    ARGS+=(-it)
+fi
 
 # Secrets (never baked into the image). Forward ONLY the env vars the configs actually reference via
 # ${VAR} -- whatever names the user chose (GEMINI_API_KEY, a custom GEMINI_KEY, ...) -- for any that
@@ -65,7 +82,7 @@ ARGS=(
 # match $HOME/$PATH); use MATCLAW_FORWARD_ENV="VAR1 VAR2" for anything the config does not template.
 # A repo-root .env is also applied if present.
 _keys=""
-[ -d configs ] && _keys=$(grep -rhE '\$\{[A-Za-z_][A-Za-z0-9_]*\}' configs 2>/dev/null \
+[ -d "${CONFIGS_SRC}" ] && _keys=$(grep -rhE '\$\{[A-Za-z_][A-Za-z0-9_]*\}' "${CONFIGS_SRC}" 2>/dev/null \
     | grep -vE '^[[:space:]]*#' | grep -oE '\$\{[A-Za-z_][A-Za-z0-9_]*\}' | tr -d '${}')
 for _k in $(printf '%s\n' ${_keys} ${MATCLAW_FORWARD_ENV:-} | sort -u); do
     [ -n "${!_k:-}" ] && ARGS+=(-e "${_k}")
@@ -78,17 +95,16 @@ if [ "$(uname -s)" = "Linux" ]; then
     ARGS+=(--add-host "host.docker.internal:host-gateway")
 fi
 
-# Mounts: workspace rw; configs/corpus ro; ssh/jfremote ro (staged, rewritten by
-# the entrypoint); experience.md rw (nested over the ro configs); optional volume.
+# Mounts: workspace rw; config rw so the agent can append to experience.md, which
+# lives INSIDE the config dir (no separate experience.md mount); corpus ro from the
+# project root; ssh/jfremote ro (staged, rewritten by the entrypoint); optional volume.
 ARGS+=(
-    -v "${PWD}/workspace:/work/workspace"
+    -v "${WORKSPACE_SRC}:/work/workspace"
+    -v "${CONFIGS_SRC}:/work/configs"
     -v "${PWD}/corpus:/work/corpus:ro"
-    -v "${PWD}/configs:/work/configs:ro"
     -v "${HOME}/.ssh:/opt/ssh-host:ro"
     -v "${HOME}/.jfremote:/opt/jfremote-host:ro"
 )
-[ -f "${PWD}/configs/experience.md" ] && \
-    ARGS+=(-v "${PWD}/configs/experience.md:/work/configs/experience.md")
 [ -n "${MATCLAW_ENV_VOLUME:-}" ] && \
     ARGS+=(-v "${MATCLAW_ENV_VOLUME}:/home/agent")
 

@@ -96,6 +96,8 @@ MatClaw submits computational jobs to remote HPC clusters via [jobflow-remote](h
 
 Multiple clusters can run simultaneously. Select the target cluster with `--project <name>` on `matclaw run`.
 
+On the container host, `docker/host_up.sh` brings up and verifies these singletons in one idempotent step: it binds MongoDB so the container can reach it via `host.docker.internal`, proves the connection, ensures the jobflow-remote runner is up, and fail-fast checks cluster SSH. Run it before launching `docker/run.sh`.
+
 ## Reference Documentation
 
 There is no index to build. The agent finds API usage by grepping the installed package
