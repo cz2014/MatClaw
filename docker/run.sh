@@ -22,17 +22,23 @@
 #   MATCLAW_CONFIGS=/path/to/config           host config dir (default: repo configs/);
 #                                             point outside the repo to keep run config separate
 #
-# Prerequisites on the host (shared singletons -- see the plan, topology):
-#   - MongoDB on 127.0.0.1:27017
-#   - one `jf -p <project> runner run` per HPC project
-#   - ~/.ssh, ~/.jfremote, and a repo-root .env with the API keys
+# All tunables can also be set persistently in the launcher config
+# ($XDG_CONFIG_HOME/matclaw/launcher.env, shared with docker/host_up.sh); env vars
+# at invocation override it. See docker/launcher.env.example.
 #
-# Operator guide: docs/references/docker-runtime.md
+# Prerequisites on the host: run docker/host_up.sh first -- it brings up and
+# verifies the shared singletons (Mongo bound for container reach, the jf runner,
+# HPC connectivity). It also needs ~/.ssh, ~/.jfremote, and a repo-root .env with
+# the API keys. Operator guide: docs/references/docker-runtime.md
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${REPO_ROOT}"
+
+# Layered config: env > launcher.env > the defaults below (same file host_up.sh reads).
+LAUNCHER_CONF="${MATCLAW_LAUNCHER_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/matclaw/launcher.env}"
+[ -f "$LAUNCHER_CONF" ] && . "$LAUNCHER_CONF"
 
 # Run data (workspace) and run config may live OUTSIDE the repo (e.g. under
 # /work/matclaw_runs) via these overrides; default to the repo dirs so existing

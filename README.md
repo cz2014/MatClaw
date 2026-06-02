@@ -96,7 +96,7 @@ MatClaw submits computational jobs to remote HPC clusters via [jobflow-remote](h
 
 Multiple clusters can run simultaneously. Select the target cluster with `--project <name>` on `matclaw run`.
 
-On the container host, `docker/host_up.sh` brings up and verifies these singletons in one idempotent step: it binds MongoDB so the container can reach it via `host.docker.internal`, proves the connection, ensures the jobflow-remote runner is up, and fail-fast checks cluster SSH. Run it before launching `docker/run.sh`.
+On the container host (Linux or macOS), `docker/host_up.sh` brings up and verifies these singletons in one idempotent step: it starts MongoDB so the container can reach it via `host.docker.internal`, proves the connection, ensures the jobflow-remote runner is up, and checks the HPC workers and stores with `jf project check`. Run it before launching `docker/run.sh`. Both scripts read host-specific settings (mongod/jf paths, image, project, resource caps) from an optional launcher config at `~/.config/matclaw/launcher.env` (copy `docker/launcher.env.example`); environment variables override it, so the repo carries no host paths.
 
 ## Reference Documentation
 
