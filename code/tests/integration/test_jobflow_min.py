@@ -1,49 +1,46 @@
-"""Minimal jobflow-remote submission: submit MoS2 relaxation and wait for result."""
+"""Integration test: submit a minimal VASP relaxation to an HPC cluster and check the result.
+
+Cluster-agnostic (via the ``hpc_target`` fixture). Submits an ions-only (ISIF=2) MoS2 relax,
+waits for completion, and asserts a scalar energy + a parseable relaxed structure come back.
+This is the real, expensive end-to-end (a live VASP job); it skips when no HPC project is
+configured or the reference structure is missing.
+
+Tier: integration. Run with:
+
+    uv run --project code --extra dev pytest code/tests -m integration --hpc-project anvil
+"""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from core.tools import wait_for_jobflow
+import pytest
 
-# Constants
-PROJECT = "anvil"
-WORKER = "anvil_cpu"
-TIMEOUT_S = 60 * 60  # 60 minutes
-MOS2_CIF_PATH = Path(__file__).parent.parent.parent.parent / "ref" / "MoS2.cif"
+# code/tests/integration -> code/tests -> code -> repo root -> ref/MoS2.cif
+REF_MOS2 = Path(__file__).resolve().parents[3] / "ref" / "MoS2.cif"
 
 
-def main():
-    """Submit MoS2 relaxation and retrieve relaxed structure."""
+def test_jobflow_min_relax(hpc_target):
+    if not REF_MOS2.exists():
+        pytest.skip(f"reference structure missing: {REF_MOS2}")
+
+    from atomate2.vasp.jobs.core import RelaxMaker
+    from atomate2.vasp.powerups import update_user_incar_settings
     from jobflow import Flow
     from jobflow_remote import submit_flow
     from pymatgen.core import Structure
-    from pymatgen.io.cif import CifWriter
-    from atomate2.vasp.jobs.core import RelaxMaker
-    from atomate2.vasp.powerups import update_user_incar_settings
 
-    structure = Structure.from_file(str(MOS2_CIF_PATH))
-    print(f"Structure: {structure.formula} ({len(structure)} atoms)")
+    from core.tools import wait_for_jobflow
 
-    # Create relax job
+    project, worker = hpc_target
+    structure = Structure.from_file(str(REF_MOS2))
+
     job = RelaxMaker().make(structure)
-    # Force ions-only relaxation (fixed cell)
-    job = update_user_incar_settings(job, {"ISIF": 2})
+    job = update_user_incar_settings(job, {"ISIF": 2})  # ions only, fixed cell
+    submit_flow(Flow([job], name="mos2_relax_min"), worker=worker, project=project)
 
-    flow = Flow([job], name="mos2_relax_min")
-    submit_flow(flow, worker=WORKER, project=PROJECT)
-    print(f"Submitted job: {job.uuid}")
-
-    output = wait_for_jobflow(PROJECT, job.uuid, timeout_s=TIMEOUT_S)
-
-    energy = output["output"]["energy"]
-    relaxed = Structure.from_dict(output["output"]["structure"])
-
-    # Save result
-    out_path = Path(__file__).parent / "relaxed_min.cif"
-    CifWriter(relaxed).write_file(str(out_path))
-    print(f"Done! Energy: {energy} eV, saved to {out_path}")
-
-
-if __name__ == "__main__":
-    main()
+    out = wait_for_jobflow(project, job.uuid)
+    energy = out["output"]["energy"]
+    relaxed = Structure.from_dict(out["output"]["structure"])
+    assert isinstance(energy, (int, float)), f"no scalar energy in result: {out!r}"
+    assert len(relaxed) == len(structure), "relaxed structure lost atoms"

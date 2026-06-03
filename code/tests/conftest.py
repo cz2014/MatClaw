@@ -39,6 +39,16 @@ def pytest_addoption(parser):
         help="NAME of the host env var holding the API key for --llm-provider (value is read from "
              "the environment, never passed as a value). Default: GEMINI_API_KEY.",
     )
+    parser.addoption(
+        "--hpc-project", action="store", default=os.environ.get("MATCLAW_TEST_PROJECT"),
+        help="jobflow-remote project for the HPC integration tests (or $MATCLAW_TEST_PROJECT). "
+             "Cluster-agnostic; the tests skip when it is unset or not configured on this host.",
+    )
+    parser.addoption(
+        "--hpc-worker", action="store", default=os.environ.get("MATCLAW_TEST_WORKER"),
+        help="Worker within --hpc-project (or $MATCLAW_TEST_WORKER). Defaults to the project's "
+             "first configured worker.",
+    )
 
 
 def pytest_collection_modifyitems(config, items):
@@ -121,3 +131,33 @@ def make_agent(monkeypatch, tmp_path):
 
     yield _make
     os.chdir(state["cwd"])  # create_agent chdir's into the workspace; restore it
+
+
+# --- HPC integration tier: cluster-agnostic target resolution ---
+
+
+@pytest.fixture
+def hpc_target(request):
+    """(project, worker) for the HPC integration tests -- cluster-agnostic.
+
+    Resolves from --hpc-project/--hpc-worker (or $MATCLAW_TEST_PROJECT/$MATCLAW_TEST_WORKER).
+    SKIPS cleanly when no HPC project is configured on this host (so a machine without a
+    cluster stays green); only a configured-but-unreachable cluster surfaces as a failure.
+    Worker defaults to the project's first configured worker.
+    """
+    project = request.config.getoption("--hpc-project")
+    if not project:
+        pytest.skip("no HPC project (set --hpc-project or $MATCLAW_TEST_PROJECT)")
+    try:
+        from jobflow_remote.config.manager import ConfigManager
+
+        proj = ConfigManager().get_project(project)
+    except Exception as exc:  # project not defined in ~/.jfremote on this host
+        pytest.skip(f"jobflow-remote project {project!r} not configured here: {exc}")
+    workers = list(getattr(proj, "workers", {}) or {})
+    worker = request.config.getoption("--hpc-worker") or (workers[0] if workers else None)
+    if not worker:
+        pytest.skip(f"project {project!r} has no workers configured")
+    if worker not in workers:
+        pytest.skip(f"worker {worker!r} not in project {project!r} (have: {workers})")
+    return project, worker

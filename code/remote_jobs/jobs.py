@@ -6,7 +6,7 @@ from jobflow import job
 
 
 @job
-def hello_anvil():
-    """Trivial smoke test: returns hostname to verify remote execution works."""
+def hello_hpc():
+    """Trivial smoke test: returns the worker hostname to verify remote execution works."""
     import socket
-    return {"hostname": socket.gethostname(), "message": "Anvil connection works"}
+    return {"hostname": socket.gethostname(), "message": "HPC connection works"}
