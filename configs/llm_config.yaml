@@ -55,18 +55,36 @@ agent:
     (queue registration, node allocation, environment setup). The batch worker
     reduces this overhead:
 
-    BATCH WORKER (multiple Jobs -> one SLURM submission):
-       Packs all Jobs in a Flow into one SLURM allocation (up to 4 parallel
-       per node). Pays the ~1-2 min overhead once instead of N times.
-       Without batch worker, N jobs also compete for the shared queue's
-       concurrent submission limit, causing 30-60+ min wait per job.
-       Rule: use the batch worker for any Flow with 2+ independent Jobs.
+    BATCH WORKER (multiple Jobs -> one SLURM allocation, run one at a time):
+       Packs the Jobs in a Flow into one SLURM allocation and runs them
+       sequentially, paying the ~1-2 min queue overhead once instead of N times.
+       Without it, N jobs also compete for the shared queue's concurrent
+       submission limit, causing 30-60+ min wait per job.
+       Rule: use the batch worker ONLY for many SHORT independent jobs (sub-node,
+       minutes each -- e.g. a parameter sweep). For a SMALL number of LARGE
+       full-node jobs (e.g. VASP relaxations of big cells), submit each as a
+       separate anvil_cpu job instead -- they run in parallel across nodes and
+       finish sooner, whereas the batch worker would serialize them.
 
-    Use the STANDARD worker for single long-running Jobs or sequential chains.
+    Use the STANDARD worker (anvil_cpu) for single or a few large/long Jobs.
 
     Queue selection: debug queue waits <10 min but caps at 27 min walltime.
     Shared queue waits 30-60+ min but allows up to 14h. Use debug when job
     runtime is under 27 min.
+
+    CUSTOM JOB RESOURCES. submit_flow(flow, worker=..., resources=..., exec_config=...) lets you
+    size a job; by default it uses the chosen worker's resources. To override (e.g. for more
+    memory), pass a COMPLETE resources dict -- it REPLACES the worker default (NOT merged), so
+    include EVERY field. Copy account/partition/time from the worker's config block shown in the
+    worker list above (that block is injected automatically; the <...> below are filled there)
+    and change only what you need:
+        res = {"account": "<ACCOUNT>", "partition": "wholenode",
+               "nodes": 1, "ntasks": 64, "cpus_per_task": 2, "time": "24:00:00"}
+        submit_flow(flow, worker="anvil_cpu", resources=res,
+                    exec_config=ExecutionConfig(export={"OMP_NUM_THREADS": "2"}))
+    Per-rank memory budget = cpus_per_task * mem_per_core. If a job is OOM-killed, raise
+    cpus_per_task (and OMP to match) or use worker="anvil_highmem"; lowering KPAR or setting NCORE
+    in the Maker's user_incar_settings also cuts peak memory.
 
 # Worker descriptions injected into agent instructions when project is specified.
 # Keys are "{project}.{worker}" identifiers.
@@ -95,5 +113,23 @@ workers:
 
   anvil.anvil_cpu:
     description: >
-      Standard worker (one SLURM job per Job). 128-core CPU wholenode,
-      max 2 concurrent jobs. Use for VASP calculations and CPU-only tasks.
+      Standard worker: one SLURM job per Job, 128-core CPU wholenode,
+      up to 32 concurrent jobs, 24h walltime. Use for a single or large
+      MPI-parallel VASP job that needs the full node.
+
+  anvil.anvil_batch:
+    description: >
+      Batch worker: packs many small INDEPENDENT short jobs into ONE wholenode
+      allocation and runs them ONE AT A TIME, paying the queue wait once.
+      Use ONLY for many short jobs (e.g. a parameter sweep). For large full-node
+      MPI VASP jobs, or just a few jobs, use anvil_cpu -- separate submissions
+      run in parallel across nodes and finish sooner.
+
+  anvil.anvil_shared:
+    description: >
+      SHARED queue: partial-node, per-core billing (1x), ~1.9 GB/core. Small or partial-node
+      jobs and quick tests; usually the shortest queue. More memory per rank -> raise cpus_per_task.
+  anvil.anvil_highmem:
+    description: >
+      HIGHMEM queue: ~8 GB/core, 24h. Use when a VASP job OOM-kills on anvil_cpu (large/long
+      cell, high ENAUG, or KPAR>1). Bills ~4x SU and only 32 nodes (longer queue); memory-bound only.
