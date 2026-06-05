@@ -100,3 +100,58 @@ def test_resume_reconstructs_error_steps(make_agent, tmp_workspace):
     messages = " ".join(str(s.error) for s in errored)
     assert "boom" in messages          # dict-form message preserved
     assert "bad value" in messages     # string-form message preserved
+
+
+def test_runner_resume_continues_not_reset(make_agent, tmp_workspace, monkeypatch):
+    """Regression: the runner must resume (reset=False), not restart fresh.
+
+    create_agent(resume=True) reconstructs memory from history, but agent.run()
+    defaults to reset=True (memory.reset() clears it). The runner must call
+    agent.run(task, reset=not resume) -- otherwise --resume silently restarts the
+    task from scratch, which on a real run re-explores inputs and re-submits
+    already-completed HPC jobs (the L4 opus run, 2026-06-05). This drives the
+    actual run_agent so the wiring is pinned, not just the agent-level invariant.
+    """
+    marker = "PRIOR_RUN_OBSERVATION_MARKER"
+    records = [
+        {"step": 0, "role": "system", "content": "system prompt"},
+        {"step": 0, "role": "user", "content": "the task"},
+        {
+            "step": 1, "role": "assistant",
+            "content": json.dumps({"phase": "P1", "plan": "pl", "code": "x = 1", "summary": "s1"}),
+            "summary": "s1", "phase": "P1",
+        },
+        {"step": 1, "role": "tool-response", "content": marker},
+    ]
+    (tmp_workspace / "history.jsonl").write_text(_history(records))
+
+    # A resume-reconstructed agent whose scripted model finishes in one step.
+    agent = make_agent(
+        steps=[{"phase": "end", "plan": "fin", "code": "final_answer('ok')", "summary": "fin"}],
+        resume=True,
+    )
+    assert any(
+        marker in (s.observations or "")
+        for s in agent.memory.steps if isinstance(s, ActionStep)
+    ), "precondition: memory reconstructed from history before the run"
+
+    import sys
+    import core.runner as runner_mod
+
+    # Inject this exact (already-resumed) agent into the runner, then run resumed.
+    monkeypatch.setattr(runner_mod, "create_agent", lambda **kw: agent)
+    saved_stdout = sys.stdout
+    try:
+        runner_mod.run_agent(
+            task="the task", workspace_dir=tmp_workspace,
+            config_dir=tmp_workspace, resume=True,
+        )
+    finally:
+        sys.stdout = saved_stdout  # run_agent installs a TeeWriter; restore
+
+    # The reconstructed observation must still be present: a reset=True run would
+    # have wiped it and restarted fresh.
+    assert any(
+        marker in (s.observations or "")
+        for s in agent.memory.steps if isinstance(s, ActionStep)
+    ), "runner wiped reconstructed memory: resume restarted fresh instead of continuing"

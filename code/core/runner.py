@@ -96,6 +96,9 @@ def run_agent(
         print(f"Task: {task[:200]}{'...' if len(task) > 200 else ''}")
     print("-" * 50)
 
-    result = agent.run(task)
+    # reset=False on resume: create_agent(resume=True) reconstructed agent.memory
+    # from history; agent.run() defaults to reset=True, which would wipe it and
+    # restart the task fresh. Pass reset=not resume so a resumed run continues.
+    result = agent.run(task, reset=not resume)
     print("-" * 50)
     print(f"Result: {result.output}")
