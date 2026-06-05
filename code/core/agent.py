@@ -389,7 +389,14 @@ def _restart_from_history(agent: CodeAgent, history_file: Path) -> int:
                 if "error" in rec and rec["error"]:
                     from core._smol.utils import AgentError
                     err = rec["error"]
-                    error = AgentError(err.get("message", str(err)) if isinstance(err, dict) else str(err))
+                    # AgentError requires an AgentLogger (its __init__ calls
+                    # logger.log_error). Pass agent.logger, not the module-level
+                    # logging logger, or restart crashes on any history that
+                    # contains an error step.
+                    error = AgentError(
+                        err.get("message", str(err)) if isinstance(err, dict) else str(err),
+                        agent.logger,
+                    )
                 if rec.get("is_final_answer"):
                     is_final_answer = True
                 if "token_usage" in rec and rec["token_usage"]:
