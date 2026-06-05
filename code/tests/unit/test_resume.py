@@ -200,3 +200,32 @@ def test_resume_continues_step_numbering(make_agent, tmp_workspace):
         if isinstance(s, ActionStep) and s.step_number is not None and s.step_number >= 4
     ]
     assert new_steps, "the continued run did not produce a step numbered >= 4"
+
+
+def test_monitor_step_summary_uses_step_number():
+    """The Monitor's '[Step N: Duration ...]' summary must use the step's own
+    step_number, not len(step_durations), so a resumed run's per-step summary
+    continues (e.g. Step 45) instead of restarting at 1. (Second step-counter
+    found in the L4 opus resume after the header counter was fixed.)
+    """
+    from types import SimpleNamespace
+
+    from core._smol.monitoring import Monitor
+
+    logged: list[str] = []
+
+    class _CapLogger:
+        def log(self, text, level=None, **kwargs):
+            logged.append(str(text))
+
+    monitor = Monitor(tracked_model=SimpleNamespace(), logger=_CapLogger())
+    step = SimpleNamespace(
+        step_number=45,
+        timing=SimpleNamespace(duration=1.23),
+        token_usage=None,
+    )
+    monitor.update_metrics(step)
+
+    joined = " ".join(logged)
+    assert "Step 45" in joined, f"summary did not use step_number: {logged}"
+    assert "Step 1:" not in joined, f"summary restarted the counter at 1: {logged}"

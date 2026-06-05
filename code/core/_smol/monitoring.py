@@ -105,7 +105,11 @@ class Monitor:
         """
         step_duration = step_log.timing.duration
         self.step_durations.append(step_duration)
-        console_outputs = f"[Step {len(self.step_durations)}: Duration {step_duration:.2f} seconds"
+        # MatClaw (direct edit): use the step's own number, not len(step_durations),
+        # so a resumed run's per-step summary continues (e.g. Step 45) instead of
+        # restarting at 1. Falls back to the running count when a step has no number.
+        step_no = getattr(step_log, "step_number", None) or len(self.step_durations)
+        console_outputs = f"[Step {step_no}: Duration {step_duration:.2f} seconds"
 
         if step_log.token_usage is not None:
             self.total_input_token_count += step_log.token_usage.input_tokens
