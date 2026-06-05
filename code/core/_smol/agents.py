@@ -545,7 +545,17 @@ You have been provided with these additional arguments, that you can access dire
     def _run_stream(
         self, task: str, max_steps: int, images: list["PIL.Image.Image"] | None = None
     ) -> Generator[ActionStep | PlanningStep | FinalAnswerStep | ChatMessageStreamDelta]:
-        self.step_number = 1
+        # MatClaw (direct edit): continue step numbering across a resumed/continued
+        # run. When run(reset=False) keeps a reconstructed or prior conversation in
+        # memory (e.g. create_agent(resume=True)), start from the highest existing
+        # ActionStep so displayed and recorded step numbers continue instead of
+        # restarting at 1 and colliding with the prior steps. A fresh run
+        # (reset=True) clears memory first, so this list is empty -> step 1.
+        _prior = [
+            s.step_number for s in self.memory.steps
+            if isinstance(s, ActionStep) and getattr(s, "step_number", None)
+        ]
+        self.step_number = max(_prior) + 1 if _prior else 1
         returned_final_answer = False
         while not returned_final_answer and self.step_number <= max_steps:
             if self.interrupt_switch:

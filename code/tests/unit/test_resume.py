@@ -155,3 +155,48 @@ def test_runner_resume_continues_not_reset(make_agent, tmp_workspace, monkeypatc
         marker in (s.observations or "")
         for s in agent.memory.steps if isinstance(s, ActionStep)
     ), "runner wiped reconstructed memory: resume restarted fresh instead of continuing"
+
+
+def test_resume_continues_step_numbering(make_agent, tmp_workspace):
+    """Regression: a resumed run must continue step numbering, not restart at 1.
+
+    smolagents resets self.step_number=1 in _run_stream; on a continued run
+    (reset=False with reconstructed memory) it must start from the highest
+    existing ActionStep so the displayed and recorded ActionStep.step_number
+    continue from where the prior run stopped, instead of restarting at 1 and
+    colliding with the reconstructed steps. (The L4 opus run showed 'Step 1'
+    after resuming from step 44.)
+    """
+    records = [
+        {"step": 0, "role": "system", "content": "sys"},
+        {"step": 0, "role": "user", "content": "task"},
+    ]
+    for n in (1, 2, 3):
+        records.append({
+            "step": n, "role": "assistant",
+            "content": json.dumps({"phase": f"P{n}", "plan": "p", "code": f"v{n}={n}", "summary": f"s{n}"}),
+            "summary": f"s{n}", "phase": f"P{n}",
+        })
+        records.append({"step": n, "role": "tool-response", "content": f"obs{n}"})
+    (tmp_workspace / "history.jsonl").write_text(_history(records))
+
+    # max recovered step is 3 -> a continued run must number the next step 4+.
+    agent = make_agent(
+        steps=[{"phase": "end", "plan": "fin", "code": "final_answer('ok')", "summary": "fin"}],
+        resume=True,
+    )
+    recovered = [s.step_number for s in agent.memory.steps if isinstance(s, ActionStep)]
+    assert max(recovered) == 3, "precondition: 3 steps recovered from history"
+
+    agent.run("task", reset=False)
+
+    assert agent.step_number >= 4, (
+        f"resumed run restarted step numbering at {agent.step_number}, "
+        "expected it to continue from the recovered history max (3) + 1"
+    )
+    # and no newly created step collides with the reconstructed step numbers 1-3
+    new_steps = [
+        s for s in agent.memory.steps
+        if isinstance(s, ActionStep) and s.step_number is not None and s.step_number >= 4
+    ]
+    assert new_steps, "the continued run did not produce a step numbered >= 4"
