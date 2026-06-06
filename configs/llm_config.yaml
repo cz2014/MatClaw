@@ -5,10 +5,11 @@ default_provider: claude
 
 providers:
   openai:
-    model_id: gpt-5.4
+    model_id: gpt-5.5
     api_key: ${OPENAI_API_KEY}
-    context_window: 200000     # GPT-5.2: near-perfect at 256K (MRCR v2)
+    context_window: 200000     # near-perfect at 256K (MRCR v2)
     reasoning_effort: high
+    timeout: 1200              # detached high-effort runs hang on litellm.Timeout without this
 
   gemini:
     model_id: gemini/gemini-3.5-flash
