@@ -101,6 +101,45 @@ def _expand_env_strict(value: str) -> str:
     return expanded
 
 
+def _resolve_web_search(llm_cfg: dict[str, Any], agent_cfg: dict[str, Any]) -> tuple[str, str | None]:
+    """Resolve the web_search (model, api_key) from agent.web_search.
+
+    Each of provider/model/api_key is optional and falls back to the matching
+    providers.<provider> block, so by default web_search reuses the project's Gemini
+    provider (its model_id and api_key template). The key template (e.g. "${GEMINI_API_KEY}")
+    is expanded the same way as the agent's own provider key, so the tool receives a resolved
+    value -- never a hardcoded env-var name.
+    """
+    ws_cfg = agent_cfg.get("web_search", {}) or {}
+    provider = ws_cfg.get("provider", "gemini")
+    prov_cfg = (llm_cfg.get("providers", {}) or {}).get(provider, {}) or {}
+    model = ws_cfg.get("model") or prov_cfg.get("model_id") or "gemini/gemini-3.5-flash"
+    key_tmpl = ws_cfg.get("api_key") or prov_cfg.get("api_key")
+    api_key = _expand_env_strict(key_tmpl) if key_tmpl else None
+    return model, api_key
+
+
+def _filter_disabled_tools(tools: list, disabled: set[str]) -> list:
+    """Drop any tool whose ``.name`` is in ``disabled``.
+
+    Fail-fast on disabling the essential ``final_answer`` or naming a tool that is not
+    registered (typo protection). Returns the list unchanged when ``disabled`` is empty.
+    The disable policy is application-level, so it lives here, not in vendored ``_smol``.
+    """
+    if not disabled:
+        return tools
+    if "final_answer" in disabled:
+        raise ValueError("Cannot disable the essential 'final_answer' tool.")
+    registered = {t.name for t in tools}
+    unknown = disabled - registered
+    if unknown:
+        raise ValueError(
+            f"disabled_tools lists unknown tool(s): {sorted(unknown)}. "
+            f"Registered tools: {sorted(registered)}."
+        )
+    return [t for t in tools if t.name not in disabled]
+
+
 def _make_steps_log_path(workspace_dir: Path) -> Path:
     """Create workspace directory and return path for steps log."""
     workspace_dir.mkdir(parents=True, exist_ok=True)
@@ -765,13 +804,21 @@ def create_agent(
         RemoteGetTool,
         RemoteLsTool,
         RemotePutTool,
+        WebSearchTool,
         WriteExperienceTool,
         WriteFileTool,
+        web_fetch,
     )
     site_packages = Path(sysconfig.get_paths()["purelib"]).resolve()
     corpus_dir = (config_dir.parent / "corpus").resolve()
     corpora = _load_corpus_registry(config_dir / "corpus.yaml", corpus_dir)
     search_roots = [workspace_dir.resolve(), site_packages, *(c["path"] for c in corpora)]
+
+    # web_search backend: model/key fall back to the matching providers.<provider> entry, so by
+    # default search reuses the project's Gemini provider. The key template is resolved here (same
+    # ${VAR} expansion as the agent's provider key) -- nothing hardcoded to an env-var name.
+    ws_model, ws_api_key = _resolve_web_search(llm_cfg, agent_cfg)
+
     tools = list(tools) + [
         WriteFileTool(workspace_dir),
         ReadFileTool(workspace_dir),
@@ -785,11 +832,21 @@ def create_agent(
         RemoteGetTool(workspace_dir),
         RemoteLsTool(),
         QueryJobstoreTool(),
+        web_fetch,
+        WebSearchTool(model=ws_model, api_key=ws_api_key),
     ]
 
     # Experience tool: only add if experience_file is configured
     if experience_path:
         tools.append(WriteExperienceTool(experience_path))
+
+    # Remove tools disabled in config (general mechanism; the repo config disables web access by
+    # default). Filtered by name before the agent is built -- an application concern, so the
+    # vendored _smol framework stays untouched.
+    disabled = set(agent_cfg.get("disabled_tools", []))
+    tools = _filter_disabled_tools(tools, disabled)
+    if disabled:
+        logger.info("Tools disabled by config: %s", sorted(disabled))
 
     # Max steps from config
     max_steps = agent_cfg.get("max_steps", 10)

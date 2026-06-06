@@ -36,6 +36,26 @@ agent:
   context_pruning: true         # enable zone-based context management (default: true)
   experience_file: experience.md   # resolved relative to config dir (configs/); cross-session lessons
   # exec_timeout_s: 600         # optional best-effort per-step SIGALRM watchdog (exec executor); off when unset.
+
+  # web_search: Google Search via Gemini grounding. Configured like a provider above --
+  # provider/model/api_key are all OPTIONAL, each falling back to providers.<provider>:
+  #   provider: which configured provider backs search (default: gemini)
+  #   model:    grounding model; else providers.<provider>.model_id; else gemini/gemini-3.5-flash
+  #             (NOT gemini-2.5-flash: deprecated, retires 2026-10-16; gemini-3.1-flash-lite is cheaper)
+  #   api_key:  ${ENV} template (your own env-var name); else providers.<provider>.api_key. Resolved
+  #             like the agent's provider key and passed explicitly to litellm.
+  web_search:
+    provider: gemini
+    model: gemini/gemini-3.5-flash
+    api_key: ${GEMINI_API_KEY}     # omit to reuse providers.gemini.api_key
+
+  # disabled_tools: remove these tool functions from the toolset (by name). Forbids ANY
+  # registered tool; 'final_answer' cannot be disabled. Web access ships DISABLED by default --
+  # remove these entries (or set `disabled_tools: []`) to turn it on.
+  disabled_tools:
+    - web_fetch
+    - web_search
+
   additional_authorized_imports:
     - "*"   # P4: full access. The exec executor enforces no import policy (the P3 container is the
             # boundary); CodeAgent still renders this into {{authorized_imports}} and logs a one-time

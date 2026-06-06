@@ -22,6 +22,20 @@ def set_pause_controller(controller):
     _pause_controller = controller
 
 
+class JobflowWaitTimeout(Exception):
+    """wait_for_jobflow returned control after timeout_s without a terminal state.
+
+    Not a crash -- a check-in. The agent decides whether to keep waiting or to
+    investigate and fix. Carries ``.jobs`` (a structured per-job snapshot of the
+    whole flow) and renders to the human-readable diagnostic message (its ``str``
+    form) the LLM reads. Built from the object returned by _collect_job_diagnostics.
+    """
+
+    def __init__(self, diagnostics):
+        self.jobs = diagnostics.jobs
+        super().__init__(diagnostics.render())
+
+
 # --- Shared helpers for I/O and remote transfer tools ---
 
 
@@ -68,10 +82,312 @@ def _get_ssh_host(project_name: str, worker_name: str):
     return host
 
 
+# --- wait_for_jobflow timeout diagnostics (the gather) ---
+#
+# When a bounded wait_for_jobflow times out, we hand the agent everything it would
+# otherwise spend several steps gathering by hand. The gather PRESENTS raw evidence;
+# it does not classify or guess a cause (only the LLM can reliably tell a quiet job
+# from a stuck one). It is deliberately code-agnostic: a directory listing sorted by
+# mtime (the heartbeat for any engine), the jobflow standard streams, the newest-file
+# tails, and the scheduler/resource numbers -- no per-engine filenames, no grep
+# pattern list. See docs/exec-plans/active/2026-06-04_bounded-wait-jobflow-stall-recovery.md.
+
+
+def _job_field(job, key):
+    """Read a top-level field from a JobInfo object or a raw Mongo dict.
+
+    get_jobs_info_by_flow_uuid returns raw find() dicts (where the name is nested
+    under job['job']['name']) or, in some versions, JobInfo objects (flat .name).
+    """
+    if isinstance(job, dict):
+        if key == "name":
+            return job.get("job", {}).get("name", "unknown")
+        return job.get(key)
+    return getattr(job, key, None)
+
+
+def _job_process_id(job):
+    """The SLURM process id from remote.process_id (dict or object form)."""
+    remote = job.get("remote") if isinstance(job, dict) else getattr(job, "remote", None)
+    if remote is None:
+        return None
+    return remote.get("process_id") if isinstance(remote, dict) else getattr(remote, "process_id", None)
+
+
+def _state_value(state):
+    """Extract .value from a JobState enum, or return a string state as-is."""
+    return state.value if hasattr(state, "value") else state
+
+
+def _to_datetime(val):
+    """Best-effort parse of a Mongo datetime field to NAIVE UTC.
+
+    jobflow-remote stores naive UTC datetimes (created_on / start_time), so we
+    normalize everything to naive UTC for safe arithmetic against _utcnow().
+    """
+    from datetime import datetime, timezone
+
+    if val is None:
+        return None
+    if isinstance(val, datetime):
+        dt = val
+    else:
+        try:
+            dt = datetime.fromisoformat(str(val).replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
+
+def _utcnow():
+    """Naive UTC now (matches jobflow-remote's stored naive datetimes)."""
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _fmt_duration(seconds):
+    """Render a duration in s as e.g. '2h46m' / '6m12s' / '8s'; '?' if unknown."""
+    if seconds is None:
+        return "?"
+    seconds = int(seconds)
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    if h:
+        return f"{h}h{m:02d}m"
+    if m:
+        return f"{m}m{s:02d}s"
+    return f"{s}s"
+
+
+# Fixed, job-agnostic next-steps menu shown on every timeout (S7.3). Deliberately
+# generic: a job-specific worker/resources suggestion is guesswork the harness
+# cannot get right across tasks and engines -- the agent decides from the evidence.
+_NEXT_STEPS = (
+    "Next steps:\n"
+    "  1. keep waiting -- call wait_for_jobflow(...) again for the still-running job(s)\n"
+    "  2. fix         -- use the jf command to cancel the job, then resubmit it\n"
+    "                    (adjust the worker or resources as needed)"
+)
+
+
+def _remote_probe_script(probes: list[dict]) -> str:
+    """Build ONE batched shell script for a worker host (Sources B+C).
+
+    `probes` is a list of {db_id, run_dir, slurm_id}. Per probe it emits, fenced by
+    `===JOB <db_id> <SECTION>===` markers so the combined stdout parses back per job:
+      - LS      : `ls -la --time-style=long-iso` (mtime-sorted heartbeat + inventory)
+      - STREAMS : tail of the jobflow standard streams (std_err/std_out/queue.err/.out)
+      - NEWEST  : tail of the one or two most-recently-written files
+      - SCHED   : squeue / sacct / sstat for the SLURM id
+    Code-agnostic on purpose: no engine filenames, no grep pattern list.
+    """
+    import shlex
+
+    parts = ["set +e"]
+    for p in probes:
+        db_id = p["db_id"]
+        rd = shlex.quote(str(p["run_dir"]))
+        sid = shlex.quote(str(p["slurm_id"]))
+        parts.append(f'echo "===JOB {db_id} LS==="')
+        parts.append(f"ls -la --time-style=long-iso {rd} 2>&1")
+        parts.append(f'echo "===JOB {db_id} STREAMS==="')
+        parts.append(
+            f"for f in std_err.txt std_out.txt queue.err queue.out; do "
+            f'if [ -f {rd}/$f ]; then echo "--- $f ---"; tail -n 15 {rd}/$f; fi; done'
+        )
+        parts.append(f'echo "===JOB {db_id} NEWEST==="')
+        parts.append(
+            f"for f in $(ls -t {rd} 2>/dev/null | head -2); do "
+            f'echo "--- $f ---"; tail -n 15 {rd}/$f 2>&1; done'
+        )
+        parts.append(f'echo "===JOB {db_id} SCHED==="')
+        parts.append(
+            f"squeue -j {sid} 2>&1; "
+            f"sacct -j {sid} --format=State,MaxRSS,ExitCode,Elapsed,Timelimit -P 2>&1; "
+            f"sstat -j {sid}.* --format=AveCPU,MaxRSS,NTasks -P 2>&1"
+        )
+        parts.append(f'echo "===JOB {db_id} END==="')
+    return "\n".join(parts)
+
+
+def _parse_probe_output(stdout: str) -> dict:
+    """Parse the batched probe stdout into {db_id: {section: text}} by the markers."""
+    import re
+
+    out: dict[str, dict] = {}
+    cur_id = cur_sec = None
+    buf: list[str] = []
+    marker = re.compile(r"^===JOB (\S+) (LS|STREAMS|NEWEST|SCHED|END)===$")
+
+    def _flush():
+        if cur_id is not None and cur_sec is not None and cur_sec != "END":
+            out.setdefault(cur_id, {})[cur_sec] = "\n".join(buf).strip()
+
+    for line in stdout.splitlines():
+        m = marker.match(line.strip())
+        if m:
+            _flush()
+            cur_id, cur_sec = m.group(1), m.group(2)
+            buf = []
+        else:
+            buf.append(line)
+    _flush()
+    return out
+
+
+class _JobDiagnostics:
+    """Structured + rendered snapshot of a flow at wait_for_jobflow timeout.
+
+    `.jobs` is the structured list (one record per job); `.render()` is the
+    human-readable message the LLM reads.
+    """
+
+    def __init__(self, jobs: list[dict], flow_uuid: str, timeout_s: int, elapsed_s):
+        self.jobs = jobs
+        self.flow_uuid = flow_uuid
+        self.timeout_s = timeout_s
+        self.elapsed_s = elapsed_s
+
+    def render(self) -> str:
+        active = [j for j in self.jobs if j["category"] in ("RUNNING", "QUEUED")]
+        lines = [
+            f"JobflowWaitTimeout after {int(self.timeout_s)}s "
+            f"({self.timeout_s / 3600:.1f}h). Flow {self.flow_uuid}: "
+            f"{len(active)}/{len(self.jobs)} jobs still active.",
+            "",
+        ]
+        for j in self.jobs:
+            cat = j["category"]
+            if cat == "DONE":
+                lines.append(f"[DONE]    {j['name']}  {j['state']}")
+                continue
+            tag = "[ACTIVE]" if cat in ("RUNNING", "QUEUED") else "[FAILED]"
+            head = f"{tag}  {j['name']}  {j['state']}"
+            if j.get("slurm_id"):
+                head += f"  slurm={j['slurm_id']}"
+            head += f"  run={_fmt_duration(j.get('run_time_s'))}  queue={_fmt_duration(j.get('queue_wait_s'))}"
+            lines.append(head)
+            if j.get("run_dir"):
+                lines.append(f"          run_dir = {j['run_dir']}")
+            if j.get("remote_error"):
+                lines.append(f"          (remote probe unavailable: {j['remote_error']})")
+            if j.get("listing"):
+                lines.append("          recent files (newest first):")
+                lines += [f"            {ln}" for ln in j["listing"].splitlines()]
+            if j.get("sched"):
+                lines.append("          scheduler / resources (squeue/sacct/sstat):")
+                lines += [f"            {ln}" for ln in j["sched"].splitlines()]
+            for label, key in (("streams", "streams"), ("newest files", "newest")):
+                if j.get(key):
+                    lines.append(f"          {label} (tail):")
+                    lines += [f"            {ln}" for ln in j[key].splitlines()]
+            if j.get("error"):
+                lines.append(f"          error = {j['error']}")
+        lines += ["", _NEXT_STEPS]
+        return "\n".join(lines)
+
+
+def _collect_job_diagnostics(jc, flow_uuid, project_name, timeout_s=14400, elapsed_s=None):
+    """Snapshot every job in the flow for a timed-out wait_for_jobflow.
+
+    Source A (no remote): per-job state/worker/run_dir/slurm-id/timings from the
+    JobController DB. Sources B+C (one batched SSH per worker, only for jobs that
+    already have a run_dir AND a process_id): a code-agnostic directory listing,
+    the jobflow standard-stream tails, the newest-file tails, and the
+    squeue/sacct/sstat numbers. The remote half is best-effort (fail-soft): any
+    failure attaches remote_error and falls back to Source A. Returns a
+    _JobDiagnostics (carry it into JobflowWaitTimeout).
+    """
+    from jobflow_remote.jobs.state import JobState
+
+    completed = JobState.COMPLETED.value
+    terminal_error = {
+        JobState.FAILED.value,
+        JobState.REMOTE_ERROR.value,
+        JobState.STOPPED.value,
+        JobState.USER_STOPPED.value,
+    }
+
+    raw_jobs = jc.get_jobs_info_by_flow_uuid(flow_uuid)
+
+    # Source A -- classify and time every job from the DB only.
+    records: list[dict] = []
+    for job in raw_jobs:
+        state = _state_value(_job_field(job, "state"))
+        if state == completed:
+            category = "DONE"
+        elif state in terminal_error:
+            category = "FAILED"
+        elif state == JobState.RUNNING.value:
+            category = "RUNNING"
+        else:
+            category = "QUEUED"  # submitted/uploaded/checked-out: no node yet
+
+        created = _to_datetime(_job_field(job, "created_on"))
+        started = _to_datetime(_job_field(job, "start_time"))
+        now = _utcnow()
+        queue_wait_s = (started - created).total_seconds() if (started and created) else None
+        run_time_s = (now - started).total_seconds() if started else None
+
+        records.append({
+            "name": _job_field(job, "name"),
+            "uuid": _job_field(job, "uuid"),
+            "db_id": _job_field(job, "db_id"),
+            "worker": _job_field(job, "worker"),
+            "state": state,
+            "category": category,
+            "run_dir": _job_field(job, "run_dir"),
+            "slurm_id": _job_process_id(job),
+            "queue_wait_s": queue_wait_s,
+            "run_time_s": run_time_s,
+            "error": _job_field(job, "error"),
+        })
+
+    # Sources B+C -- one batched remote probe per worker, only for jobs that have a
+    # run_dir AND a slurm id (RUNNING ones; QUEUED jobs have no node yet -> skip).
+    by_worker: dict[str, list[dict]] = {}
+    rec_by_id: dict[str, dict] = {}
+    for rec in records:
+        if rec["category"] in ("RUNNING", "QUEUED") and rec["run_dir"] and rec["slurm_id"]:
+            by_worker.setdefault(rec["worker"], []).append({
+                "db_id": rec["db_id"],
+                "run_dir": rec["run_dir"],
+                "slurm_id": rec["slurm_id"],
+            })
+            rec_by_id[str(rec["db_id"])] = rec
+
+    for worker, probes in by_worker.items():
+        # Fail-soft: the SSH call AND the parsing. A gather failure must never
+        # suppress the JobflowWaitTimeout -- fall back to Source A for these jobs.
+        try:
+            host = _get_ssh_host(project_name, worker)
+            stdout, _stderr, _rc = host.execute(_remote_probe_script(probes))
+            parsed = _parse_probe_output(stdout)
+            for db_id, sections in parsed.items():
+                rec = rec_by_id.get(str(db_id))
+                if rec is None:
+                    continue
+                rec["listing"] = sections.get("LS")
+                rec["streams"] = sections.get("STREAMS")
+                rec["newest"] = sections.get("NEWEST")
+                rec["sched"] = sections.get("SCHED")
+        except Exception as e:  # noqa: BLE001 -- best-effort enrichment
+            for probe in probes:
+                rec = rec_by_id.get(str(probe["db_id"]))
+                if rec is not None:
+                    rec["remote_error"] = f"{type(e).__name__}: {e}"
+
+    return _JobDiagnostics(records, flow_uuid, timeout_s, elapsed_s)
+
+
 @tool
 def wait_for_jobflow(
     project_name: str,
     job_uuid: str,
+    timeout_s: int = 14400,
 ) -> dict:
     """Block until all jobs in a jobflow complete, showing progress for each.
 
@@ -81,18 +397,22 @@ def wait_for_jobflow(
       3. Returns the output of the specified job when complete
       4. Raises an exception if any job fails
 
-    This function handles long SLURM queue waits automatically (up to 12 hours).
-    Do not attempt to set your own timeout -- just call this and wait for it to
-    return.
+    Long SLURM queue waits are handled automatically. If the flow is still not
+    terminal after timeout_s, the call returns control to you by raising
+    JobflowWaitTimeout, which carries a diagnostic snapshot of every non-terminal
+    job (recent files, scheduler/memory numbers, log tails) plus next-step options.
+    You can then keep waiting (call this again) or investigate and fix. You normally
+    do not need to set timeout_s -- the 4h default is the right check-in cadence.
 
     Args:
         project_name: The jobflow-remote project (as configured in ~/.jfremote).
         job_uuid: Any Job UUID from the flow to monitor.
+        timeout_s: Seconds to wait before returning control with a diagnostic
+            snapshot (default 14400 = 4h). You rarely need to change this.
 
     Returns:
         The output dict of the specified job.
     """
-    timeout_s = 43200  # 12h internal safeguard; not exposed to the agent
     from jobflow_remote.jobs.jobcontroller import JobController
     from jobflow_remote.jobs.state import JobState
 
@@ -175,19 +495,16 @@ def wait_for_jobflow(
 
                 return jc.get_job_output(job_id=job_uuid, load=True)
 
-        # Timeout check -- return status dict instead of raising
+        # Bounded wait: after timeout_s, hand control back to the agent with a
+        # diagnostic snapshot of every non-terminal job (no internal backstop --
+        # we trust the agent to re-call wait_for_jobflow as it sees fit).
         if elapsed > timeout_s:
-            job_states = {
-                _get(j, "name"): _state_val(_get(j, "state")) for j in jobs
-            }
-            print(f"  Timeout after {int(elapsed)}s. Job states: {job_states}", flush=True)
-            return {
-                "status": "timeout",
-                "flow_uuid": flow_uuid,
-                "job_uuid": job_uuid,
-                "elapsed_s": int(elapsed),
-                "job_states": job_states,
-            }
+            print(f"  Timeout after {int(elapsed)}s; gathering diagnostics.", flush=True)
+            raise JobflowWaitTimeout(
+                _collect_job_diagnostics(
+                    jc, flow_uuid, project_name, timeout_s=timeout_s, elapsed_s=elapsed
+                )
+            )
 
         time.sleep(POLL_S)
         if _pause_controller is not None:
@@ -1240,3 +1557,190 @@ Returns an empty list if the directory does not exist."""
     ) -> list[str]:
         host = _get_ssh_host(project_name, worker_name)
         return host.listdir(remote_path)
+
+
+# --- Web access tools (web_fetch + web_search) ---
+#
+# web_fetch mirrors the Anthropic API web_fetch server tool (url in -> raw content out;
+# no prompt/sub-model -- the agent reads the content itself). It runs client-side in this
+# harness, so it does NOT enforce Anthropic's "URL must be in context" rule: bash already
+# has unrestricted container network, so restricting web_fetch URLs would add no real
+# protection, and the agent legitimately fetches canonical repo/PyPI URLs it knows.
+#
+# web_search is provider-native: it reaches Google Search via Gemini "Grounding with
+# Google Search", invoked through the litellm MatClaw already uses. The model and key are
+# resolved in create_agent (from agent.web_search, falling back to providers.<provider>)
+# and passed in -- the tool never reads a hardcoded env-var name.
+# See docs/exec-plans/active/2026-06-05_web-access-tools.md.
+
+
+def _normalize_fetch_url(url: str) -> str:
+    """Rewrite the friendly GitHub/PyPI URLs the agent knows into endpoints that return
+    real content (GitHub pages are JS-rendered SPAs whose file text a plain GET misses):
+
+      github.com/<o>/<r>/blob/<ref>/<path>  -> raw.githubusercontent.com/<o>/<r>/<ref>/<path>
+      github.com/<o>/<r>                    -> api.github.com/repos/<o>/<r>/readme
+      pypi.org/project/<name>               -> pypi.org/pypi/<name>/json
+
+    Anything else is returned unchanged.
+    """
+    import re
+
+    m = re.match(r"https?://github\.com/([^/]+)/([^/]+)/blob/(.+)$", url)
+    if m:
+        return f"https://raw.githubusercontent.com/{m.group(1)}/{m.group(2)}/{m.group(3)}"
+    m = re.match(r"https?://github\.com/([^/]+)/([^/]+)/?$", url)
+    if m:
+        return f"https://api.github.com/repos/{m.group(1)}/{m.group(2)}/readme"
+    m = re.match(r"https?://pypi\.org/project/([^/]+)/?$", url)
+    if m:
+        return f"https://pypi.org/pypi/{m.group(1)}/json"
+    return url
+
+
+@tool
+def web_fetch(url: str, max_chars: int = 40000) -> str:
+    """Fetch a web page or API endpoint and return its text (HTML rendered to markdown).
+
+    Returns the raw page content for you to read (this agent IS the model -- there is no
+    sub-model and no prompt argument). Reliable for env bring-up targets: GitHub (READMEs,
+    pyproject/requirements, releases), PyPI (versions + dependencies), Hugging Face, and
+    project docs. GitHub blob URLs are auto-rewritten to raw.githubusercontent.com, a bare
+    github.com/<org>/<repo> fetches the README, and pypi.org/project/<name> is rewritten to
+    the JSON metadata endpoint. JSON and plain text pass through unchanged; HTML is converted
+    to markdown. Set GITHUB_TOKEN in the environment to raise the GitHub rate limit. For PDFs,
+    download with bash and read with read_pdf.
+
+    Args:
+        url: The URL to fetch (https). GitHub/PyPI URLs are normalized automatically.
+        max_chars: Truncate the returned text to this many characters (default 40000).
+
+    Returns:
+        The page text: markdown for HTML pages, raw text for JSON/plain endpoints.
+    """
+    import requests
+    from markdownify import markdownify
+
+    url = _normalize_fetch_url(url)
+    headers = {"User-Agent": "MatClaw/1.0"}
+    if "api.github.com" in url:
+        headers["Accept"] = "application/vnd.github.raw+json"  # raw README, not base64 JSON
+        token = os.environ.get("GITHUB_TOKEN")
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+
+    resp = requests.get(url, headers=headers, timeout=20)
+    resp.raise_for_status()  # fail-fast: surface 404/403/rate-limit as the tool's error
+    ctype = resp.headers.get("Content-Type", "").lower()
+    text = markdownify(resp.text) if "html" in ctype else resp.text
+    text = text.strip()
+    if len(text) > max_chars:
+        text = text[:max_chars] + f"\n\n[truncated at {max_chars} chars]"
+    return text
+
+
+def _extract_grounding_sources(resp, max_results: int = 5) -> list[tuple[str, str]]:
+    """Pull (title, url) source pages from a Gemini grounding response.
+
+    Walks the serialized response for groundingChunks ({"web": {"uri","title"}}) -- litellm
+    surfaces Gemini's groundingMetadata in version-dependent places, so we search broadly --
+    then resolves the expiring vertexaisearch redirect URIs to their real destinations (one
+    HTTP request each) so web_fetch works on them directly. De-dups by resolved URL and caps
+    to max_results. Best-effort: returns [] if no grounding metadata is present.
+    """
+    import requests
+
+    blobs = []
+    try:
+        blobs.append(resp.model_dump())
+    except Exception:  # noqa: BLE001 -- best-effort metadata extraction
+        pass
+    hidden = getattr(resp, "_hidden_params", None)
+    if isinstance(hidden, dict):
+        blobs.append(hidden)
+
+    raw: list[tuple[str, str]] = []
+
+    def walk(obj):
+        if isinstance(obj, dict):
+            web = obj.get("web") if isinstance(obj.get("web"), dict) else None
+            if web and web.get("uri"):
+                raw.append((web.get("title") or web["uri"], web["uri"]))
+            for v in obj.values():
+                walk(v)
+        elif isinstance(obj, list):
+            for v in obj:
+                walk(v)
+
+    for blob in blobs:
+        walk(blob)
+
+    out: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for title, uri in raw:
+        try:
+            r = requests.get(
+                uri, allow_redirects=True, timeout=10, stream=True,
+                headers={"User-Agent": "MatClaw/1.0"},
+            )
+            final = r.url
+            r.close()
+        except Exception:  # noqa: BLE001 -- fall back to the redirect URL if resolution fails
+            final = uri
+        if final in seen:
+            continue
+        seen.add(final)
+        out.append((title, final))
+        if len(out) >= max_results:
+            break
+    return out
+
+
+class WebSearchTool(Tool):
+    name = "web_search"
+    description = (
+        "Search the web (Google, via Gemini grounding) and return a short grounded summary "
+        "with source URLs. Use this for the 'I don't know the URL' case (an install recipe, a "
+        "dependency conflict discussed in an issue); if you already know the URL, prefer "
+        "web_fetch. Do NOT use web search for correctness-critical facts (DFT settings, energy "
+        "corrections) -- read those from the installed library source with grep."
+    )
+
+    inputs = {
+        "query": {"type": "string", "description": "The search query."},
+        "max_results": {
+            "type": "integer",
+            "description": "Cap on the number of source links returned (default 5).",
+            "nullable": True,
+        },
+    }
+    output_type = "string"
+
+    def __init__(self, model: str, api_key: str | None = None):
+        super().__init__()
+        self._model = model
+        self._api_key = api_key  # the RESOLVED key value (not an env-var name); may be None
+
+    def forward(self, query: str, max_results: int = 5) -> str:
+        from litellm import completion
+
+        try:
+            # One-shot grounding call. Fail-soft: a missing key / network / quota error
+            # becomes an agent-readable message, never a crash of the run.
+            resp = completion(
+                model=self._model,
+                api_key=self._api_key,
+                messages=[{"role": "user", "content": query}],
+                tools=[{"googleSearch": {}}],
+            )
+        except Exception as e:  # noqa: BLE001 -- report to the agent, do not propagate
+            return (
+                f"web_search unavailable ({type(e).__name__}: {e}). "
+                "Try web_fetch with a known URL."
+            )
+
+        answer = (resp.choices[0].message.content or "").strip()
+        sources = _extract_grounding_sources(resp, max_results)
+        if sources:
+            answer += "\n\nSources:\n" + "\n".join(f"- {t}: {u}" for t, u in sources)
+        return answer or f"No results for: {query}"

@@ -23,6 +23,10 @@ dependencies = [
     "jobflow-remote==0.1.8",
     "pyyaml",
     "pymupdf>=1.24",
+    # web_fetch: requests (promoted from transitive) + HTML->markdown. web_search needs
+    # nothing new -- it calls litellm (above) for Gemini grounding.
+    "requests",
+    "markdownify",
 ]
 
 [project.optional-dependencies]
