@@ -17,6 +17,9 @@
 #                                              across runs; installs reinstall fast)
 #   MATCLAW_FORWARD_ENV="VAR1 VAR2"           extra env vars to forward beyond the ones the
 #                                             configs reference via ${VAR}
+#   MATCLAW_GPUS=all                          pass --gpus to the container for GPU workloads
+#                                             (e.g. MatterGen); requires nvidia-container-toolkit
+#                                             on the host. Unset (default) = no GPU, unchanged.
 #   MATCLAW_WORKSPACE=/path/to/run            host workspace dir (default: repo workspace/);
 #                                             point outside the repo to keep run data separate
 #   MATCLAW_CONFIGS=/path/to/config           host config dir (default: repo configs/);
@@ -79,6 +82,10 @@ if [ -n "${DETACH:-}" ]; then
 else
     ARGS+=(-it)
 fi
+
+# Optional GPU passthrough (e.g. MatterGen). Off by default so non-GPU runs are unchanged;
+# requires nvidia-container-toolkit on the host.
+[ -n "${MATCLAW_GPUS:-}" ] && ARGS+=(--gpus "${MATCLAW_GPUS}")
 
 # Secrets (never baked into the image). Forward ONLY the env vars the configs actually reference via
 # ${VAR} -- whatever names the user chose (GEMINI_API_KEY, a custom GEMINI_KEY, ...) -- for any that
