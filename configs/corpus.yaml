@@ -13,3 +13,9 @@ corpus:
   vasp:
     path: docs/vasp
     description: "VASP wiki documentation -- INCAR tags (ALGO, IBRION, NBANDS, ...), defaults, and recommended settings (one markdown file per tag)."
+  abacus:
+    path: docs/abacus
+    description: "ABACUS DFT -- COMPLETE upstream docs/ tree: full INPUT keyword reference, STRU/KPT formats, SCF/magnetism (nspin, mag), DFT+U, MD/relax, bandstructure/DOS, interfaces, pseudopotentials+orbitals (LCAO), and more. grep for any keyword or feature; see SOURCE.md + index.rst."
+  lammps:
+    path: docs/lammps
+    description: "LAMMPS -- COMPLETE manual source (doc/src, ~1000 pages): every pair_style/fix/compute/dump/region command, input-script + data-file formats, minimize, units. grep for any command syntax; see SOURCE.md + Commands_all.rst."

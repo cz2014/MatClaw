@@ -8,7 +8,7 @@ dir afterwards.
 
 Tier: integration. Run with:
 
-    MATCLAW_TEST_REMOTE_DIR=/anvil/scratch/x-cz2014/agent_tmp \\
+    MATCLAW_TEST_REMOTE_DIR=/anvil/scratch/<user>/agent_tmp \\
       uv run --project code --extra dev pytest code/tests -m integration --hpc-project anvil
 """
 

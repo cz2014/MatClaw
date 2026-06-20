@@ -73,3 +73,7 @@ traces/
 # macOS
 .DS_Store
 node_modules/
+
+# Scratch / tooling output (not for commit)
+tmp/
+.playwright-mcp/

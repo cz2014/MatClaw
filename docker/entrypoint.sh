@@ -26,7 +26,7 @@ SSH_DST="${HOME}/.ssh"
 #    (a) the loopback Mongo host (queue store + docs store + GridFS additional store)
 #        -> the host alias, so the agent reaches the shared host Mongo; and
 #    (b) every SSH `key_filename` -> the in-container ssh dir. The mounted config holds
-#        HOST paths (e.g. /home/<host-user>/.ssh/key_anvil); inside the container the
+#        HOST paths (e.g. /home/<host-user>/.ssh/<key>); inside the container the
 #        keys are re-staged under ${SSH_DST} by basename (block 2), so any in-container
 #        SSH -- jobflow-remote and the remote_* tools -- must read them from there, not
 #        the host path (which does not exist in the container). Without (b) every
