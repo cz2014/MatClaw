@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import shutil
 import subprocess
+import threading
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +23,24 @@ def set_pause_controller(controller):
     """Set the pause controller for wait_for_jobflow polling."""
     global _pause_controller
     _pause_controller = controller
+
+
+def _wait_if_paused(context: str) -> None:
+    """Honor harness pause state locally or through the kernel tool socket."""
+    if _pause_controller is not None:
+        _pause_controller.wait_if_paused(context=context)
+        return
+    socket_path = os.environ.get("MATCLAW_TOOL_SOCKET")
+    if not socket_path:
+        return
+    from core.toolserver import ToolClient
+
+    client = ToolClient(socket_path)
+    try:
+        while client.call("pause_status").get("paused"):
+            time.sleep(0.25)
+    except (ConnectionError, OSError, RuntimeError):
+        return
 
 
 class JobflowWaitTimeout(Exception):
@@ -160,6 +181,43 @@ def _fmt_duration(seconds):
     if m:
         return f"{m}m{s:02d}s"
     return f"{s}s"
+
+
+@dataclass(frozen=True)
+class ToolSpec:
+    """Picklable inputs for constructing stateless tools inside a kernel."""
+
+    workspace: Path
+    search_roots: tuple[Path, ...]
+    site_packages: Path
+    experience_path: Path | None = None
+    web_search_model: str | None = None
+    web_search_api_key: str | None = None
+    disabled: tuple[str, ...] = ()
+
+
+def build_stateless_tools(spec: ToolSpec) -> list[Tool]:
+    """Build per-kernel tools whose behavior depends only on config/filesystem."""
+    tools: list[Tool] = [
+        wait_for_jobflow,
+        WriteFileTool(spec.workspace),
+        ReadFileTool(spec.workspace),
+        EditFileTool(spec.workspace),
+        ReadPdfTool(spec.workspace),
+        GrepTool(list(spec.search_roots), spec.site_packages),
+        GlobTool(list(spec.search_roots), spec.workspace),
+        FetchHistoryTool(spec.workspace),
+        RemotePutTool(spec.workspace),
+        RemoteGetTool(spec.workspace),
+        RemoteLsTool(),
+        QueryJobstoreTool(),
+        web_fetch,
+        WebSearchTool(model=spec.web_search_model, api_key=spec.web_search_api_key),
+    ]
+    if spec.experience_path is not None:
+        tools.append(WriteExperienceTool(spec.experience_path))
+    disabled = set(spec.disabled)
+    return [tool_instance for tool_instance in tools if tool_instance.name not in disabled]
 
 
 # Fixed, job-agnostic next-steps menu shown on every timeout (S7.3). Deliberately
@@ -389,7 +447,7 @@ def wait_for_jobflow(
     job_uuid: str,
     timeout_s: int = 14400,
 ) -> dict:
-    """Block until all jobs in a jobflow complete, showing progress for each.
+    """Bounded check-in on a jobflow's progress; the jobs themselves are never killed.
 
     Given any job UUID from a flow, this function:
       1. Finds the parent flow containing that job
@@ -397,18 +455,25 @@ def wait_for_jobflow(
       3. Returns the output of the specified job when complete
       4. Raises an exception if any job fails
 
-    Long SLURM queue waits are handled automatically. If the flow is still not
-    terminal after timeout_s, the call returns control to you by raising
-    JobflowWaitTimeout, which carries a diagnostic snapshot of every non-terminal
-    job (recent files, scheduler/memory numbers, log tails) plus next-step options.
-    You can then keep waiting (call this again) or investigate and fix. You normally
-    do not need to set timeout_s -- the 4h default is the right check-in cadence.
+    This follows the same bounded check-in model as wait_command: long SLURM queue
+    waits are handled automatically, but if the flow is still not terminal after
+    timeout_s, the call returns control by raising JobflowWaitTimeout. The exception
+    carries a diagnostic snapshot of every non-terminal job (recent files,
+    scheduler/memory numbers, log tails) plus next-step options. Re-call this tool to
+    wait again, or use the diagnostics to investigate and act.
+
+    Interaction with the per-step timeout: the code step itself returns control
+    after at most 600 s (the `# timeout:` cap) with `running: true` while this call
+    keeps waiting inside its kernel. For long HPC waits, run this call in a
+    dedicated kernel (e.g. `# kernel: hpc`) and check in from later steps with
+    `wait_command("hpc")`; timeout_s only bounds the wait inside that kernel.
 
     Args:
         project_name: The jobflow-remote project (as configured in ~/.jfremote).
         job_uuid: Any Job UUID from the flow to monitor.
-        timeout_s: Seconds to wait before returning control with a diagnostic
-            snapshot (default 14400 = 4h). You rarely need to change this.
+        timeout_s: Seconds this call waits in its kernel before raising the
+            diagnostic snapshot (default 14400 = 4h). You rarely need to change it;
+            the step's own `# timeout:` returns control to you far earlier.
 
     Returns:
         The output dict of the specified job.
@@ -507,10 +572,9 @@ def wait_for_jobflow(
             )
 
         time.sleep(POLL_S)
-        if _pause_controller is not None:
-            _pause_controller.wait_if_paused(
-                context=f"During jobflow polling (flow={flow_uuid}, elapsed={int(elapsed)}s)"
-            )
+        _wait_if_paused(
+            context=f"During jobflow polling (flow={flow_uuid}, elapsed={int(elapsed)}s)"
+        )
 
 
 # --- History fetch tool ---
@@ -1132,8 +1196,8 @@ class GrepTool(Tool):
     description = """Search file contents with ripgrep and return a structured result (mirrors Claude `Grep`).
 
 A general content search (not code-only), powered by ripgrep (Rust-regex syntax,
-not POSIX). By default searches the installed package source under site-packages; scope to a
-package with path (e.g. ".../pymatgen") or glob/type. output_mode:
+not POSIX). Searches installed package sources (site-packages) by default; pass path= to search elsewhere, such as the doc corpus directories listed in the system prompt.
+Scope to a package with path (e.g. ".../pymatgen") or glob/type. output_mode:
   - "files_with_matches" (default): list[str] of matching file paths.
   - "content": {"matches": [{"file","line","text"}], "truncated": bool}.
   - "count": {file: match_count}.
@@ -1143,7 +1207,7 @@ Searches all files including .gitignored paths (the package source lives in a gi
 
     inputs = {
         "pattern": {"type": "string", "description": "Ripgrep regex to search for."},
-        "path": {"type": "string", "description": "Dir/file to search (default: corpus/sources).", "nullable": True},
+        "path": {"type": "string", "description": "Dir/file to search (default: installed package sources under site-packages).", "nullable": True},
         "glob": {"type": "string", "description": "Glob filter, e.g. '**/*.py'.", "nullable": True},
         "type": {"type": "string", "description": "ripgrep file type, e.g. 'py'.", "nullable": True},
         "output_mode": {
@@ -1275,15 +1339,584 @@ the workspace."""
         return out
 
 
+# One process-table scan is shared by every vitals sampler tick in this window;
+# each owned process would otherwise walk the whole host table five times a second.
+_PROCESS_SCAN_TTL_S = 0.15
+_process_scan_lock = threading.Lock()
+_process_scan: tuple[float, dict[int, list]] = (0.0, {})
+
+
+def _process_table_by_group(max_age_s: float = 0.0) -> dict[int, list]:
+    """Return the host process table grouped by pgid, reusing a recent scan."""
+    import psutil
+
+    global _process_scan
+    with _process_scan_lock:
+        sampled_at, groups = _process_scan
+        if groups and time.monotonic() - sampled_at < max_age_s:
+            return groups
+        groups = {}
+        for proc in psutil.process_iter():
+            try:
+                groups.setdefault(os.getpgid(proc.pid), []).append(proc)
+            except (OSError, psutil.Error):
+                continue
+        _process_scan = (time.monotonic(), groups)
+        return groups
+
+
+def _process_create_time(pid: int) -> float | None:
+    """Identity stamp for a PID, used to detect reuse; None when unreadable."""
+    import psutil
+
+    try:
+        return psutil.Process(pid).create_time()
+    except psutil.Error:
+        return None
+
+
+@dataclass
+class _LocalProcess:
+    proc: subprocess.Popen
+    command: str
+    log_path: Path
+    started_at: float
+    stream: Any = field(repr=False)
+    max_output_chars: int = 30_000
+    background: bool = False
+    create_time: float | None = None
+    sample_at: float = 0.0
+    sample_cpu_time: float = 0.0
+    sample_rss: int = 0
+    sample_log_size: int = 0
+    latest_vitals: dict = field(default_factory=dict, repr=False)
+    sample_ready: threading.Event = field(default_factory=threading.Event, repr=False)
+    sample_stop: threading.Event = field(default_factory=threading.Event, repr=False)
+    sampler: threading.Thread | None = field(default=None, repr=False)
+
+
+class _LocalExecState:
+    """Harness-owned foreground Bash slot and background process registry."""
+
+    def __init__(self, workspace: Path, pause_controller=None, kill_grace_s: float = 5.0):
+        self.workspace = workspace.resolve()
+        self.pause_controller = pause_controller
+        self.kill_grace_s = kill_grace_s
+        self.foreground: _LocalProcess | None = None
+        self.background: dict[int, _LocalProcess] = {}
+        self.completed: dict[int, _LocalProcess] = {}
+        self.completed_foreground_pid: int | None = None
+        self._completion_notes: list[str] = []
+        self._lock = threading.RLock()
+
+    def _log_path(self, prefix: str) -> Path:
+        return self.workspace / f".{prefix}_{os.getpid()}_{time.time_ns()}.log"
+
+    @staticmethod
+    def _close_stream(record: _LocalProcess) -> None:
+        record.sample_stop.set()
+        if record.sampler is not None and record.sampler is not threading.current_thread():
+            record.sampler.join(timeout=0.2)
+        if not record.stream.closed:
+            record.stream.close()
+
+    @staticmethod
+    def _output(record: _LocalProcess, cap: int | None = None) -> tuple[str, bool]:
+        cap = cap or record.max_output_chars
+        try:
+            size = record.log_path.stat().st_size
+        except FileNotFoundError:
+            return "", False
+        with record.log_path.open("rb") as stream:
+            if size <= cap:
+                return stream.read().decode("utf-8", errors="replace"), False
+            half = max(1, cap // 2)
+            head = stream.read(half).decode("utf-8", errors="replace")
+            stream.seek(max(0, size - half))
+            tail = stream.read(half).decode("utf-8", errors="replace")
+        return (
+            head
+            + f"\n..._This content has been truncated to stay below {cap} characters_...\n"
+            + tail,
+            True,
+        )
+
+    @staticmethod
+    def _group_alive(pgid: int) -> bool:
+        try:
+            os.killpg(pgid, 0)
+            return True
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+
+    @staticmethod
+    def _group_processes(pgid: int, max_age_s: float = 0.0):
+        return _process_table_by_group(max_age_s).get(pgid, [])
+
+    @staticmethod
+    def _same_process(proc, create_time: float | None) -> bool:
+        import psutil
+
+        if create_time is None:
+            return True
+        try:
+            return abs(proc.create_time() - create_time) < 1e-6
+        except psutil.Error:
+            return False
+
+    @classmethod
+    def _record_running(cls, record: _LocalProcess) -> bool:
+        """Popen owns the direct child; a surviving group must prove its identity.
+
+        A PID/PGID recycled by an unrelated process would otherwise keep the slot
+        busy forever and make the kill ladder signal a stranger.
+        """
+        if record.proc.poll() is None:
+            return True
+        if not cls._group_alive(record.proc.pid):
+            return False
+        members = cls._group_processes(record.proc.pid)
+        for proc in members:
+            if proc.pid == record.proc.pid and not cls._same_process(proc, record.create_time):
+                return False
+        return bool(members)
+
+    @classmethod
+    def _resource_totals(cls, record: _LocalProcess) -> tuple[float, int, int]:
+        import psutil
+
+        members = cls._group_processes(record.proc.pid, _PROCESS_SCAN_TTL_S)
+        cpu_time = 0.0
+        rss = 0
+        live = 0
+        for proc in members:
+            try:
+                cpu_time += sum(proc.cpu_times()[:2])
+                rss += proc.memory_info().rss
+            except psutil.Error:
+                continue
+            live += 1
+        return cpu_time, rss, max(0, live - 1)
+
+    @classmethod
+    def _start_sampler(
+        cls, record: _LocalProcess, sample_window_s: float = 1.0, tick_s: float = 0.2
+    ) -> None:
+        import psutil
+
+        def sample() -> None:
+            try:
+                cpu_time, _, _ = cls._resource_totals(record)
+            except (psutil.Error, OSError):
+                cpu_time = 0.0
+            history = [(time.monotonic(), cpu_time)]
+            while not record.sample_stop.wait(tick_s):
+                try:
+                    cpu_time, rss, child_count = cls._resource_totals(record)
+                    now = time.monotonic()
+                    history.append((now, cpu_time))
+                    cutoff = now - sample_window_s
+                    while len(history) > 2 and history[1][0] <= cutoff:
+                        history.pop(0)
+                    sampled_at, cpu_before = history[0]
+                    log_size = record.log_path.stat().st_size if record.log_path.exists() else 0
+                    record.latest_vitals = {
+                        "pid": record.proc.pid,
+                        "elapsed_s": round(max(0.0, now - record.started_at), 3),
+                        "cpu_time_s": round(cpu_time, 3),
+                        "cpu_over_wall": round(
+                            max(0.0, cpu_time - cpu_before) / max(1e-9, now - sampled_at), 3
+                        ),
+                        "rss_bytes": rss,
+                        "children": child_count,
+                        "log_bytes": log_size,
+                    }
+                    record.sample_at = now
+                    record.sample_cpu_time = cpu_time
+                    record.sample_ready.set()
+                    if not cls._record_running(record):
+                        return
+                except (psutil.Error, OSError):
+                    if not cls._record_running(record):
+                        return
+
+        record.sampler = threading.Thread(
+            target=sample,
+            name=f"matclaw-vitals-{record.proc.pid}",
+            daemon=True,
+        )
+        record.sampler.start()
+
+    @classmethod
+    def _vitals(cls, record: _LocalProcess) -> dict:
+        import psutil
+
+        record.sample_ready.wait(timeout=0.05)
+        if record.latest_vitals:
+            result = dict(record.latest_vitals)
+            result["elapsed_s"] = round(max(0.0, time.monotonic() - record.started_at), 3)
+            result["rss_delta"] = result["rss_bytes"] - record.sample_rss
+            result["log_growth_bytes"] = result["log_bytes"] - record.sample_log_size
+            record.sample_rss = result["rss_bytes"]
+            record.sample_log_size = result["log_bytes"]
+            return result
+        try:
+            cpu_time, rss, child_count = cls._resource_totals(record)
+            log_size = record.log_path.stat().st_size if record.log_path.exists() else 0
+            return {
+                "pid": record.proc.pid,
+                "elapsed_s": round(max(0.0, time.monotonic() - record.started_at), 3),
+                "cpu_time_s": round(cpu_time, 3),
+                "cpu_over_wall": 0.0,
+                "rss_bytes": rss,
+                "rss_delta": rss,
+                "children": child_count,
+                "log_bytes": log_size,
+                "log_growth_bytes": log_size,
+            }
+        except (psutil.Error, OSError):
+            return {
+                "pid": record.proc.pid,
+                "elapsed_s": round(max(0.0, time.monotonic() - record.started_at), 3),
+                "log_bytes": record.log_path.stat().st_size if record.log_path.exists() else 0,
+            }
+
+    def _reap(self) -> None:
+        if self.foreground is not None and not self._record_running(self.foreground):
+            record = self.foreground
+            self._close_stream(record)
+            self._completion_notes.append(
+                f"bash PID {record.proc.pid} completed with returncode {record.proc.returncode}"
+            )
+            self.completed[record.proc.pid] = record
+            self.completed_foreground_pid = record.proc.pid
+            self.foreground = None
+        for pid, record in list(self.background.items()):
+            if not self._record_running(record):
+                self._close_stream(record)
+                self._completion_notes.append(
+                    f"background PID {pid} completed with returncode {record.proc.returncode}"
+                )
+                self.completed[pid] = record
+                del self.background[pid]
+
+    def _take_notes(self) -> list[str]:
+        notes, self._completion_notes = self._completion_notes, []
+        return notes
+
+    def take_completion_notes(self) -> list[str]:
+        """Reap, then drain the pending bash notes so a code step can carry them."""
+        with self._lock:
+            self._reap()
+            return self._take_notes()
+
+    def is_local_target(self, target: str | int) -> bool:
+        """True for the bash aliases and for PIDs this state currently knows."""
+        if target in ("bash", "foreground", "bash:foreground"):
+            return True
+        try:
+            pid = int(str(target).removeprefix("bash:"))
+        except ValueError:
+            return False
+        with self._lock:
+            return (
+                (self.foreground is not None and self.foreground.proc.pid == pid)
+                or pid in self.background
+                or pid in self.completed
+            )
+
+    def status_lines(self) -> str:
+        with self._lock:
+            self._reap()
+            if self.foreground is None:
+                foreground = "bash: idle"
+            else:
+                v = self._vitals(self.foreground)
+                foreground = (
+                    f"bash: busy {_fmt_duration(v['elapsed_s'])}, "
+                    f"cpu {v.get('cpu_over_wall', 0) * 100:.0f}%, "
+                    f"rss {v.get('rss_bytes', 0) / (1024 ** 2):.1f}M"
+                )
+            live = [record for record in self.background.values() if self._record_running(record)]
+            if live:
+                background = "background: " + " | ".join(
+                    f"PID {record.proc.pid} {record.command[:40]} "
+                    f"(elapsed {_fmt_duration(time.monotonic() - record.started_at)}, "
+                    f"cpu {self._vitals(record).get('cpu_over_wall', 0) * 100:.0f}%)"
+                    for record in live
+                )
+            else:
+                background = "background: none"
+            return foreground + "\n" + background
+
+    def run_bash(
+        self,
+        command: str,
+        timeout: int = 120,
+        max_output_chars: int = 30_000,
+        cwd: str | None = None,
+        run_in_background: bool = False,
+    ) -> dict:
+        run_cwd = str(self.workspace if cwd is None else Path(cwd))
+        timeout = min(int(timeout or 120), 600)
+        cap = int(max_output_chars or 30_000)
+        with self._lock:
+            self._reap()
+            notes = self._take_notes()
+            if run_in_background:
+                log = self._log_path("bash_bg")
+                stream = open(log, "wb")
+                proc = subprocess.Popen(
+                    command,
+                    shell=True,
+                    cwd=run_cwd,
+                    stdout=stream,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
+                record = _LocalProcess(
+                    proc,
+                    command,
+                    log,
+                    time.monotonic(),
+                    stream,
+                    cap,
+                    background=True,
+                    create_time=_process_create_time(proc.pid),
+                )
+                self._start_sampler(record)
+                self.background[proc.pid] = record
+                return {
+                    "pid": proc.pid,
+                    "background": True,
+                    "log_file": os.path.relpath(log, self.workspace),
+                    "returncode": None,
+                    "completion_notes": notes,
+                }
+
+            if self.foreground is not None:
+                record = self.foreground
+                output, truncated = self._output(record, cap)
+                return {
+                    "running": True,
+                    "bash": "foreground",
+                    "pid": record.proc.pid,
+                    "elapsed": time.monotonic() - record.started_at,
+                    "stdout": output,
+                    "tail": output[-4000:],
+                    "truncated": truncated,
+                    "log_file": os.path.relpath(record.log_path, self.workspace),
+                    "vitals": self._vitals(record),
+                    "refused": True,
+                    "completion_notes": notes,
+                }
+
+            log = self._log_path("bash_fg")
+            stream = open(log, "wb")
+            proc = subprocess.Popen(
+                command,
+                shell=True,
+                cwd=run_cwd,
+                stdout=stream,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+            record = _LocalProcess(
+                proc,
+                command,
+                log,
+                time.monotonic(),
+                stream,
+                cap,
+                create_time=_process_create_time(proc.pid),
+            )
+            self._start_sampler(record)
+            self.completed_foreground_pid = None
+            self.foreground = record
+
+        if not self._wait_record(record, timeout):
+            with self._lock:
+                output, truncated = self._output(record, cap)
+                return {
+                    "running": True,
+                    "bash": "foreground",
+                    "pid": proc.pid,
+                    "elapsed": time.monotonic() - record.started_at,
+                    "stdout": output,
+                    "tail": output[-4000:],
+                    "truncated": truncated,
+                    "log_file": os.path.relpath(log, self.workspace),
+                    "vitals": self._vitals(record),
+                    "completion_notes": notes,
+                }
+
+        with self._lock:
+            self._close_stream(record)
+            output, truncated = self._output(record, cap)
+            if self.foreground is record:
+                self.foreground = None
+            return {
+                "stdout": output,
+                "returncode": proc.returncode,
+                "truncated": truncated,
+                "log_file": os.path.relpath(log, self.workspace),
+                "completion_notes": notes,
+            }
+
+    def _resolve(self, target: str | int) -> _LocalProcess | None:
+        self._reap()
+        if target in ("bash", "foreground", "bash:foreground"):
+            if self.foreground is not None:
+                return self.foreground
+            if self.completed_foreground_pid is not None:
+                return self.completed.get(self.completed_foreground_pid)
+            return None
+        try:
+            pid = int(str(target).removeprefix("bash:"))
+        except ValueError:
+            return None
+        if self.foreground is not None and self.foreground.proc.pid == pid:
+            return self.foreground
+        return self.background.get(pid) or self.completed.get(pid)
+
+    def _wait_record(self, record: _LocalProcess, timeout: float) -> bool:
+        deadline = time.monotonic() + max(0.0, timeout)
+        while self._record_running(record):
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(min(0.05, max(0.0, deadline - time.monotonic())))
+        record.proc.poll()
+        return True
+
+    def wait_command(self, target: str | int, timeout: int = 60) -> dict:
+        # Same per-call cap as kernel execution: a check-in is always bounded.
+        timeout = min(max(0, int(timeout or 60)), 600)
+        with self._lock:
+            record = self._resolve(target)
+            notes = self._take_notes()
+            if record is None:
+                return {"running": False, "target": str(target), "completion_notes": notes}
+        if not self._wait_record(record, timeout):
+            with self._lock:
+                output, truncated = self._output(record)
+                return {
+                    "running": True,
+                    "bash": str(target),
+                    "pid": record.proc.pid,
+                    "elapsed": time.monotonic() - record.started_at,
+                    "stdout": output,
+                    "tail": output[-4000:],
+                    "truncated": truncated,
+                    "log_file": os.path.relpath(record.log_path, self.workspace),
+                    "vitals": self._vitals(record),
+                    "completion_notes": notes,
+                }
+        with self._lock:
+            self._close_stream(record)
+            output, truncated = self._output(record)
+            if self.foreground is record:
+                self.foreground = None
+            self.background.pop(record.proc.pid, None)
+            self.completed.pop(record.proc.pid, None)
+            if self.completed_foreground_pid == record.proc.pid:
+                self.completed_foreground_pid = None
+            return {
+                "running": False,
+                "bash": str(target),
+                "pid": record.proc.pid,
+                "stdout": output,
+                "returncode": record.proc.returncode,
+                "truncated": truncated,
+                "log_file": os.path.relpath(record.log_path, self.workspace),
+                "completion_notes": notes,
+            }
+
+    def kill_command(self, target: str | int) -> dict:
+        with self._lock:
+            record = self._resolve(target)
+            notes = self._take_notes()
+            if record is None:
+                return {
+                    "running": False,
+                    "target": str(target),
+                    "method": "noop",
+                    "completion_notes": notes,
+                }
+            if not self._record_running(record):
+                self._close_stream(record)
+                output, truncated = self._output(record)
+                self.completed.pop(record.proc.pid, None)
+                if self.completed_foreground_pid == record.proc.pid:
+                    self.completed_foreground_pid = None
+                return {
+                    "running": False,
+                    "bash": str(target),
+                    "pid": record.proc.pid,
+                    "method": "noop",
+                    "stdout": output,
+                    "returncode": record.proc.returncode,
+                    "truncated": truncated,
+                    "log_file": os.path.relpath(record.log_path, self.workspace),
+                    "completion_notes": notes,
+                }
+        method = "term"
+        try:
+            os.killpg(record.proc.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        if not self._wait_record(record, self.kill_grace_s):
+            method = "kill"
+            try:
+                os.killpg(record.proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            self._wait_record(record, max(1.0, self.kill_grace_s))
+        with self._lock:
+            self._close_stream(record)
+            output, truncated = self._output(record)
+            if self.foreground is record:
+                self.foreground = None
+            self.background.pop(record.proc.pid, None)
+            self.completed.pop(record.proc.pid, None)
+            if self.completed_foreground_pid == record.proc.pid:
+                self.completed_foreground_pid = None
+            return {
+                "running": False,
+                "bash": str(target),
+                "pid": record.proc.pid,
+                "method": method,
+                "stdout": output,
+                "returncode": record.proc.returncode,
+                "truncated": truncated,
+                "log_file": os.path.relpath(record.log_path, self.workspace),
+                "completion_notes": notes,
+            }
+
+    def shutdown(self) -> None:
+        with self._lock:
+            records = ([self.foreground] if self.foreground is not None else []) + list(
+                self.background.values()
+            )
+        for record in records:
+            if self._record_running(record):
+                self.kill_command(record.proc.pid)
+        with self._lock:
+            self.foreground = None
+            self.background.clear()
+            self.completed.clear()
+            self.completed_foreground_pid = None
+
+
 class BashTool(Tool):
     name = "bash"
     description = """Run a shell command and capture its output (mirrors Claude `Bash` / OpenAI `ShellTool`).
 
 The explicit shell escape hatch -- bounded by the container, not by path checks.
-stdout and stderr are both captured. Default cwd is the workspace; set cwd to run
-elsewhere (prefer the cwd arg over a `cd` in the command). timeout defaults to 120s
-(cap 600s); output is capped at max_output_chars (default 30000) with a truncated
-flag. Returns {"stdout","stderr","returncode","truncated"}.
+stdout and stderr are merged into stdout. Default cwd is the workspace; set cwd
+to run elsewhere. timeout defaults to 120s (cap 600s) and returns control without
+killing a still-running command. Use wait_command or kill_command to re-enter it.
 
 For long-running HPC compute, submit jobs and use wait_for_jobflow -- not local bash.
 run_in_background launches the command detached, streaming output to a workspace log
@@ -1291,7 +1924,7 @@ file, and returns {"pid","background","log_file"} without waiting."""
 
     inputs = {
         "command": {"type": "string", "description": "The shell command to run."},
-        "timeout": {"type": "integer", "description": "Seconds before the command is killed (default 120, cap 600).", "nullable": True},
+        "timeout": {"type": "integer", "description": "Seconds before returning control without killing work (default 120, cap 600).", "nullable": True},
         "max_output_chars": {"type": "integer", "description": "Cap on captured stdout/stderr (default 30000).", "nullable": True},
         "cwd": {"type": "string", "description": "Working directory (default: workspace).", "nullable": True},
         "run_in_background": {"type": "boolean", "description": "Launch detached, stream to a log file. Default False.", "nullable": True},
@@ -1302,9 +1935,10 @@ file, and returns {"pid","background","log_file"} without waiting."""
     _DEFAULT_TIMEOUT = 120
     _DEFAULT_MAX_CHARS = 30_000
 
-    def __init__(self, workspace: Path):
+    def __init__(self, workspace: Path, state: _LocalExecState | None = None):
         super().__init__()
         self._workspace = workspace.resolve()
+        self._state = state or _LocalExecState(self._workspace)
 
     def forward(
         self,
@@ -1314,42 +1948,68 @@ file, and returns {"pid","background","log_file"} without waiting."""
         cwd: str | None = None,
         run_in_background: bool = False,
     ) -> dict:
-        run_cwd = str(self._workspace if cwd is None else Path(cwd))
-        if run_in_background:
-            log = self._workspace / f".bash_bg_{os.getpid()}_{int(time.time() * 1000)}.log"
-            fh = open(log, "w", encoding="utf-8")
-            proc = subprocess.Popen(
-                command, shell=True, cwd=run_cwd, stdout=fh, stderr=subprocess.STDOUT, text=True
-            )
-            return {
-                "pid": proc.pid,
-                "background": True,
-                "log_file": os.path.relpath(log, self._workspace),
-                "returncode": None,
-            }
+        return self._state.run_bash(
+            command,
+            timeout=timeout,
+            max_output_chars=max_output_chars,
+            cwd=cwd,
+            run_in_background=run_in_background,
+        )
 
-        timeout = min(int(timeout or self._DEFAULT_TIMEOUT), self._TIMEOUT_CAP)
-        cap = int(max_output_chars or self._DEFAULT_MAX_CHARS)
-        try:
-            proc = subprocess.run(
-                command, shell=True, cwd=run_cwd, capture_output=True, text=True, timeout=timeout
-            )
-        except subprocess.TimeoutExpired as e:
-            return {
-                "stdout": (e.stdout or "") if isinstance(e.stdout, str) else "",
-                "stderr": f"[bash: timed out after {timeout}s]",
-                "returncode": None,
-                "truncated": False,
-                "timed_out": True,
-            }
-        stdout, stderr = proc.stdout or "", proc.stderr or ""
-        truncated = len(stdout) > cap or len(stderr) > cap
-        return {
-            "stdout": stdout[:cap],
-            "stderr": stderr[:cap],
-            "returncode": proc.returncode,
-            "truncated": truncated,
-        }
+
+def _require_bash_target(state: _LocalExecState, target: str | int) -> None:
+    """Reject kernel targets: these Tool objects only see the harness bash state."""
+    if state.is_local_target(target):
+        return
+    raise ValueError(
+        f"{target!r} is not a bash target: this tool object covers 'bash' and background "
+        "PIDs only, and kernel targets are reachable only through the kernel runtime's "
+        "RPC stubs."
+    )
+
+
+class WaitCommandTool(Tool):
+    name = "wait_command"
+    description = """Wait briefly for a running local kernel or Bash target.
+
+This is a bounded check-in, not a second execution. It returns completed output, or
+current output and process vitals when the target is still running. Re-call it to
+wait again, or use the diagnostics to decide whether to act. Default timeout is 60
+seconds, capped at 600."""
+    inputs = {
+        "target": {"type": "string", "description": "Kernel name, 'bash', or background PID."},
+        "timeout": {"type": "integer", "description": "Maximum check-in wait in seconds (default 60, cap 600).", "nullable": True},
+    }
+    output_type = "object"
+
+    def __init__(self, state: _LocalExecState):
+        super().__init__()
+        self._state = state
+
+    def forward(self, target: str, timeout: int = 60) -> dict:
+        _require_bash_target(self._state, target)
+        return self._state.wait_command(target, timeout)
+
+
+class KillCommandTool(Tool):
+    name = "kill_command"
+    description = """Stop a running local kernel or Bash target with the harness-owned kill ladder.
+
+Use this after a bounded check-in shows that the work should stop. The ladder is
+automatic and reports the method used and, for kernels, whether the namespace
+survived; there are no signal or force parameters."""
+    inputs = {
+        "target": {"type": "string", "description": "Kernel name, 'bash', or background PID."},
+    }
+    output_type = "object"
+
+    def __init__(self, state: _LocalExecState):
+        super().__init__()
+        self._state = state
+
+    def forward(self, target: str) -> dict:
+        _require_bash_target(self._state, target)
+        return self._state.kill_command(target)
 
 
 # --- Remote transfer tools ---

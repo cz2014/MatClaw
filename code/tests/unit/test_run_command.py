@@ -11,7 +11,6 @@ that captures an output directory; ``env``/``setup`` injection; and ``run_dir`` 
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 from remote_jobs.jobs import _run_command_impl
 

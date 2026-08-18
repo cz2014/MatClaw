@@ -11,26 +11,16 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
-
 from core.context import (
-    _CHARS_PER_TOKEN,
     _HARD_CLEAR_PLACEHOLDER,
-    _SOFT_TRIM_MAX_CHARS,
-    _TRUNCATION_MARKER,
-    _ZONE_HARD_CLEAR,
-    _ZONE_PROTECT,
-    _ZONE_SOFT_TRIM,
-    _count_tokens,
     _enforce_token_cap,
-    _find_first_user_idx,
     _get_content_str,
     _get_role,
-    _total_chars,
-    manage_context,
     wrap_model_with_context_management,
 )
+
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 # ---------------------------------------------------------------------------
 # Test helpers

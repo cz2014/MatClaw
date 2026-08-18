@@ -6,7 +6,6 @@ Loads .env, builds the agent, and runs a task -- the common harness the
 """
 
 import os
-import sys
 from pathlib import Path
 
 # repo root: code/tests/demos/_harness.py -> demos -> tests -> code -> repo root

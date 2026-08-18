@@ -2,14 +2,16 @@
 
 No real LLM/network: the `make_agent` fixture replaces the model with a fake that returns
 pre-written {phase, plan, code, summary} steps. We assert the loop's observable contract --
-structured-output parsing, code execution, namespace persistence across steps, calling a tool
-from the namespace, history.jsonl writing, and final-answer termination. This fills the single
+structured-output parsing, code execution, namespace persistence across steps, rejection of
+user-supplied tools, history.jsonl writing, and final-answer termination. This fills the single
 biggest coverage gap (the orchestration loop has no other automated test).
 """
 
 from __future__ import annotations
 
 import json
+
+import pytest
 
 from core._smol import tool
 
@@ -40,14 +42,18 @@ def test_run_executes_code_and_returns_final_answer(make_agent):
     assert len(agent._fake_calls) == 2
 
 
-def test_run_calls_namespace_tool(make_agent):
-    """A tool passed to create_agent is callable from inside the code action."""
+def test_run_rejects_user_supplied_tools(make_agent):
+    """User Tool objects cannot cross the kernel boundary; the run fails fast.
+
+    Executing them harness-side instead would put them outside all kernel
+    supervision (timeouts, vitals, kill ladder), so the executor refuses them.
+    """
     agent = make_agent(
-        steps=[_step("y = echo_tool('hi')"), _step("final_answer(y)")],
+        steps=[_step("final_answer('never runs')")],
         tools=[echo_tool],
     )
-    result = agent.run("use the echo tool")
-    assert result.output == "echo:hi"
+    with pytest.raises(ValueError, match="user-supplied tools"):
+        agent.run("try to use a custom tool")
 
 
 def test_run_opened_runtime_native_io_and_subprocess(make_agent, tmp_workspace):
@@ -117,3 +123,61 @@ def test_run_writes_history(make_agent, tmp_workspace):
     assert assistant, "expected at least one assistant record"
     assert any(r.get("summary") == "set up" for r in assistant)
     assert any(r.get("phase") == "Phase 1" for r in assistant)
+
+
+def test_run_records_max_steps_error_on_its_own_step(make_agent):
+    """A run that never calls final_answer files a max-steps step of its own.
+
+    The RunResult state must derive from a correctly attributed record: the synthetic step
+    carries the AgentMaxStepsError and uses a step number no other step uses.
+    """
+    from core._smol import ActionStep
+    from core._smol.utils import AgentMaxStepsError
+
+    agent = make_agent(steps=[_step("x = 1")])
+    result = agent.run("never finish", max_steps=1)
+
+    assert result.state == "max_steps_error"
+    action_steps = [s for s in agent.memory.steps if isinstance(s, ActionStep)]
+    errored = [s for s in action_steps if isinstance(s.error, AgentMaxStepsError)]
+    assert len(errored) == 1, "the max-steps error must land on exactly one step"
+    assert errored[0].step_number == 2
+    assert [s.step_number for s in action_steps] == [1, 2]
+
+
+def test_run_stream_yields_the_max_steps_step(make_agent):
+    """Streaming consumers see the max-steps step itself, not a repeat of the last action."""
+    from core._smol import ActionStep
+    from core._smol.utils import AgentMaxStepsError
+
+    agent = make_agent(steps=[_step("x = 1")])
+    yielded = [
+        event for event in agent.run("never finish", max_steps=1, stream=True)
+        if isinstance(event, ActionStep)
+    ]
+
+    assert [s.step_number for s in yielded] == [1, 2]
+    assert isinstance(yielded[-1].error, AgentMaxStepsError)
+
+
+def test_executor_cleanup_registers_exit_backstop(make_agent, monkeypatch):
+    """The executor is reachable from an atexit backstop, and the backstop is idempotent.
+
+    Teardown is otherwise finally-only, so a killed harness would orphan the kernel
+    processes and their child forests.
+    """
+    from core import agent as agent_mod
+
+    registered = []
+    monkeypatch.setattr(agent_mod.atexit, "register", registered.append)
+    monkeypatch.setattr(agent_mod, "_ATEXIT_REGISTERED", False)
+
+    agent = make_agent()
+    executor = agent.python_executor
+    assert registered == [agent_mod._cleanup_active_executors]
+    assert executor in agent_mod._ACTIVE_EXECUTORS
+
+    agent.cleanup()
+    agent_mod._cleanup_active_executors()
+    agent_mod._cleanup_active_executors()
+    assert executor._closed

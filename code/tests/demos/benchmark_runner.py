@@ -9,8 +9,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.analyze_steps import parse
-from tests.utils import append_summary_to_report
+from scripts.analyze_steps import parse  # noqa: E402  (sys.path setup above)
+from tests.utils import append_summary_to_report  # noqa: E402  (sys.path setup above)
 
 WORKSPACE_DIR = PROJECT_ROOT.parent / "workspace"
 RESULTS_DIR = Path(__file__).parent  # demos/ directory

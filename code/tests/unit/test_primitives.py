@@ -70,7 +70,7 @@ def test_read_file_path_traversal_rejected(tmp_path):
 
 def test_write_file_overwrite_and_auto_mkdir(tmp_path):
     t = WriteFileTool(tmp_path)
-    p = t.forward("a/b/c.txt", "hello")
+    t.forward("a/b/c.txt", "hello")
     assert (tmp_path / "a" / "b" / "c.txt").read_text() == "hello"
     t.forward("a/b/c.txt", "world")  # full overwrite, no append
     assert (tmp_path / "a" / "b" / "c.txt").read_text() == "world"
@@ -216,20 +216,28 @@ def test_glob_does_not_apply_gitignore(tmp_path):
 
 def test_bash_captures_stdout_and_stderr(tmp_path):
     res = BashTool(tmp_path).forward("echo out; echo err 1>&2")
-    assert res["stdout"].strip() == "out"
-    assert res["stderr"].strip() == "err"
+    assert "out" in res["stdout"] and "err" in res["stdout"]
+    assert "stderr" not in res
     assert res["returncode"] == 0 and res["truncated"] is False
 
 
 def test_bash_timeout_enforced(tmp_path):
-    res = BashTool(tmp_path).forward("sleep 5", timeout=1)
-    assert res.get("timed_out") is True
-    assert res["returncode"] is None
+    tool = BashTool(tmp_path)
+    try:
+        res = tool.forward("sleep 5", timeout=1)
+        assert res["running"] is True
+        assert res["pid"] > 0
+        assert tool._state.foreground.proc.poll() is None
+    finally:
+        tool._state.shutdown()
 
 
 def test_bash_output_cap_truncated_flag(tmp_path):
-    res = BashTool(tmp_path).forward("printf '%0500d' 0", max_output_chars=100)
-    assert len(res["stdout"]) == 100 and res["truncated"] is True
+    res = BashTool(tmp_path).forward(
+        "printf 'HEAD'; printf '%0500d' 0; printf 'TAIL'", max_output_chars=100
+    )
+    assert res["truncated"] is True
+    assert "HEAD" in res["stdout"] and "TAIL" in res["stdout"]
 
 
 def test_bash_default_cwd_is_workspace(tmp_path):

@@ -23,8 +23,6 @@ import time
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Generator
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from contextvars import copy_context
 from dataclasses import dataclass
 from logging import getLogger
 from pathlib import Path
@@ -36,7 +34,6 @@ from jinja2 import StrictUndefined, Template
 from rich.console import Group
 from rich.live import Live
 from rich.markdown import Markdown
-from rich.panel import Panel
 from rich.rule import Rule
 from rich.text import Text
 
@@ -44,7 +41,7 @@ from rich.text import Text
 if TYPE_CHECKING:
     import PIL.Image
 
-from .agent_types import AgentAudio, AgentImage, handle_agent_output_types
+from .agent_types import handle_agent_output_types
 from .default_tools import TOOL_MAPPING, FinalAnswerTool
 from .local_python_executor import BASE_BUILTIN_MODULES, LocalPythonExecutor, PythonExecutor, fix_final_answer_code
 from .memory import (
@@ -68,7 +65,6 @@ from .models import (
     MessageRole,
     Model,
     agglomerate_stream_deltas,
-    parse_json_if_needed,
 )
 from .monitoring import (
     YELLOW_HEX,
@@ -76,15 +72,13 @@ from .monitoring import (
     LogLevel,
     Monitor,
 )
-from .tools import BaseTool, Tool, validate_tool_arguments
+from .tools import BaseTool, Tool
 from .utils import (
     AgentError,
     AgentExecutionError,
     AgentGenerationError,
     AgentMaxStepsError,
     AgentParsingError,
-    AgentToolCallError,
-    AgentToolExecutionError,
     create_agent_gradio_app_template,
     extract_code_from_text,
     is_valid_name,
@@ -619,8 +613,11 @@ You have been provided with these additional arguments, that you can access dire
                 self.step_number += 1
 
         if not returned_final_answer and self.step_number == max_steps + 1:
-            final_answer = self._handle_max_steps_reached(task)
-            yield action_step
+            # MatClaw (direct edit): yield the synthetic max-steps step itself, not the
+            # preceding action step, so the record carrying AgentMaxStepsError reaches
+            # stream consumers under its own step number.
+            final_answer, max_steps_step = self._handle_max_steps_reached(task)
+            yield max_steps_step
         final_answer_step = FinalAnswerStep(handle_agent_output_types(final_answer))
         self._finalize_step(final_answer_step)
         yield final_answer_step
@@ -637,7 +634,7 @@ You have been provided with these additional arguments, that you can access dire
             memory_step.timing.end_time = time.time()
         self.step_callbacks.callback(memory_step, agent=self)
 
-    def _handle_max_steps_reached(self, task: str) -> Any:
+    def _handle_max_steps_reached(self, task: str) -> tuple[Any, ActionStep]:
         action_step_start_time = time.time()
         final_answer = self.provide_final_answer(task)
         final_memory_step = ActionStep(
@@ -649,7 +646,7 @@ You have been provided with these additional arguments, that you can access dire
         final_memory_step.action_output = final_answer.content
         self._finalize_step(final_memory_step)
         self.memory.steps.append(final_memory_step)
-        return final_answer.content
+        return final_answer.content, final_memory_step
 
     def _generate_planning_step(
         self, task, is_first_step: bool, step: int

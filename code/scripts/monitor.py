@@ -34,7 +34,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.analyze_steps import parse
+from scripts.analyze_steps import parse  # noqa: E402  (sys.path setup above)
 
 # ---------------------------------------------------------------------------
 # Health check functions

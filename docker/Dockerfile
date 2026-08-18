@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
 #
-# MatClaw runtime image (P3) -- containerizes the WHOLE `matclaw run` process.
-# The in-process LocalPythonExecutor is bounded by this container; the container
-# is the security boundary (see docs/exec-plans/.../2026-05-31_p3_docker_runtime.md).
+# MatClaw runtime image -- containerizes the WHOLE `matclaw run` process.
+# The harness supervises named ipykernel and shell child processes; the container
+# remains the security boundary (see docs/references/docker-runtime.md).
 #
 # Build from the repo root:
 #   docker build -f docker/Dockerfile \

@@ -27,6 +27,9 @@ dependencies = [
     # nothing new -- it calls litellm (above) for Gemini grounding.
     "requests",
     "markdownify",
+    "jupyter_client==8.6.3",
+    "ipykernel",
+    "psutil",
 ]
 
 [project.optional-dependencies]

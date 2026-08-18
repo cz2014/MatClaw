@@ -16,6 +16,39 @@ configs/prompts.yaml, and the history writer is driven by the scripted fake mode
 from __future__ import annotations
 
 import json
+from pathlib import Path
+
+import yaml
+
+from core.kernel import DEFAULT_STEP_TIMEOUT_S, MAX_KERNELS, MAX_STEP_TIMEOUT_S
+
+
+# The number-bearing phrases are built from the constants the runtime actually
+# enforces, so changing a constant breaks this test until the prompt is updated.
+# Purely verbal phrases stay literal.
+_RUNTIME_CONTRACT_SNAPSHOT = (
+    "Every code step runs in a named persistent kernel",
+    "# kernel: <name>",
+    "# timeout: <seconds>",
+    f"at most {MAX_KERNELS} kernels",
+    f"default {DEFAULT_STEP_TIMEOUT_S}",
+    f"cap {MAX_STEP_TIMEOUT_S}",
+    "A timeout returns control with",
+    "running: true",
+    "kills nothing",
+    "wait_command(target, timeout=60)",
+    "kill_command(target)",
+    "exactly bare `wait_command(...)` or `kill_command(...)` call",
+    "run_in_background=True",
+    "WORKING memory",
+    "DURABLE memory",
+    "Namespaces are isolated between kernels",
+    "lost if a kernel restarts",
+    "kernel/background status lines",
+    "names are case-insensitive",
+    "Run long HPC waits",
+    'wait_command("hpc")',
+)
 
 
 def _step(code: str, phase: str = "P", plan: str = "pl", summary: str = "s") -> dict:
@@ -38,6 +71,28 @@ def test_system_prompt_framing(make_agent):
 
     # no stale smolagents 'thought' framing (P-B5 reframing must hold)
     assert "thought" not in sp.lower(), "system prompt still contains 'thought' framing"
+
+    # P5's execution contract is load-bearing: assert the rendered prompt, not merely YAML source.
+    for phrase in _RUNTIME_CONTRACT_SNAPSHOT:
+        assert phrase in sp, f"rendered runtime contract missing {phrase!r}"
+    assert "wait_for_jobflow() is a bounded check-in" in sp
+    assert "wait_for_jobflow() to block until completion" not in sp
+    # The rendered tool docstring must not resurrect the pre-multikernel wording
+    # that contradicts the per-step cap.
+    assert "Block until all jobs" not in sp
+    assert "4h default is the right check-in cadence" not in sp
+    # Nor the pre-P5 retrieval framing: the corpus is reached with grep/read_file,
+    # and the step timeout is a directive, not an `exec_timeout_s` knob.
+    for gone in ("rag_search", "corpus knowledge base", "corpus/sources", "exec_timeout_s"):
+        assert gone not in sp, f"rendered prompt resurrected {gone!r}"
+
+
+def test_vendored_fallback_mirrors_runtime_contract():
+    """The built-in fallback keeps the same runtime semantics as configs/prompts.yaml."""
+    fallback = Path(__file__).parents[2] / "core/_smol/prompts/structured_code_agent.yaml"
+    prompt = yaml.safe_load(fallback.read_text())["system_prompt"]
+    for phrase in _RUNTIME_CONTRACT_SNAPSHOT:
+        assert phrase in prompt, f"vendored runtime contract missing {phrase!r}"
 
 
 def test_history_golden(make_agent, tmp_workspace):
@@ -66,10 +121,8 @@ def test_history_golden(make_agent, tmp_workspace):
     assert rec["phase"] == "Phase 1"
     assert json.loads(rec["content"])["code"] == "x = 1"
     assert json.loads(rec["content"])["plan"] == "set x"
-    # NOTE (current writer quirk): code_action/timing/token_usage come from the *callback's*
-    # step, not the message, so they belong to the NEXT step (model_input_messages diffing).
-    # V4/C2 fixes this attribution -- update these when V4 lands. For now just pin presence+type.
-    assert isinstance(rec["code_action"], str) and rec["code_action"]
+    # Callback metadata and message content must describe the same action.
+    assert rec["code_action"] == json.loads(rec["content"])["code"]
     # volatile fields: present + correctly typed (not value-pinned)
     assert isinstance(rec["timing"], dict) and {"start_time", "end_time"} <= set(rec["timing"])
     assert isinstance(rec["token_usage"], dict)

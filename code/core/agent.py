@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import atexit
 import json
 import logging
 import os
@@ -9,6 +10,7 @@ import re
 import sys
 import threading
 import time
+import weakref
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -17,7 +19,6 @@ import yaml
 from core._smol import CodeAgent, LiteLLMModel
 
 from core.context import _get_content_str, _get_role
-from core.tools import wait_for_jobflow
 from core._smol.agents import PromptTemplates
 
 logger = logging.getLogger(__name__)
@@ -186,9 +187,10 @@ def _extract_images_b64(msg) -> list[str]:
 def _history_writer(history_file: Path, workspace_dir: Path):
     """Create a step callback that appends new messages to history.jsonl.
 
-    Each message is stored exactly once. The callback diffs the current
-    model_input_messages against a running count of previously-written
-    messages (bootstrap messages are written on the first step).
+    Each message is stored exactly once. ``model_input_messages`` are captured
+    at the start of an action, so an ActionStep callback flushes the metadata
+    buffered from the preceding action. A FinalAnswerStep callback flushes the
+    last buffered action from the agent's complete memory.
 
     Uses a global step counter (next_step) instead of step.step_number to
     ensure globally unique step numbers across multiple run() calls.
@@ -202,35 +204,47 @@ def _history_writer(history_file: Path, workspace_dir: Path):
         "written": 0,
         "skip_first": history_file.exists(),
         "next_step": 1,
+        "pending": None,
+        "last_written": None,
     }
 
-    def cb(step, agent):
+    def _fingerprint(msg) -> tuple[str, int]:
+        return (_get_role(msg), hash(_get_content_str(msg)))
+
+    def _is_reset(messages) -> bool:
+        """True when ``messages`` starts a new conversation instead of extending the written one.
+
+        A length comparison alone misses the boundary where the new list is exactly as long
+        as what was written (e.g. an interrupted run wrote only its bootstrap system+task
+        pair), so compare the message sitting at the last written position instead.
+        """
+        written = _state["written"]
+        if written == 0:
+            return False
+        if len(messages) < written:
+            return True
+        return _fingerprint(messages[written - 1]) != _state["last_written"]
+
+    def _resume_position(messages) -> None:
+        _state["written"] = len(messages)
+        _state["last_written"] = _fingerprint(messages[-1]) if messages else None
+        _state["skip_first"] = False
+        max_step = 0
+        with history_file.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        rec = json.loads(line)
+                        max_step = max(max_step, rec.get("step", 0))
+                    except json.JSONDecodeError:
+                        pass
+        _state["next_step"] = max_step + 1
+
+    def _flush(messages, metadata_step) -> None:
         import dataclasses
 
-        from core._smol import ActionStep
-
-        if not isinstance(step, ActionStep):
-            return
-
-        messages = step.model_input_messages
         if messages is None:
-            return
-
-        if _state["skip_first"]:
-            _state["written"] = len(messages)
-            _state["skip_first"] = False
-            # Resume step counter from existing history
-            max_step = 0
-            with history_file.open("r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line:
-                        try:
-                            rec = json.loads(line)
-                            max_step = max(max_step, rec.get("step", 0))
-                        except json.JSONDecodeError:
-                            pass
-            _state["next_step"] = max_step + 1
             return
 
         written = _state["written"]
@@ -245,7 +259,7 @@ def _history_writer(history_file: Path, workspace_dir: Path):
                 role = _get_role(msg)
                 content = _get_content_str(msg)
 
-                if written == 0 and role in ("system", "user"):
+                if metadata_step is None:
                     msg_step = 0
                 else:
                     msg_step = step_num
@@ -265,19 +279,19 @@ def _history_writer(history_file: Path, workspace_dir: Path):
                     except (json.JSONDecodeError, TypeError):
                         pass
 
-                    if step.timing:
+                    if metadata_step is not None and metadata_step.timing:
                         rec["timing"] = {
-                            "start_time": step.timing.start_time,
-                            "end_time": step.timing.end_time,
+                            "start_time": metadata_step.timing.start_time,
+                            "end_time": metadata_step.timing.end_time,
                         }
-                    if step.error:
-                        rec["error"] = step.error.dict()
-                    if step.code_action is not None:
-                        rec["code_action"] = step.code_action
-                    if step.is_final_answer:
+                    if metadata_step is not None and metadata_step.error:
+                        rec["error"] = metadata_step.error.dict()
+                    if metadata_step is not None and metadata_step.code_action is not None:
+                        rec["code_action"] = metadata_step.code_action
+                    if metadata_step is not None and metadata_step.is_final_answer:
                         rec["is_final_answer"] = True
-                    if step.token_usage:
-                        rec["token_usage"] = dataclasses.asdict(step.token_usage)
+                    if metadata_step is not None and metadata_step.token_usage:
+                        rec["token_usage"] = dataclasses.asdict(metadata_step.token_usage)
 
                 images_b64 = _extract_images_b64(msg)
                 if images_b64:
@@ -287,7 +301,34 @@ def _history_writer(history_file: Path, workspace_dir: Path):
                 written += 1
 
         _state["written"] = written
-        _state["next_step"] = step_num + 1
+        _state["last_written"] = _fingerprint(messages[written - 1]) if written else None
+        if metadata_step is not None:
+            _state["next_step"] = step_num + 1
+
+    def cb(step, agent):
+        from core._smol import ActionStep
+        from core._smol.memory import FinalAnswerStep
+
+        if isinstance(step, ActionStep):
+            messages = step.model_input_messages
+            if messages is None:
+                return
+            if _state["skip_first"]:
+                _resume_position(messages)
+            else:
+                # MultiStepAgent.run(reset=True) replaces its in-memory history.
+                # Reset only the per-memory cursor; global history numbering must
+                # continue across runs on the same agent instance.
+                if _is_reset(messages):
+                    _state["written"] = 0
+                    _flush(messages, None)
+                _flush(messages, _state["pending"])
+            _state["pending"] = step
+            return
+
+        if isinstance(step, FinalAnswerStep) and _state["pending"] is not None:
+            _flush(agent.write_memory_to_messages(), _state["pending"])
+            _state["pending"] = None
 
     return cb
 
@@ -658,6 +699,30 @@ def _setup_experience_reloader(agent: CodeAgent, experience_path: Path) -> None:
     agent._on_run_start.append(_refresh)
 
 
+# An agent's executor owns kernel processes and their child forests. The normal teardown is
+# the caller's finally block (see run_agent), but an exit path that skips it would orphan
+# them, so every executor is also reachable from an interpreter-exit backstop. The weak set
+# keeps long-lived processes from retaining dead agents, and cleanup is idempotent, so the
+# backstop is harmless when the finally block already ran.
+_ACTIVE_EXECUTORS: weakref.WeakSet = weakref.WeakSet()
+_ATEXIT_REGISTERED = False
+
+
+def _cleanup_active_executors() -> None:
+    """Tear down every executor still alive. Safe to call repeatedly."""
+    for executor in list(_ACTIVE_EXECUTORS):
+        executor.cleanup()
+
+
+def _register_executor_cleanup(executor) -> None:
+    """Track ``executor`` for the exit backstop, registering the atexit hook on first use."""
+    global _ATEXIT_REGISTERED
+    _ACTIVE_EXECUTORS.add(executor)
+    if not _ATEXIT_REGISTERED:
+        atexit.register(_cleanup_active_executors)
+        _ATEXIT_REGISTERED = True
+
+
 def create_agent(
     config_dir: Path,
     workspace_dir: Path,
@@ -679,7 +744,9 @@ def create_agent(
         config_dir: Directory containing llm_config.yaml, prompts.yaml, corpus.yaml.
         workspace_dir: Directory for workspace and logs.
         provider_name: LLM provider name. Defaults to config default_provider.
-        tools: Custom tools list. Defaults to [wait_for_jobflow] (+ the always-added primitives).
+        tools: Extra tools list. Defaults to [wait_for_jobflow] (+ the always-added
+            primitives). Only tools from the built-in set are supported: user-defined
+            Tool objects cannot cross the kernel boundary and the executor rejects them.
         enable_step_logging: Whether to log steps to JSONL file in workspace.
         planning_interval: Steps between planning updates. None disables planning.
         final_answer_checks: List of check functions passed to CodeAgent.
@@ -690,7 +757,11 @@ def create_agent(
             (for non-project overrides like task-specific constraints).
 
     Returns:
-        Configured CodeAgent instance.
+        Configured CodeAgent instance. The agent owns live execution resources (one
+        ipykernel process per kernel plus the tool server), so the caller must call
+        ``agent.cleanup()`` when the run is over -- ``run_agent`` does this in a finally
+        block, and an atexit backstop covers a normal interpreter exit, but a caller that
+        drives the agent itself is responsible for the teardown.
     """
     # Read all configs from config_dir
     llm_cfg = _read_yaml(config_dir / "llm_config.yaml")
@@ -764,51 +835,22 @@ def create_agent(
 
     prompt_templates = _build_prompt_templates(prompts_cfg)
 
-    # Create executor: the thin ExecPythonExecutor (the P4 opened runtime). It inherits
-    # the real builtins (open, __import__, ...) and enforces no import policy and no
-    # op-cap -- the P3 container is the execution boundary. No code-execution timeout by
-    # default (the broken 30s ThreadPoolExecutor timeout was removed in P2/P-B2); the
-    # opt-in `agent.exec_timeout_s` arms a best-effort SIGALRM watchdog. (The vendored AST
-    # LocalPythonExecutor is no longer selectable: P4 removed the rollback flag once the
-    # opened runtime was validated. The vendored class stays dormant in core/_smol until
-    # P6 owns the loop.)
+    # Resolve the complete per-kernel tool construction spec before starting
+    # execution resources. The harness retains only stateful local process state.
     additional_imports = agent_cfg.get("additional_authorized_imports") or []
     os.chdir(workspace_dir.resolve())
-    from core.exec import ExecPythonExecutor
-
-    executor = ExecPythonExecutor(exec_timeout_s=agent_cfg.get("exec_timeout_s"))
-
-    # Tools: use the custom list, or the default agent toolset. (RAG was removed in P5c -- the agent
-    # retrieves by grepping the installed package source; see the grep/glob wiring below.)
-    if tools is None:
-        tools = [wait_for_jobflow]
-
-    # I/O, search, shell, and remote transfer tools are always added.
-    # The IO trio (read_file/write_file/edit_file) is workspace-bound; bash is the
-    # container-bounded shell escape hatch. grep/glob default to the installed package source
-    # (site-packages) -- the agent searches the real library code, scoping by package -- and also
-    # reach the reference-doc corpora declared in configs/corpus.yaml (e.g. the VASP wiki, which is
-    # not pip-installed). sysconfig resolves site-packages correctly on the host .venv AND in the P3
-    # container; corpus is config_dir.parent/corpus on both (host repo, /work in the container).
     import sysconfig
 
     from core.tools import (
         BashTool,
-        EditFileTool,
-        FetchHistoryTool,
-        GlobTool,
-        GrepTool,
-        QueryJobstoreTool,
-        ReadFileTool,
-        ReadPdfTool,
-        RemoteGetTool,
-        RemoteLsTool,
-        RemotePutTool,
-        WebSearchTool,
-        WriteExperienceTool,
-        WriteFileTool,
-        web_fetch,
+        KillCommandTool,
+        ToolSpec,
+        WaitCommandTool,
+        _LocalExecState,
+        build_stateless_tools,
     )
+    from core.toolserver import ToolServer
+
     site_packages = Path(sysconfig.get_paths()["purelib"]).resolve()
     corpus_dir = (config_dir.parent / "corpus").resolve()
     corpora = _load_corpus_registry(config_dir / "corpus.yaml", corpus_dir)
@@ -819,34 +861,36 @@ def create_agent(
     # ${VAR} expansion as the agent's provider key) -- nothing hardcoded to an env-var name.
     ws_model, ws_api_key = _resolve_web_search(llm_cfg, agent_cfg)
 
-    tools = list(tools) + [
-        WriteFileTool(workspace_dir),
-        ReadFileTool(workspace_dir),
-        EditFileTool(workspace_dir),
-        ReadPdfTool(workspace_dir),
-        GrepTool(search_roots, site_packages),
-        GlobTool(search_roots, workspace_dir.resolve()),
-        BashTool(workspace_dir),
-        FetchHistoryTool(workspace_dir),
-        RemotePutTool(workspace_dir),
-        RemoteGetTool(workspace_dir),
-        RemoteLsTool(),
-        QueryJobstoreTool(),
-        web_fetch,
-        WebSearchTool(model=ws_model, api_key=ws_api_key),
-    ]
-
-    # Experience tool: only add if experience_file is configured
-    if experience_path:
-        tools.append(WriteExperienceTool(experience_path))
-
-    # Remove tools disabled in config (general mechanism; the repo config disables web access by
-    # default). Filtered by name before the agent is built -- an application concern, so the
-    # vendored _smol framework stays untouched.
     disabled = set(agent_cfg.get("disabled_tools", []))
-    tools = _filter_disabled_tools(tools, disabled)
+    unfiltered_spec = ToolSpec(
+        workspace=workspace_dir.resolve(),
+        search_roots=tuple(search_roots),
+        site_packages=site_packages,
+        experience_path=experience_path,
+        web_search_model=ws_model,
+        web_search_api_key=ws_api_key,
+    )
+    tool_spec = ToolSpec(
+        workspace=unfiltered_spec.workspace,
+        search_roots=unfiltered_spec.search_roots,
+        site_packages=unfiltered_spec.site_packages,
+        experience_path=unfiltered_spec.experience_path,
+        web_search_model=unfiltered_spec.web_search_model,
+        web_search_api_key=unfiltered_spec.web_search_api_key,
+        disabled=tuple(sorted(disabled)),
+    )
+    local_state = _LocalExecState(workspace_dir)
+    stateful_tools = [
+        BashTool(workspace_dir, local_state),
+        WaitCommandTool(local_state),
+        KillCommandTool(local_state),
+    ]
+    default_tools = build_stateless_tools(unfiltered_spec) + stateful_tools
+    tools = _filter_disabled_tools(list(tools or []) + default_tools, disabled)
     if disabled:
         logger.info("Tools disabled by config: %s", sorted(disabled))
+
+    tool_server = ToolServer(local_state)
 
     # Max steps from config
     max_steps = agent_cfg.get("max_steps", 10)
@@ -854,7 +898,6 @@ def create_agent(
     kwargs: dict[str, Any] = dict(
         tools=tools,
         model=model,
-        executor=executor,
         additional_authorized_imports=additional_imports,
         max_steps=max_steps,
         add_base_tools=False,
@@ -903,31 +946,60 @@ def create_agent(
     if instructions:
         kwargs["instructions"] = instructions
 
-    # History writer -- always enabled (primary conversation storage)
+    # History writer -- always enabled (primary conversation storage). Register
+    # its final flush for FinalAnswerStep as well as the ordinary action callbacks.
     history_file = workspace_dir / "history.jsonl"
-    callbacks.append(_history_writer(history_file, workspace_dir))
+    history_callback = _history_writer(history_file, workspace_dir)
 
     if enable_step_logging:
         steps_log = _make_steps_log_path(workspace_dir)
         callbacks.append(_step_jsonl_logger(steps_log))
         print(f"[agent] steps_log={steps_log}")
 
-    kwargs["step_callbacks"] = callbacks
+    from core._smol import ActionStep
+    from core._smol.memory import FinalAnswerStep
 
-    agent = CodeAgent(**kwargs)
+    kwargs["step_callbacks"] = {
+        ActionStep: [*callbacks, history_callback],
+        FinalAnswerStep: [history_callback],
+    }
 
-    # Dynamic experience injection (must be before resume to include in system prompt)
-    if experience_path:
-        _setup_experience_reloader(agent, experience_path)
+    executor = None
+    kernel_manager = None
+    try:
+        from core.exec import ExecPythonExecutor
+        from core.kernel import KernelManager
 
-    if resume:
-        history_file = workspace_dir / "history.jsonl"
-        if history_file.exists():
-            _restart_from_history(agent, history_file)
+        tool_server.start()
+        kernel_manager = KernelManager(workspace_dir, tool_spec, tool_server)
+        executor = ExecPythonExecutor(kernel_manager, tool_server)
+        _register_executor_cleanup(executor)
+        kwargs["executor"] = executor
+        agent = CodeAgent(**kwargs)
+
+        # Dynamic experience injection (must be before resume to include in system prompt)
+        if experience_path:
+            _setup_experience_reloader(agent, experience_path)
+
+        if resume:
+            history_file = workspace_dir / "history.jsonl"
+            if history_file.exists():
+                _restart_from_history(agent, history_file)
+            else:
+                logger.warning("resume=True but no history.jsonl found in %s", workspace_dir)
+
+        return agent
+    except BaseException:
+        if executor is not None:
+            executor.cleanup()
+        elif kernel_manager is not None:
+            try:
+                kernel_manager.shutdown()
+            finally:
+                tool_server.stop()
         else:
-            logger.warning("resume=True but no history.jsonl found in %s", workspace_dir)
-
-    return agent
+            tool_server.stop()
+        raise
 
 
 # --- Pause/resume support ---

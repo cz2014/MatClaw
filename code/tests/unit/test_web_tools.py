@@ -19,7 +19,6 @@ from unittest.mock import MagicMock, patch
 from core.agent import _filter_disabled_tools, _resolve_web_search
 from core.tools import (
     WebSearchTool,
-    _extract_grounding_sources,
     _normalize_fetch_url,
     web_fetch,
 )

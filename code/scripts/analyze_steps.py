@@ -250,7 +250,7 @@ def cmd_step(steps: list[StepRecord], step_num: int) -> None:
 
     # Phase
     if s.phase:
-        print(f"--- Phase ---")
+        print("--- Phase ---")
         print(s.phase)
         print()
 

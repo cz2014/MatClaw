@@ -36,7 +36,6 @@ agent:
   max_steps: 100
   context_pruning: true         # enable zone-based context management (default: true)
   experience_file: experience.md   # resolved relative to config dir (configs/); cross-session lessons
-  # exec_timeout_s: 600         # optional best-effort per-step SIGALRM watchdog (exec executor); off when unset.
 
   # web_search: Google Search via Gemini grounding. Configured like a provider above --
   # provider/model/api_key are all OPTIONAL, each falling back to providers.<provider>:
@@ -60,16 +59,23 @@ agent:
   additional_authorized_imports:
     - "*"   # P4: full access. The exec executor enforces no import policy (the P3 container is the
             # boundary); CodeAgent still renders this into {{authorized_imports}} and logs a one-time
-            # "*" caution (benign). Roll back by listing modules here AND setting executor: ast.
+            # "*" caution (benign).
   instructions: |
     Native open()/pathlib/subprocess are available. Convenience helpers are also provided:
     read_file/write_file/edit_file (workspace-relative IO), glob (find files), grep (ripgrep
-    content search, defaults to the corpus knowledge base), and bash (captured shell). Use
-    whichever you prefer.
+    content search), and bash (captured shell). grep: Searches installed package sources
+    (site-packages) by default; pass path= to search elsewhere, such as the doc corpus
+    directories listed in the system prompt. A bash timeout returns control without killing
+    the command; use wait_command/kill_command to re-enter or stop it, and
+    run_in_background=True for known-long independent shell work. Use whichever interface
+    fits the task.
 
     If real computations are requested, use jobflow-remote to submit jobs to remote HPC:
     - Prefer to use atomate2 Makers (e.g., RelaxMaker) to create jobs if possible, otherwise define custom jobs
-    - Use submit_flow() to submit, then wait_for_jobflow() to block until completion
+    - Use submit_flow() to submit. wait_for_jobflow() is a bounded check-in: it returns the
+      completed output, or timeout diagnostics after which you re-wait or act. Run it in a
+      dedicated kernel (# kernel: hpc) and check in with wait_command("hpc") so the default
+      kernel stays free
     - Output is a dict: e.g., output["output"]["energy"], output["output"]["structure"]
 
     BATCHING STRATEGY: Each SLURM job submission costs ~1-2 min overhead

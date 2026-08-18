@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from core._smol import ActionStep
 
 
@@ -155,6 +157,105 @@ def test_runner_resume_continues_not_reset(make_agent, tmp_workspace, monkeypatc
         marker in (s.observations or "")
         for s in agent.memory.steps if isinstance(s, ActionStep)
     ), "runner wiped reconstructed memory: resume restarted fresh instead of continuing"
+
+
+def test_runner_cleans_agent_when_run_raises(make_agent, tmp_workspace, monkeypatch):
+    import sys
+
+    import core.runner as runner_mod
+
+    agent = make_agent()
+    cleaned = []
+    original_cleanup = agent.cleanup
+
+    def cleanup():
+        cleaned.append(True)
+        original_cleanup()
+
+    def fail_run(*args, **kwargs):
+        raise RuntimeError("model failed")
+
+    agent.cleanup = cleanup
+    agent.run = fail_run
+    monkeypatch.setattr(runner_mod, "create_agent", lambda **kwargs: agent)
+    saved_stdout = sys.stdout
+    try:
+        with pytest.raises(RuntimeError, match="model failed"):
+            runner_mod.run_agent(
+                task="failure", workspace_dir=tmp_workspace, config_dir=tmp_workspace
+            )
+    finally:
+        sys.stdout = saved_stdout
+    assert cleaned == [True]
+
+
+def test_runner_cleans_agent_when_pause_setup_raises(make_agent, tmp_workspace, monkeypatch):
+    import sys
+
+    import core.runner as runner_mod
+
+    agent = make_agent()
+    cleaned = []
+    original_cleanup = agent.cleanup
+
+    def cleanup():
+        cleaned.append(True)
+        original_cleanup()
+
+    def fail_pause_setup(controller):
+        raise RuntimeError("pause setup failed")
+
+    agent.cleanup = cleanup
+    agent.model.set_pause_controller = fail_pause_setup
+    monkeypatch.setattr(runner_mod, "create_agent", lambda **kwargs: agent)
+    saved_stdout = sys.stdout
+    try:
+        with pytest.raises(RuntimeError, match="pause setup failed"):
+            runner_mod.run_agent(
+                task="failure", workspace_dir=tmp_workspace, config_dir=tmp_workspace
+            )
+    finally:
+        sys.stdout = saved_stdout
+    assert cleaned == [True]
+
+
+def test_runner_installs_sigterm_handler(make_agent, tmp_workspace, monkeypatch):
+    """The run path turns SIGTERM into SystemExit so the teardown paths still run.
+
+    Without it, a plain `kill` of the harness skips the finally block and leaves the agent's
+    kernel processes and their children orphaned. The previous handler is restored on exit.
+    """
+    import signal
+    import sys
+
+    import core.runner as runner_mod
+
+    agent = make_agent(steps=[
+        {"phase": "end", "plan": "fin", "code": "final_answer('ok')", "summary": "fin"},
+    ])
+    monkeypatch.setattr(runner_mod, "create_agent", lambda **kwargs: agent)
+
+    original_handler = signal.getsignal(signal.SIGTERM)
+    seen = {}
+    real_run = agent.run
+
+    def run(*args, **kwargs):
+        seen["handler"] = signal.getsignal(signal.SIGTERM)
+        return real_run(*args, **kwargs)
+
+    agent.run = run
+    saved_stdout = sys.stdout
+    try:
+        runner_mod.run_agent(
+            task="a task", workspace_dir=tmp_workspace, config_dir=tmp_workspace
+        )
+    finally:
+        sys.stdout = saved_stdout
+
+    assert seen["handler"] is runner_mod._sigterm_exit
+    assert signal.getsignal(signal.SIGTERM) is original_handler
+    with pytest.raises(SystemExit):
+        runner_mod._sigterm_exit(signal.SIGTERM, None)
 
 
 def test_resume_continues_step_numbering(make_agent, tmp_workspace):

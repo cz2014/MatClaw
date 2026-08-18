@@ -12,13 +12,14 @@ import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import MagicMock
 
 
 # repo root: code/tests/unit/test_history_fetch.py -> unit -> tests -> code
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from core.tools import FetchHistoryTool
+from core.tools import FetchHistoryTool  # noqa: E402  (sys.path setup above)
 
 
 def _generate_reference_history(output_path: Path, n_steps: int = 30):
@@ -201,81 +202,58 @@ def test_unknown_mode():
 
 
 def test_history_writer_callback():
-    from unittest.mock import MagicMock
-
     from core.agent import _history_writer
+    from core._smol.memory import ActionStep, FinalAnswerStep
+    from core._smol.monitoring import Timing
 
     with tempfile.TemporaryDirectory() as tmpdir:
         ws = Path(tmpdir)
         hf = ws / "history.jsonl"
         cb = _history_writer(hf, ws)
-
-        # Simulate step 1 with bootstrap + step messages
-        # Note: step.step_number is what smolagents assigns (resets per run).
-        # The writer should use its own global counter instead.
-        step1 = MagicMock()
-        step1.__class__.__name__ = "ActionStep"
-        step1.step_number = 1  # smolagents assigns this
-        step1.timing = MagicMock(start_time=100.0, end_time=105.0)
-        step1.error = None
-        step1.code_action = "print('hello')"
-        step1.is_final_answer = False
-        step1.token_usage = None
-        step1.model_input_messages = [
+        messages = [
             {"role": "system", "content": "You are an assistant"},
             {"role": "user", "content": "Do something"},
-            {"role": "assistant", "content": json.dumps({"phase": "P1", "plan": "test", "code": "x=1", "summary": "Step 1 summary"})},
-            {"role": "tool-response", "content": "Result: ok"},
         ]
 
-        import core._smol as smolagents
-        with _patch_isinstance(step1, smolagents.ActionStep):
-            cb(step1, None)
+        codes = ("x=1", "y=2", "z=3", "u=4", "v=5")
+        for i, code in enumerate(codes, start=1):
+            step = ActionStep(
+                step_number=1,  # deliberately reset: writer owns global numbering
+                timing=Timing(start_time=100.0 * i, end_time=100.0 * i + 5),
+                model_input_messages=list(messages),
+                code_action=code,
+            )
+            cb(step, None)
+            messages.extend([
+                {"role": "assistant", "content": json.dumps({
+                    "phase": "P1", "plan": f"step{i}", "code": code,
+                    "summary": f"Step {i} summary",
+                })},
+                {"role": "tool-response", "content": f"Result: {i}"},
+            ])
 
-        lines = hf.read_text().strip().split("\n")
-        assert len(lines) == 4
-        r0 = json.loads(lines[0])
-        assert r0["step"] == 0
-        assert r0["role"] == "system"
-        r2 = json.loads(lines[2])
-        assert r2["step"] == 1  # global counter, happens to match smolagents here
-        assert r2["role"] == "assistant"
-        assert r2["summary"] == "Step 1 summary"
-        assert r2["phase"] == "P1"
-        assert r2["timing"]["start_time"] == 100.0
-        assert r2["code_action"] == "print('hello')"
+        class FakeAgent:
+            def write_memory_to_messages(self):
+                return messages
 
-        # Step 2: only new messages appended
-        # Simulate smolagents resetting step_number to 1 (new run() call)
-        # but the writer should still assign step 2 via its global counter.
-        step2 = MagicMock()
-        step2.step_number = 1  # smolagents reset! but writer should use 2
-        step2.timing = MagicMock(start_time=110.0, end_time=115.0)
-        step2.error = None
-        step2.code_action = "y=2"
-        step2.is_final_answer = False
-        step2.token_usage = None
-        step2.model_input_messages = step1.model_input_messages + [
-            {"role": "assistant", "content": json.dumps({"phase": "P1", "plan": "step2", "code": "y=2", "summary": "Step 2 summary"})},
-            {"role": "tool-response", "content": "Result: ok2"},
-        ]
+        cb(FinalAnswerStep("done"), FakeAgent())
 
-        with _patch_isinstance(step2, smolagents.ActionStep):
-            cb(step2, None)
-
-        lines = hf.read_text().strip().split("\n")
-        assert len(lines) == 6  # 4 from step1 + 2 new
-        r4 = json.loads(lines[4])
-        assert r4["step"] == 2  # global counter, NOT smolagents' reset 1
-        assert r4["summary"] == "Step 2 summary"
+        records = [json.loads(line) for line in hf.read_text().splitlines() if line]
+        assert sorted(set(rec["step"] for rec in records)) == [0, 1, 2, 3, 4, 5]
+        assistants = [rec for rec in records if rec["role"] == "assistant"]
+        assert len(assistants) == 5, "the final action must be flushed"
+        for i, rec in enumerate(assistants, start=1):
+            assert rec["step"] == i
+            assert rec["code_action"] == json.loads(rec["content"])["code"]
+            assert rec["timing"]["start_time"] == 100.0 * i
 
     print("  PASS: test_history_writer_callback")
 
 
 def test_restart_history_writer():
-    from unittest.mock import MagicMock
-
     from core.agent import _history_writer
+    from core._smol.memory import ActionStep, FinalAnswerStep
+    from core._smol.monitoring import Timing
 
     with tempfile.TemporaryDirectory() as tmpdir:
         ws = Path(tmpdir)
@@ -288,40 +266,27 @@ def test_restart_history_writer():
         # Create callback -- skip_first should be True since file exists
         cb = _history_writer(hf, ws)
 
-        # First callback: simulates reconstructed messages (all pre-existing)
-        step = MagicMock()
-        step.step_number = 1  # smolagents resets to 1 on new run()
-        step.timing = MagicMock(start_time=200.0, end_time=205.0)
-        step.error = None
-        step.code_action = None
-        step.is_final_answer = False
-        step.token_usage = None
-        step.model_input_messages = [{"role": "system", "content": "sys"}] * 8  # 8 reconstructed
-
-        import core._smol as smolagents
-        with _patch_isinstance(step, smolagents.ActionStep):
-            cb(step, None)
+        existing_messages = [{"role": "system", "content": "sys"}] * 8
+        step = ActionStep(
+            step_number=1,
+            timing=Timing(start_time=200.0, end_time=205.0),
+            model_input_messages=existing_messages,
+            code_action="z=3",
+        )
+        cb(step, None)
 
         # Should NOT have written anything
         assert len(hf.read_text().strip().split("\n")) == original_count
 
-        # Second callback: has new messages beyond the 8 reconstructed
-        # smolagents step_number is still 1 (reset), but writer should use 4
-        # (continuing from max step 3 in existing history)
-        step2 = MagicMock()
-        step2.step_number = 1  # smolagents reset! writer should use 4
-        step2.timing = MagicMock(start_time=200.0, end_time=205.0)
-        step2.error = None
-        step2.code_action = "z=3"
-        step2.is_final_answer = False
-        step2.token_usage = None
-        step2.model_input_messages = [{"role": "system", "content": "sys"}] * 8 + [
+        messages = existing_messages + [
             {"role": "assistant", "content": json.dumps({"phase": "P2", "plan": "new", "code": "z=3", "summary": "New step"})},
             {"role": "tool-response", "content": "new result"},
         ]
+        class FakeAgent:
+            def write_memory_to_messages(self):
+                return messages
 
-        with _patch_isinstance(step2, smolagents.ActionStep):
-            cb(step2, None)
+        cb(FinalAnswerStep("done"), FakeAgent())
 
         lines = hf.read_text().strip().split("\n")
         assert len(lines) == original_count + 2
@@ -330,8 +295,95 @@ def test_restart_history_writer():
         assert new_rec["step"] == 4, (
             f"After resume from 3-step history, new step should be 4, got {new_rec['step']}"
         )
+        assert new_rec["code_action"] == json.loads(new_rec["content"])["code"] == "z=3"
+        assert new_rec["timing"]["start_time"] == 200.0
 
     print("  PASS: test_restart_history_writer")
+
+
+def test_history_writer_same_agent_reset_run():
+    """A second run(reset=True) resets the message cursor, not global steps."""
+    from core.agent import _history_writer
+    from core._smol.memory import ActionStep, FinalAnswerStep
+    from core._smol.monitoring import Timing
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        history = Path(tmpdir) / "history.jsonl"
+        callback = _history_writer(history, Path(tmpdir))
+
+        def finish_run(task: str, code: str):
+            bootstrap = [
+                {"role": "system", "content": "system"},
+                {"role": "user", "content": task},
+            ]
+            action = ActionStep(
+                step_number=1,
+                timing=Timing(start_time=1.0, end_time=2.0),
+                model_input_messages=bootstrap,
+                code_action=code,
+                is_final_answer=True,
+            )
+            callback(action, None)
+            complete = bootstrap + [
+                {"role": "assistant", "content": json.dumps({
+                    "phase": "P", "plan": "finish", "code": code, "summary": task,
+                })},
+                {"role": "tool-response", "content": "done"},
+            ]
+
+            class FakeAgent:
+                def write_memory_to_messages(self):
+                    return complete
+
+            callback(FinalAnswerStep("done"), FakeAgent())
+
+        finish_run("run one", "final_answer('one')")
+        finish_run("run two", "final_answer('two')")
+
+        records = [json.loads(line) for line in history.read_text().splitlines() if line]
+        assistants = [record for record in records if record["role"] == "assistant"]
+        assert [record["step"] for record in assistants] == [1, 2]
+        assert [json.loads(record["content"])["summary"] for record in assistants] == [
+            "run one", "run two",
+        ]
+
+
+def test_history_writer_reset_at_equal_message_count():
+    """A new run is detected even when its message list is exactly as long as what was written.
+
+    A run cut short right after its first action callback (interrupt, crashed harness) leaves
+    the writer holding exactly the system+task pair the next run starts with. Comparing lengths
+    alone sees no shrink there and silently drops the second run's task record.
+    """
+    from core.agent import _history_writer
+    from core._smol.memory import ActionStep
+    from core._smol.monitoring import Timing
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        history = Path(tmpdir) / "history.jsonl"
+        callback = _history_writer(history, Path(tmpdir))
+
+        def start_run(task: str, code: str):
+            bootstrap = [
+                {"role": "system", "content": "system"},
+                {"role": "user", "content": f"New task: {task}"},
+            ]
+            callback(
+                ActionStep(
+                    step_number=1,
+                    timing=Timing(start_time=1.0, end_time=2.0),
+                    model_input_messages=bootstrap,
+                    code_action=code,
+                ),
+                None,
+            )
+
+        start_run("run one", "x = 1")  # interrupted here: nothing further is flushed
+        start_run("run two", "y = 2")
+
+        records = [json.loads(line) for line in history.read_text().splitlines() if line]
+        tasks = [record["content"] for record in records if record["role"] == "user"]
+        assert tasks == ["New task: run one", "New task: run two"]
 
 
 def test_context_recovery_matches_steps():
@@ -479,9 +531,9 @@ def test_multi_run_unique_steps():
     smolagents resets step_number to 1 for run 2, but the writer should assign 4-5.
     FetchHistoryTool detail mode for steps 4-5 should only return run 2 messages.
     """
-    from unittest.mock import MagicMock
-
     from core.agent import _history_writer
+    from core._smol.memory import ActionStep, FinalAnswerStep
+    from core._smol.monitoring import Timing
 
     with tempfile.TemporaryDirectory() as tmpdir:
         ws = Path(tmpdir)
@@ -493,49 +545,51 @@ def test_multi_run_unique_steps():
             {"role": "system", "content": "System prompt"},
             {"role": "user", "content": "Task 1"},
         ]
-        import core._smol as smolagents
         for i in range(1, 4):
+            step = ActionStep(
+                step_number=i,
+                timing=Timing(start_time=100.0 + i, end_time=105.0 + i),
+                model_input_messages=list(msgs),
+                code_action=f"x={i}",
+                is_final_answer=(i == 3),
+            )
+            cb1(step, None)
             msgs = list(msgs) + [
                 {"role": "assistant", "content": json.dumps({"phase": "R1", "plan": f"step{i}", "code": f"x={i}", "summary": f"Run1 step {i}"})},
                 {"role": "tool-response", "content": f"Run1 result {i}"},
             ]
-            step = MagicMock()
-            step.step_number = i
-            step.timing = MagicMock(start_time=100.0 + i, end_time=105.0 + i)
-            step.error = None
-            step.code_action = f"x={i}"
-            step.is_final_answer = (i == 3)
-            step.token_usage = None
-            step.model_input_messages = list(msgs)
-            with _patch_isinstance(step, smolagents.ActionStep):
-                cb1(step, None)
+
+        class Run1Agent:
+            def write_memory_to_messages(self):
+                return msgs
+
+        cb1(FinalAnswerStep("run1 done"), Run1Agent())
 
         # --- Simulate resume: create new writer (file exists) ---
         cb2 = _history_writer(hf, ws)
 
         # First callback after resume: skip_first triggers
-        skip_step = MagicMock()
-        skip_step.step_number = 1  # smolagents reset
-        skip_step.model_input_messages = list(msgs)  # all reconstructed
-        with _patch_isinstance(skip_step, smolagents.ActionStep):
-            cb2(skip_step, None)
-
-        # Run 2: 2 more steps. smolagents numbers them 1, 2 but writer should use 4, 5
+        # Run 2: two steps. The first callback establishes the resume position
+        # while retaining that action as the pending step.
         for i in range(1, 3):
+            step = ActionStep(
+                step_number=i,
+                timing=Timing(start_time=200.0 + i, end_time=205.0 + i),
+                model_input_messages=list(msgs),
+                code_action=f"y={i}",
+                is_final_answer=(i == 2),
+            )
+            cb2(step, None)
             msgs = list(msgs) + [
                 {"role": "assistant", "content": json.dumps({"phase": "R2", "plan": f"step{i}", "code": f"y={i}", "summary": f"Run2 step {i}"})},
                 {"role": "tool-response", "content": f"Run2 result {i}"},
             ]
-            step = MagicMock()
-            step.step_number = i  # smolagents reset numbering
-            step.timing = MagicMock(start_time=200.0 + i, end_time=205.0 + i)
-            step.error = None
-            step.code_action = f"y={i}"
-            step.is_final_answer = (i == 2)
-            step.token_usage = None
-            step.model_input_messages = list(msgs)
-            with _patch_isinstance(step, smolagents.ActionStep):
-                cb2(step, None)
+
+        class Run2Agent:
+            def write_memory_to_messages(self):
+                return msgs
+
+        cb2(FinalAnswerStep("run2 done"), Run2Agent())
 
         # Verify: parse history and check step numbers
         records = []
@@ -580,10 +634,6 @@ class _patch_isinstance:
         self._obj.__class__ = MagicMock
 
 
-# Need MagicMock at module level for _patch_isinstance __exit__
-from unittest.mock import MagicMock
-
-
 UNIT_TESTS = [
     test_index_mode,
     test_index_mode_no_range,
@@ -593,6 +643,7 @@ UNIT_TESTS = [
     test_unknown_mode,
     test_history_writer_callback,
     test_restart_history_writer,
+    test_history_writer_same_agent_reset_run,
     test_context_recovery_matches_steps,
     test_analyze_steps_parses_history,
     test_multi_run_unique_steps,
@@ -611,4 +662,3 @@ if __name__ == "__main__":
     for test_fn in UNIT_TESTS:
         test_fn()
     print(f"\nAll {len(UNIT_TESTS)} unit tests passed!")
-

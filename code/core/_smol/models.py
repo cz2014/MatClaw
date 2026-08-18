@@ -14,7 +14,6 @@
 import json
 import logging
 import time
-import os
 import re
 import uuid
 import warnings
@@ -22,16 +21,11 @@ from collections.abc import Generator
 from copy import deepcopy
 from dataclasses import asdict, dataclass
 from enum import Enum
-from threading import Thread
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from .monitoring import TokenUsage
 from .tools import Tool
-from .utils import RateLimiter, Retrying, _is_package_available, encode_image_base64, make_image_url, parse_json_blob
-
-
-if TYPE_CHECKING:
-    from transformers import StoppingCriteriaList
+from .utils import RateLimiter, Retrying, encode_image_base64, make_image_url, parse_json_blob
 
 
 logger = logging.getLogger(__name__)

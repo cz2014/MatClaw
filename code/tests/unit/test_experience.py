@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import tempfile
 import time
@@ -179,8 +180,6 @@ def test_experience_token_warning(caplog=None):
 # Helpers
 # ---------------------------------------------------------------------------
 
-import contextlib
-
 
 @contextlib.contextmanager
 def _capture_logs(logger_name, level=logging.DEBUG):
@@ -231,7 +230,7 @@ def main():
         "--integration", action="store_true",
         help="Also run integration test (requires LLM API key)",
     )
-    args = parser.parse_args()
+    args = parser.parse_args()  # noqa: F841
 
     passed = 0
     failed = 0

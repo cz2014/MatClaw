@@ -13,8 +13,10 @@ Fixtures (fake_llm / tmp_workspace / agent_factory) are added in the P0b step.
 
 import json
 import os
+import time
 from pathlib import Path
 
+import psutil
 import pytest
 
 # Demo / agent-run scripts are reproducibility artifacts, not tests.
@@ -75,6 +77,94 @@ def tmp_workspace(tmp_path):
     return tmp_path
 
 
+@pytest.fixture(autouse=True)
+def reap_children():
+    """Fail tests that leave behind a new child process, after reaping it safely."""
+    parent = psutil.Process()
+
+    def snapshot():
+        found = {}
+        for child in parent.children(recursive=True):
+            try:
+                found[(child.pid, child.create_time())] = child
+            except psutil.Error:
+                pass
+        return found
+
+    before = set(snapshot())
+    yield
+    deadline = time.monotonic() + 0.3
+    leaked = {}
+    while time.monotonic() < deadline:
+        leaked = {key: proc for key, proc in snapshot().items() if key not in before}
+        if not leaked:
+            return
+        time.sleep(0.02)
+    for process in leaked.values():
+        try:
+            process.terminate()
+        except psutil.Error:
+            pass
+    _, alive = psutil.wait_procs(list(leaked.values()), timeout=0.5)
+    for process in alive:
+        try:
+            process.kill()
+        except psutil.Error:
+            pass
+    psutil.wait_procs(alive, timeout=0.5)
+    pytest.fail(f"test leaked child process(es): {sorted(pid for pid, _ in leaked)}")
+
+
+@pytest.fixture(scope="session")
+def kernel_pool(tmp_path_factory):
+    """Two real persistent kernels shared by non-destructive manager tests."""
+    from core.kernel import KernelManager
+    from core.tools import ToolSpec, _LocalExecState
+    from core.toolserver import ToolServer
+
+    workspace = tmp_path_factory.mktemp("kernel_pool")
+    state = _LocalExecState(workspace, kill_grace_s=0.2)
+    server = ToolServer(state)
+    server.start()
+    spec = ToolSpec(
+        workspace=workspace,
+        search_roots=(workspace,),
+        site_packages=Path(__file__).resolve().parents[1] / ".venv" / "lib",
+        disabled=("web_fetch", "web_search"),
+    )
+    manager = KernelManager(workspace, spec, server, grace_s=0.5)
+    manager.execute("pass", kernel_name="probe", timeout=10)
+    try:
+        yield manager
+    finally:
+        manager.shutdown()
+        server.stop()
+
+
+@pytest.fixture
+def fresh_manager(tmp_path):
+    """Function-scoped real manager for restart/crash/destructive tests."""
+    from core.kernel import KernelManager
+    from core.tools import ToolSpec, _LocalExecState
+    from core.toolserver import ToolServer
+
+    state = _LocalExecState(tmp_path, kill_grace_s=0.2)
+    server = ToolServer(state)
+    server.start()
+    spec = ToolSpec(
+        workspace=tmp_path,
+        search_roots=(tmp_path,),
+        site_packages=Path(__file__).resolve().parents[1] / ".venv" / "lib",
+        disabled=("web_fetch", "web_search"),
+    )
+    manager = KernelManager(tmp_path, spec, server, grace_s=0.5)
+    try:
+        yield manager
+    finally:
+        manager.shutdown()
+        server.stop()
+
+
 @pytest.fixture
 def make_agent(monkeypatch, tmp_path):
     """Build a real CodeAgent (via create_agent) whose model is replaced by a scripted
@@ -90,7 +180,7 @@ def make_agent(monkeypatch, tmp_path):
     the loop always terminates. The message lists the model was called with are recorded on
     agent._fake_calls.
     """
-    state = {"cwd": os.getcwd()}
+    state = {"cwd": os.getcwd(), "agents": []}
 
     def _make(steps=None, tools=None, default_tools=False, **create_kwargs):
         for key in _DUMMY_KEYS:
@@ -127,9 +217,12 @@ def make_agent(monkeypatch, tmp_path):
 
         agent.model.generate = fake_generate
         agent._fake_calls = calls
+        state["agents"].append(agent)
         return agent
 
     yield _make
+    for agent in reversed(state["agents"]):
+        agent.cleanup()
     os.chdir(state["cwd"])  # create_agent chdir's into the workspace; restore it
 
 

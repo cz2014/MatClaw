@@ -14,6 +14,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -23,6 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 DOCKER_DIR = REPO_ROOT / "docker"
 RUN_SH = DOCKER_DIR / "run.sh"
 ENTRYPOINT = DOCKER_DIR / "entrypoint.sh"
+KERNEL_PROBE = REPO_ROOT / "code" / "tests" / "integration" / "kernel_probe.py"
 
 pytestmark = pytest.mark.skipif(shutil.which("bash") is None, reason="bash required")
 
@@ -81,7 +83,6 @@ def test_run_sh_assembles_hardening_flags_and_mounts(stub_docker):
     )
     assert r.returncode == 0, r.stderr
     argv = argfile.read_text().splitlines()
-    joined = "\n".join(argv)
 
     # hardening flags (locked)
     for flag in ("--rm", "-it", "--init", "--cap-drop", "--security-opt", "--user",
@@ -173,3 +174,22 @@ def test_entrypoint_rewrites_mongo_host(tmp_path):
     assert "host.docker.internal" in out
     assert "127.0.0.1" not in out
     assert "login.example.com" in out, "SSH host must be preserved (only the Mongo loopback rewritten)"
+
+
+# --------------------------------------------------------------------------- kernel probe
+
+
+def test_kernel_probe_runs_on_host():
+    """Validate the ipykernel probe itself, daemon-free.
+
+    tests/integration/test_docker_smoke.py pipes kernel_probe.py into the container on stdin
+    (`python -`). Whether the *image* satisfies it is only knowable after a build, but whether
+    the probe is a correct program is knowable here: run the identical bytes through the local
+    interpreter the same way (stdin, not an argument), against the uv env's own ipykernel.
+    """
+    r = subprocess.run(
+        [sys.executable, "-"],
+        input=KERNEL_PROBE.read_text(), capture_output=True, text=True, timeout=180,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "ok" in r.stdout

@@ -15,7 +15,7 @@ _STABLE_TOOLS = {
     "wait_for_jobflow", "remote_put", "remote_get", "remote_ls", "query_jobstore",
     "fetch_history", "write_experience",
     "write_file", "read_file", "edit_file", "read_pdf",
-    "grep", "glob", "bash", "final_answer",
+    "grep", "glob", "bash", "wait_command", "kill_command", "final_answer",
 }
 
 

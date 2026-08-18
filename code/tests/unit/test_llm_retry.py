@@ -5,14 +5,13 @@ generate() wraps _generate_with_empty_retry() with a transient/connection retry 
 """
 
 import sys
-import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from core._smol.models import LiteLLMModel
+
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
-
-from core._smol.models import LiteLLMModel
 
 
 def _make_model():

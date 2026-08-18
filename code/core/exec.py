@@ -1,186 +1,197 @@
-"""Thin ``exec()``-namespace Python executor for the opened runtime (P4).
-
-This is the load-bearing change of framework-migration P4: it replaces the
-vendored AST interpreter (:class:`core._smol.local_python_executor.LocalPythonExecutor`)
-with a minimal executor that runs the agent's code via the builtin :func:`exec`
-in a persistent namespace. The three guardrails of the AST interpreter -- the
-import allow-list, the missing ``open`` builtin, and the ~10M elementary-operation
-cap (``MAX_OPERATIONS = 10_000_000``) -- were MatClaw's largest run-failure class,
-and they protect nothing the P3 container does not already protect. A real
-``exec()`` has none of them by construction: the namespace inherits the real
-``__builtins__`` (so ``open``, ``__import__``, ``eval``, ... all work) and there
-is no AST walk to count operations on.
-
-It honors the same :class:`core._smol.local_python_executor.PythonExecutor`
-contract the vendored ``CodeAgent`` drives (``send_tools`` / ``send_variables``
-once per run, ``__call__`` -> :class:`CodeOutput` every step), so it is a drop-in
-swap selected by the ``agent.executor`` config flag. The AST executor is kept
-in-tree for instant rollback (``agent.executor: ast``).
-
-See ``docs/exec-plans/completed/2026-05-31_p4_open_runtime.md`` (section 3).
-"""
+"""Thin CodeAgent executor client for the supervised persistent kernels."""
 
 from __future__ import annotations
 
 import ast
-import contextlib
-import io
-import logging
-import signal
-import threading
 from typing import Any
 
-from core._smol.local_python_executor import (
-    DEFAULT_MAX_LEN_OUTPUT,
-    CodeOutput,
-    PythonExecutor,
-)
+from core._smol.local_python_executor import CodeOutput, PythonExecutor
+from core._smol.tools import Tool
 from core._smol.utils import truncate_content
+from core.kernel import parse_directives
+from core.tools import build_stateless_tools
 
-logger = logging.getLogger(__name__)
-
-
-class _FinalAnswer(BaseException):
-    """Sentinel raised by the injected ``final_answer`` to unwind the code block.
-
-    Mirrors the AST executor's ``FinalAnswerException``. It derives from
-    ``BaseException`` (not ``Exception``) so the agent's own ``try/except Exception``
-    cannot accidentally swallow a final answer. It is always caught inside
-    :meth:`ExecPythonExecutor.__call__`, so it never reaches the agent loop.
-    """
-
-    def __init__(self, value: Any):
-        super().__init__()
-        self.value = value
+_STATEFUL_NAMES = {"bash", "wait_command", "kill_command", "final_answer"}
 
 
-class _ExecTimeout(BaseException):
-    """Raised from the SIGALRM handler when a single step exceeds the deadline.
-
-    ``BaseException`` so a hot loop wrapped in ``try/except Exception`` can still
-    be interrupted (same reasoning as :class:`_FinalAnswer`). It is converted to a
-    normal :class:`TimeoutError` at the executor boundary so the agent loop handles
-    it as a recoverable step failure rather than crashing the whole run.
-    """
+def _bare_control_call(code: str) -> tuple[str, dict[str, Any]] | None:
+    """Return a literal bare wait/kill call, or None for ordinary kernel code."""
+    try:
+        tree = ast.parse(code, mode="exec")
+    except SyntaxError:
+        return None
+    if len(tree.body) != 1 or not isinstance(tree.body[0], ast.Expr):
+        return None
+    call = tree.body[0].value
+    if (
+        not isinstance(call, ast.Call)
+        or not isinstance(call.func, ast.Name)
+        or call.func.id not in {"wait_command", "kill_command"}
+    ):
+        return None
+    if any(keyword.arg is None for keyword in call.keywords):
+        return None
+    keyword_names = [keyword.arg for keyword in call.keywords]
+    if len(keyword_names) != len(set(keyword_names)):
+        return None
+    try:
+        args = [ast.literal_eval(arg) for arg in call.args]
+        kwargs = {kw.arg: ast.literal_eval(kw.value) for kw in call.keywords}
+    except (ValueError, TypeError):
+        return None
+    params: dict[str, Any] = {}
+    if call.func.id == "wait_command":
+        if len(args) > 2 or (args and "target" in kwargs) or (
+            len(args) == 2 and "timeout" in kwargs
+        ):
+            return None
+        target = args[0] if args else kwargs.pop("target", None)
+        if target is None:
+            return None
+        params["target"] = target
+        if len(args) == 2:
+            params["timeout"] = args[1]
+        if "timeout" in kwargs:
+            params["timeout"] = kwargs.pop("timeout")
+    else:
+        if len(args) > 1 or (args and "target" in kwargs):
+            return None
+        target = args[0] if args else kwargs.pop("target", None)
+        if target is None:
+            return None
+        params["target"] = target
+    if kwargs:
+        return None
+    return call.func.id, params
 
 
 class ExecPythonExecutor(PythonExecutor):
-    """A minimal ``exec()``-namespace executor with full Python access.
+    """Map CodeAgent's executor contract onto a harness-owned KernelManager."""
 
-    Args:
-        max_print_outputs_length: cap on captured stdout per step (defaults to
-            ``DEFAULT_MAX_LEN_OUTPUT``), matching the AST executor.
-        exec_timeout_s: optional per-step wall-clock deadline (seconds). ``None``
-            or ``<= 0`` disables the watchdog (the default). Best-effort: only armed
-            on the main thread on platforms with ``signal.SIGALRM`` (every supported
-            runtime), and -- like any Python signal -- it can only interrupt between
-            bytecode ops, so a long C-extension call is bounded only when it returns
-            to Python. The always-on backstop is the P3 container's
-            ``--memory``/``--cpus``/``--pids-limit`` plus ``max_steps``.
-    """
-
-    def __init__(
-        self,
-        max_print_outputs_length: int | None = None,
-        exec_timeout_s: float | None = None,
-        **_ignored: Any,
-    ):
-        # _ignored absorbs additional_authorized_imports / additional_functions etc.:
-        # this executor enforces no import policy, so it has nothing to do with them.
-        self.state: dict[str, Any] = {"__name__": "__main__", "_print_outputs": ""}
+    def __init__(self, kernel_manager, tool_server=None, **_ignored: Any):
+        self.kernel_manager = kernel_manager
+        self.tool_server = tool_server or kernel_manager.tool_server
+        self.state: dict[str, Any] = {"_print_outputs": ""}
         self.static_tools: dict[str, Any] = {}
-        self.max_print_outputs_length = max_print_outputs_length or DEFAULT_MAX_LEN_OUTPUT
-        self.exec_timeout_s = exec_timeout_s
-        self._warned_no_watchdog = False
-
-    # -- PythonExecutor contract ------------------------------------------------
+        self._closed = False
 
     def send_variables(self, variables: dict[str, Any]) -> None:
-        """Inject variables into the persistent namespace (once per run)."""
+        """Pickle and inject CodeAgent state into every current/future kernel."""
+        self._ensure_open()
+        self.kernel_manager.send_variables(variables)
         self.state.update(variables)
 
-    def send_tools(self, tools: dict[str, Any]) -> None:
-        """Expose tools as plain callables in the namespace (once per run).
-
-        Overrides any ``final_answer`` the agent supplies (its ``FinalAnswerTool``)
-        with the sentinel-raising version, exactly as the AST executor does.
-        """
-
-        def final_answer(*args: Any, **kwargs: Any):
-            value = args[0] if args else next(iter(kwargs.values()), None)
-            raise _FinalAnswer(value)
-
-        self.static_tools = {**tools, "final_answer": final_answer}
-        # Tools are just names in the exec namespace.
-        self.state.update(self.static_tools)
-
-    def __call__(self, code_action: str) -> CodeOutput:
-        """Execute one code block; return its CodeOutput (every step)."""
-        buf = io.StringIO()
-        output: Any = None
-        is_final = False
-        try:
-            with contextlib.redirect_stdout(buf), self._deadline():
-                tree = ast.parse(code_action, mode="exec")
-                # IPython-style: eval a trailing bare expression so CodeOutput.output
-                # carries the last value (preserves the "Out: ..." observation).
-                if tree.body and isinstance(tree.body[-1], ast.Expr):
-                    last = ast.Expression(tree.body.pop().value)
-                    ast.fix_missing_locations(last)
-                    exec(compile(tree, "<agent>", "exec"), self.state)
-                    output = eval(compile(last, "<agent>", "eval"), self.state)
-                else:
-                    exec(compile(tree, "<agent>", "exec"), self.state)
-        except _FinalAnswer as fa:
-            output, is_final = fa.value, True
-        except _ExecTimeout as te:
-            # Surface as a normal error so the loop's `except Exception` catches it
-            # (-> AgentExecutionError -> recoverable step failure, not a crash).
-            raise TimeoutError(str(te) or "code execution timed out") from None
-        finally:
-            # Write captured stdout BEFORE any real exception propagates, so the
-            # loop's error path (agents.py: reads state["_print_outputs"]) recovers
-            # partial logs identically to the AST executor.
-            self.state["_print_outputs"] = buf.getvalue()
-        logs = truncate_content(buf.getvalue(), self.max_print_outputs_length)
-        return CodeOutput(output=output, logs=logs, is_final_answer=is_final)
-
-    def cleanup(self) -> None:  # optional in the contract; nothing to release.
-        pass
-
-    # -- optional wall-clock watchdog (opt-in, off by default) ------------------
-
-    @contextlib.contextmanager
-    def _deadline(self):
-        """Arm a SIGALRM deadline for the duration of one exec, if configured."""
-        if not self._can_arm():
-            yield
-            return
-
-        def _on_alarm(_signum, _frame):
-            raise _ExecTimeout(
-                f"Code execution exceeded {self.exec_timeout_s}s (agent.exec_timeout_s)"
+    def send_tools(self, tools: dict[str, Tool]) -> None:
+        """Validate tool values and inject only custom extras into kernels."""
+        self._ensure_open()
+        invalid = [name for name, value in tools.items() if not isinstance(value, Tool)]
+        if invalid:
+            raise TypeError(
+                "managed_agents are not supported by the multi-kernel executor: "
+                + ", ".join(sorted(invalid))
+            )
+        self.static_tools = dict(tools)
+        self.state.update(tools)
+        built = {tool.name for tool in build_stateless_tools(self.kernel_manager.tool_spec)}
+        extras = {
+            name: value
+            for name, value in tools.items()
+            if name not in built and name not in _STATEFUL_NAMES
+        }
+        if extras:
+            # User-supplied Tool objects cannot be reconstructed inside a kernel,
+            # and running them harness-side would put them outside all kernel
+            # supervision (timeouts, vitals, kill ladder). Fail fast instead.
+            raise ValueError(
+                "user-supplied tools are not supported under the multi-kernel "
+                "executor: " + ", ".join(sorted(extras))
             )
 
-        previous = signal.signal(signal.SIGALRM, _on_alarm)
-        signal.setitimer(signal.ITIMER_REAL, float(self.exec_timeout_s))
-        try:
-            yield
-        finally:
-            signal.setitimer(signal.ITIMER_REAL, 0)
-            signal.signal(signal.SIGALRM, previous)
+    def _status(self, result: dict[str, Any]) -> str:
+        roster = result.get("roster") or self.kernel_manager.roster_line()
+        local_lines = self.tool_server.state.status_lines().splitlines()
+        bash = local_lines[0] if local_lines else "bash: idle"
+        background = local_lines[1] if len(local_lines) > 1 else "background: none"
+        if bash != "bash: idle":
+            jobs = background.removeprefix("background: ")
+            suffix = "" if jobs == "none" else f" | {jobs}"
+            background = (
+                f"background: foreground bash({bash.removeprefix('bash: ')}){suffix}"
+            )
+        return roster + "\n" + background
 
-    def _can_arm(self) -> bool:
-        if not self.exec_timeout_s or self.exec_timeout_s <= 0:
-            return False
-        on_main_thread = threading.current_thread() is threading.main_thread()
-        if not hasattr(signal, "SIGALRM") or not on_main_thread:
-            if not self._warned_no_watchdog:
-                logger.warning(
-                    "agent.exec_timeout_s set but the SIGALRM watchdog cannot be armed "
-                    "(no SIGALRM or not on the main thread); relying on container limits "
-                    "+ max_steps instead."
+    def _logs(self, result: dict[str, Any]) -> str:
+        status = self._status(result)
+        notes = list(result.get("completion_notes", []))
+        # The bash slot drains its own notes only on bash-family calls, so a code
+        # step would otherwise never surface a background job that finished under it.
+        notes.extend(self.tool_server.state.take_completion_notes())
+        parts = [f"[completed] {note}" for note in notes]
+        if result.get("note"):
+            parts.append(str(result["note"]))
+        if result.get("logs"):
+            parts.append(str(result["logs"]))
+        body = truncate_content("\n".join(parts), max_length=30_000)
+        return f"{body}\n{status}" if body else status
+
+    def __call__(self, code_action: str) -> CodeOutput:
+        """Route one code block and always refresh the shadow print-output state."""
+        self._ensure_open()
+        updated = False
+        try:
+            directives = parse_directives(code_action)
+            control = _bare_control_call(code_action)
+            if control is not None:
+                method, params = control
+                result = self.tool_server.dispatch(method, params)
+            else:
+                result = self.kernel_manager.execute(
+                    code_action,
+                    kernel_name=directives.kernel,
+                    timeout=directives.timeout,
                 )
-                self._warned_no_watchdog = True
-            return False
-        return True
+            logs = self._logs(result)
+            self.state["_print_outputs"] = logs
+            updated = True
+            error = result.get("error")
+            if error and not result.get("refused") and not (
+                control is not None and control[0] == "kill_command"
+            ):
+                if isinstance(error, dict):
+                    message = f"{error.get('ename', 'ExecutionError')}: {error.get('evalue', '')}"
+                else:
+                    message = str(error)
+                raise RuntimeError(message)
+            if control is not None and control[0] == "kill_command":
+                # A kill that collected an already-finished final_answer must end
+                # the run with the computed value, not the ladder-report dict.
+                output = result.get("output") if result.get("is_final_answer") else result
+            elif "output" in result:
+                output = result["output"]
+            elif control is not None or result.get("running") or result.get("refused"):
+                output = result
+            else:
+                output = None
+            return CodeOutput(
+                output=output,
+                logs=logs,
+                is_final_answer=bool(result.get("is_final_answer")),
+            )
+        except Exception:
+            if not updated:
+                self.state["_print_outputs"] = self._status({})
+            raise
+
+    def _ensure_open(self) -> None:
+        if self._closed:
+            raise RuntimeError("multi-kernel executor is closed")
+
+    def cleanup(self) -> None:
+        """Idempotently stop kernels, local processes, the RPC server, and socket."""
+        if self._closed:
+            return
+        self._closed = True
+        try:
+            self.kernel_manager.shutdown()
+        finally:
+            self.tool_server.stop()

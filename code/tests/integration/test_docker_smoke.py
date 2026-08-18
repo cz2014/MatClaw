@@ -6,11 +6,13 @@ without Docker stays green. Run it explicitly with:
 
     uv run --project code --extra dev pytest code/tests -m docker
 
-Asserts the P3 contract (docs/references/docker-runtime.md):
+Asserts the container contract (docs/references/docker-runtime.md):
   - the image builds from docker/Dockerfile (reproducibly, from the committed uv.lock);
   - `matclaw --help` exits 0 inside the container (real entrypoint -> matclaw);
   - the smolagents PyPI dependency is gone (vendored into core._smol);
-  - the vendored core + the pre-installed scientific stack import;
+  - the vendored core, kernel runtime dependencies, and scientific stack import;
+  - a real ipykernel starts, executes a probe, and shuts down cleanly (kernel_probe.py, piped
+    in on stdin so no Python is embedded in the command line);
   - the process runs non-root;
   - a file written to /work/workspace lands on the host bind mount;
   - the container is disposable: a write outside the mounts does not survive a re-run.
@@ -30,6 +32,8 @@ import pytest
 # code/tests/integration -> code/tests -> code -> repo root
 REPO_ROOT = Path(__file__).resolve().parents[3]
 IMAGE = "matclaw:smoketest"
+# The kernel probe is a real file piped in on stdin, never an argument -- see kernel_probe.py.
+KERNEL_PROBE = Path(__file__).with_name("kernel_probe.py")
 
 
 def _docker_available() -> bool:
@@ -69,6 +73,18 @@ def _raw(image: str, *cmd: str) -> subprocess.CompletedProcess:
     )
 
 
+def _raw_stdin(image: str, program: str, *cmd: str) -> subprocess.CompletedProcess:
+    """Run a raw command inside the container, feeding `program` to it on stdin.
+
+    Used with `python -` so a multi-line Python program never appears on the command line:
+    nothing to quote, nothing to escape, and the exact same bytes can be run on the host.
+    """
+    return subprocess.run(
+        ["docker", "run", "--rm", "-i", "--entrypoint", "", image, *cmd],
+        input=program, capture_output=True, text=True,
+    )
+
+
 def _mounted_workspace() -> Path:
     """A throwaway workspace under the repo `workspace/` -- the canonical mount location.
 
@@ -95,7 +111,22 @@ def test_smolagents_dependency_is_gone(image: str):
 
 
 def test_vendored_core_and_stack_import(image: str):
-    r = _raw(image, "python", "-c", "import core._smol, pymatgen, ase, atomate2; print('ok')")
+    r = _raw(
+        image,
+        "python",
+        "-c",
+        "import core._smol, jupyter_client, ipykernel, psutil, pymatgen, ase, atomate2; print('ok')",
+    )
+    assert r.returncode == 0, r.stderr
+    assert "ok" in r.stdout
+
+
+def test_ipykernel_starts_and_executes(image: str):
+    """The probe itself is validated against the host interpreter by the daemon-free
+    counterpart, tests/unit/test_docker_wrapper.py::test_kernel_probe_runs_on_host, so a
+    failure here is about the image, not about the probe being malformed.
+    """
+    r = _raw_stdin(image, KERNEL_PROBE.read_text(), "python", "-")
     assert r.returncode == 0, r.stderr
     assert "ok" in r.stdout
 
