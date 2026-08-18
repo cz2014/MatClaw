@@ -53,7 +53,7 @@ def test_live_gemini_smoke(tmp_path, request):
 
 
 def test_live_claude_smoke(tmp_path, request):
-    """A real Claude (anthropic/claude-opus-4-8) call through create_agent.
+    """A real Claude call through create_agent, on whatever model the config pins.
 
     This is the one test that exercises the live ANTHROPIC generate path -- including
     cache_control injection and the thinking config -- which the Gemini smoke cannot cover.

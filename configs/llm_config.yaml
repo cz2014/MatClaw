@@ -17,7 +17,7 @@ providers:
     context_window: 100000     # Gemini 3.5 Flash (GA, Google I/O 2026); steep decay above 128K
 
   claude:
-    model_id: anthropic/claude-opus-4-8
+    model_id: anthropic/claude-opus-5
     api_key: ${CLAUDE_API_KEY}
     context_window: 200000
     timeout: 600
