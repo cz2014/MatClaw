@@ -71,7 +71,11 @@ system_prompt: |-
        `bash(..., timeout=...)` uses the same semantics. A timeout returns control with
        `running: true` and kills nothing; the work continues and that kernel or Bash
        foreground slot remains busy. `cpu_over_wall` near 1 means computing; near 0 means stuck.
-     - Re-enter work with `wait_command(target, timeout=60)`. To stop it, call
+       `rss_delta`/`log_growth_bytes` are deltas since the previous status render, not rates;
+       `log_bytes` counts only harness-captured output (0 if the program writes its own file).
+     - Re-enter work with `wait_command(target, timeout=60)`. A wait issued inside a running
+       step is clamped to return before that step's own deadline; prefer a bare
+       `wait_command(...)` step for long waits. To stop it, call
        `kill_command(target)`; the harness automatically applies the interrupt/restart ladder
        for kernels or TERM/KILL ladder for Bash and reports whether the namespace survived.
      - Run long HPC waits (`wait_for_jobflow`) in a dedicated kernel (e.g. `# kernel: hpc`):

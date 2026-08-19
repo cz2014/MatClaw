@@ -188,3 +188,38 @@ def test_stateful_stub_fails_cleanly_without_server(tmp_path):
 def test_pause_ping_skips_stale_socket(monkeypatch, tmp_path):
     monkeypatch.setenv("MATCLAW_TOOL_SOCKET", str(tmp_path / "stale.sock"))
     _wait_if_paused("test")
+
+
+class _StubKernelManager:
+    def __init__(self, remaining):
+        self._remaining = remaining
+
+    def remaining_step_time(self, name):
+        return self._remaining
+
+
+def test_in_kernel_wait_clamped_to_step_deadline(tmp_path):
+    instance = ToolServer(_LocalExecState(tmp_path), kernel_manager=_StubKernelManager(30.0))
+    timeout, note = instance._clamp_wait_timeout("default", 120)
+    assert timeout == 25
+    assert "clamped" in note
+
+
+def test_bare_wait_and_idle_caller_are_never_clamped(tmp_path):
+    instance = ToolServer(_LocalExecState(tmp_path), kernel_manager=_StubKernelManager(None))
+    assert instance._clamp_wait_timeout(None, 120) == (120, None)
+    assert instance._clamp_wait_timeout("default", 120) == (120, None)
+
+
+def test_wait_clamp_floors_at_one_second(tmp_path):
+    # Both wait_command implementations treat timeout 0 as "use the default".
+    instance = ToolServer(_LocalExecState(tmp_path), kernel_manager=_StubKernelManager(2.0))
+    timeout, _ = instance._clamp_wait_timeout("default", 120)
+    assert timeout == 1
+
+
+def test_kernel_stub_reports_caller_for_clamping(server):
+    instance, _ = server
+    stub = build_stateful_stubs(str(instance.socket_path), "analysis")["wait_command"]
+    result = stub("bash", timeout=1)
+    assert result["running"] is False

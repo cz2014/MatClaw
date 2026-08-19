@@ -128,11 +128,17 @@ class ToolServer:
             return self.state.run_bash(**params)
         if method == "wait_command":
             target = params["target"]
+            timeout = params.get("timeout", 60)
+            timeout, clamp_note = self._clamp_wait_timeout(params.get("kernel"), timeout)
             if self._is_local_target(target):
-                return self.state.wait_command(target, params.get("timeout", 60))
+                return self._with_clamp_note(
+                    self.state.wait_command(target, timeout), clamp_note
+                )
             if self.kernel_manager is None or _is_pid_target(target):
                 raise ValueError(f"unknown target: {target}")
-            return self.kernel_manager.wait_command(target, params.get("timeout", 60))
+            return self._with_clamp_note(
+                self.kernel_manager.wait_command(target, timeout), clamp_note
+            )
         if method == "kill_command":
             target = params["target"]
             if self._is_local_target(target):
@@ -183,6 +189,38 @@ class ToolServer:
 
     def _is_local_target(self, target: str | int) -> bool:
         return self.state.is_local_target(target)
+
+    def _clamp_wait_timeout(
+        self, caller: str | None, timeout: int, margin_s: float = 5.0
+    ) -> tuple[int, str | None]:
+        """Make an in-kernel wait return before its own step deadline.
+
+        Otherwise the wait and the step deadline race each other and the wait
+        result can be lost to scheduling jitter. Harness-side (bare-call) waits
+        carry no caller and are never clamped.
+        """
+        if caller is None or self.kernel_manager is None:
+            return timeout, None
+        remaining = self.kernel_manager.remaining_step_time(str(caller))
+        if remaining is None or timeout <= remaining - margin_s:
+            return timeout, None
+        # Floor of 1: both wait_command implementations treat a 0 timeout as
+        # "use the default", which would wait far past the deadline.
+        clamped = max(1, int(remaining - margin_s))
+        note = (
+            f"wait timeout clamped from {timeout}s to {clamped}s to return before "
+            f"this step's own deadline; use a bare wait_command(...) step or a "
+            f"longer '# timeout:' directive to wait longer"
+        )
+        return clamped, note
+
+    @staticmethod
+    def _with_clamp_note(result: Any, note: str | None) -> Any:
+        if note is None or not isinstance(result, dict):
+            return result
+        existing = result.get("note")
+        result["note"] = f"{existing}; {note}" if existing else note
+        return result
 
     def take_final_answer(self, kernel: str) -> tuple[Any, str | None] | None:
         with self._final_lock:
@@ -280,7 +318,12 @@ def build_stateful_stubs(
         )
 
     def wait_command(target: str, timeout: int = 60):
-        return client.call("wait_command", {"target": target, "timeout": timeout})
+        # The caller's kernel name lets the harness clamp an in-kernel wait to
+        # finish before the calling step's own deadline.
+        return client.call(
+            "wait_command",
+            {"target": target, "timeout": timeout, "kernel": kernel_name},
+        )
 
     def kill_command(target: str):
         return client.call("kill_command", {"target": target})

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import signal
 import shutil
 import subprocess
@@ -1395,6 +1396,24 @@ class _LocalProcess:
     sampler: threading.Thread | None = field(default=None, repr=False)
 
 
+def _collapse_cr(text: str) -> str:
+    """Keep only the final rewrite of carriage-return progress lines.
+
+    Progress bars emit hundreds of ``\\r``-updated frames that read back as
+    distinct lines and swamp the model-facing output; the on-disk log keeps
+    the raw stream.
+    """
+    if "\r" not in text:
+        return text
+    collapsed = []
+    for line in text.split("\n"):
+        segments = line.split("\r")
+        # A "\r\n" ending leaves an empty last segment; take the frame before it.
+        keep = segments[-1] or (segments[-2] if len(segments) > 1 else "")
+        collapsed.append(keep)
+    return "\n".join(collapsed)
+
+
 class _LocalExecState:
     """Harness-owned foreground Bash slot and background process registry."""
 
@@ -1429,15 +1448,15 @@ class _LocalExecState:
             return "", False
         with record.log_path.open("rb") as stream:
             if size <= cap:
-                return stream.read().decode("utf-8", errors="replace"), False
+                return _collapse_cr(stream.read().decode("utf-8", errors="replace")), False
             half = max(1, cap // 2)
             head = stream.read(half).decode("utf-8", errors="replace")
             stream.seek(max(0, size - half))
             tail = stream.read(half).decode("utf-8", errors="replace")
         return (
-            head
+            _collapse_cr(head)
             + f"\n..._This content has been truncated to stay below {cap} characters_...\n"
-            + tail,
+            + _collapse_cr(tail),
             True,
         )
 
@@ -1627,6 +1646,14 @@ class _LocalExecState:
                 or pid in self.completed
             )
 
+    @staticmethod
+    def _command_display(command: str, limit: int = 40) -> str:
+        """Roster label: show the program, not a leading VAR=VAL env prefix."""
+        words = command.split()
+        while words and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", words[0]):
+            words.pop(0)
+        return " ".join(words)[:limit] or command[:limit]
+
     def status_lines(self) -> str:
         with self._lock:
             self._reap()
@@ -1642,7 +1669,7 @@ class _LocalExecState:
             live = [record for record in self.background.values() if self._record_running(record)]
             if live:
                 background = "background: " + " | ".join(
-                    f"PID {record.proc.pid} {record.command[:40]} "
+                    f"PID {record.proc.pid} {self._command_display(record.command)} "
                     f"(elapsed {_fmt_duration(time.monotonic() - record.started_at)}, "
                     f"cpu {self._vitals(record).get('cpu_over_wall', 0) * 100:.0f}%)"
                     for record in live
@@ -1975,7 +2002,12 @@ class WaitCommandTool(Tool):
 This is a bounded check-in, not a second execution. It returns completed output, or
 current output and process vitals when the target is still running. Re-call it to
 wait again, or use the diagnostics to decide whether to act. Default timeout is 60
-seconds, capped at 600."""
+seconds, capped at 600. A wait issued from inside a running kernel step is clamped
+to finish before that step's own deadline (a note in the result says so).
+
+Vitals semantics: rss_delta and log_growth_bytes are deltas since the previous
+status render, not rates. log_bytes counts only harness-captured output; it stays
+0 when the program redirects its own output to a file."""
     inputs = {
         "target": {"type": "string", "description": "Kernel name, 'bash', or background PID."},
         "timeout": {"type": "integer", "description": "Maximum check-in wait in seconds (default 60, cap 600).", "nullable": True},
@@ -1997,7 +2029,8 @@ class KillCommandTool(Tool):
 
 Use this after a bounded check-in shows that the work should stop. The ladder is
 automatic and reports the method used and, for kernels, whether the namespace
-survived; there are no signal or force parameters."""
+survived; there are no signal or force parameters. Any logs in the result are
+what the target printed BEFORE it was stopped, not new work."""
     inputs = {
         "target": {"type": "string", "description": "Kernel name, 'bash', or background PID."},
     }

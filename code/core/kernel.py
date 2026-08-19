@@ -18,7 +18,7 @@ from typing import Any
 import psutil
 from jupyter_client import KernelManager as JupyterKernelManager
 
-from core.tools import ToolSpec, _fmt_duration
+from core.tools import ToolSpec, _collapse_cr, _fmt_duration
 from core.toolserver import FinalAnswerSignal
 
 # The execution contract these three numbers describe is rendered into the system
@@ -103,6 +103,7 @@ class _KernelExecution:
     result_path: Path
     source_path: Path
     started_at: float
+    deadline: float | None = None
     done: threading.Event = field(default_factory=threading.Event)
     cancelled: threading.Event = field(default_factory=threading.Event)
     reader: threading.Thread | None = None
@@ -377,6 +378,9 @@ class KernelManager:
             # its note: the note stays queued until a return announces it.
             kernel.completed = None
             kernel.completed_note = None
+            # This counter only advances for steps that reach a kernel, so the
+            # on-disk .kernel_* numbering trails the agent's step numbering
+            # whenever a step was handled harness-side (bare wait/kill calls).
             self._step += 1
             safe_name = re.sub(r"[^A-Za-z0-9_-]", "_", kernel.name)
             log_path = self.workspace / f".kernel_{safe_name}_step_{self._step}.log"
@@ -393,6 +397,7 @@ class KernelManager:
             execution = _KernelExecution(
                 msg_id, log_path, result_path, source_path, time.monotonic()
             )
+            execution.deadline = execution.started_at + timeout
             kernel.current = execution
             execution.reader = threading.Thread(
                 target=self._read_execution,
@@ -410,6 +415,15 @@ class KernelManager:
     def dispatch(self, code: str) -> dict:
         directives = parse_directives(code)
         return self.execute(code, directives.kernel, directives.timeout)
+
+    def remaining_step_time(self, name: str) -> float | None:
+        """Seconds left on the named kernel's current step deadline, if busy."""
+        with self._lock:
+            kernel = self.kernels.get(str(name))
+            if kernel is None or kernel.current is None or kernel.current.done.is_set():
+                return None
+            deadline = kernel.current.deadline
+        return None if deadline is None else max(0.0, deadline - time.monotonic())
 
     def _read_execution(self, kernel: _Kernel, execution: _KernelExecution) -> None:
         execution.log_path.touch()
@@ -557,16 +571,19 @@ class KernelManager:
         except FileNotFoundError:
             return "", False
         if size <= self.inline_limit:
-            return execution.log_path.read_text(encoding="utf-8", errors="replace"), False
+            return (
+                _collapse_cr(execution.log_path.read_text(encoding="utf-8", errors="replace")),
+                False,
+            )
         half = max(1, self.inline_limit // 2)
         with execution.log_path.open("rb") as stream:
             head = stream.read(half).decode("utf-8", errors="replace")
             stream.seek(max(0, size - half))
             tail = stream.read(half).decode("utf-8", errors="replace")
         return (
-            head
+            _collapse_cr(head)
             + f"\n..._This content has been truncated to stay below {self.inline_limit} characters_...\n"
-            + tail,
+            + _collapse_cr(tail),
             True,
         )
 
@@ -667,6 +684,10 @@ class KernelManager:
                 )
         with self._lock:
             logs, truncated = self._log_output(execution)
+            if logs:
+                # Replaying the killed step's stdout unlabeled reads as if the
+                # workload had just started again.
+                logs = "[output before kill]\n" + logs
             execution.cancelled.set()
             survivors = self._restart(kernel)
             kernel.current = None

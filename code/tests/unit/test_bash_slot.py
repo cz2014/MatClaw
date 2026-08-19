@@ -371,3 +371,24 @@ def test_bash_wait_command_timeout_is_capped_at_600(tmp_path, monkeypatch):
         assert calls and max(calls) <= 600
     finally:
         state.shutdown()
+
+
+def test_collapse_cr_keeps_final_progress_frame():
+    from core.tools import _collapse_cr
+
+    assert _collapse_cr("plain\n") == "plain\n"
+    assert _collapse_cr("10%\r50%\r100%") == "100%"
+    assert _collapse_cr("10%\r50%\r100%\nDone\n") == "100%\nDone\n"
+    # CRLF line endings keep the line content
+    assert _collapse_cr("line1\r\nline2\r\n") == "line1\nline2\n"
+
+
+def test_command_display_skips_env_prefix():
+    display = _LocalExecState._command_display
+    assert (
+        display("OMP_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4 python analyze.py")
+        == "python analyze.py"
+    )
+    assert display("python analyze.py") == "python analyze.py"
+    # Pure-assignment commands fall back to the raw string
+    assert display("A=1") == "A=1"

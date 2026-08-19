@@ -18,20 +18,20 @@ MoS2 lattice relaxation on Perlmutter — from natural language task to VASP res
 
 You describe a task in natural language. The agent writes and runs Python to build structures, submit HPC jobs (e.g. VASP), and analyze results. It reads its own output and errors, self-corrects, and iterates until the task is done.
 
-**Key design choices:**
+**Key design choices.** Coding agents live in a repository. MatClaw lives in a long-running Python session wired to a supercomputer — closer to a scientist at a notebook than a bot in a shell.
 
-- **Code-first execution.** The agent's actions are Python, not a fixed menu of tools. It writes loops and branches, and defines reusable functions to build the tools a task needs.
-- **Long-term memory.** Long runs tend to lose earlier context. A layered memory keeps it: live working context, full conversation history, a distilled experience log, and an external results database.
-- **Remote-first architecture.** The agent runs lightweight on your machine and offloads heavy compute to HPC through jobflow-remote. It orchestrates jobs rather than running them, so one agent can drive any configured cluster.
+- **Exploration runs against live state.** Each step executes in a named persistent IPython kernel, so the namespace — a loaded ML potential, an in-memory trajectory, a half-built DataFrame, a handle to a remote job — is working memory that carries across steps. And the agent maintains multiple kernels: an interpreter blocks while it evaluates, so a long computation ties up only one while exploration continues in the others — and its result arrives as a live object, not a log file to reparse.
+- **Its tools are whatever it writes.** The action space is the interpreter itself — Python against pymatgen, ASE, and atomate2, with loops, branches, and functions defined on the spot — not a fixed menu of schema-defined tools.
+- **The cluster is part of the agent.** It authors input decks, submits SLURM jobs through jobflow-remote, and supervises hours-long DFT/MD runs from a laptop-weight process.
 
 ## What's New
 
-Changes since the previous release:
-
-- **Self-contained core.** The agent loop is a vendored, heavily customized copy of [smolagents](https://github.com/huggingface/smolagents) that lives in the repo, so the core is fully under our control with no external agent-framework dependency.
-- **Built-in file and shell tools.** The agent gained the basic primitives of a coding CLI: read, write, and edit files, glob, search, and a shell. These follow the tool designs proven in Claude's and OpenAI's coding agents, bringing that workflow to scientific computing.
-- **ripgrep code search instead of a RAG index.** To find library APIs, the agent now greps the installed source with ripgrep rather than querying a prebuilt retrieval index. In our tests ripgrep matched RAG's accuracy at comparable (slightly higher) token cost, while being far more flexible.
-- **Hardened container runtime.** Because the agent runs Python with full library and shell access, isolation is handled by a locked-down Docker container that wraps the whole process and serves as the real safety boundary.
+- **2026-08-18 — Multi-kernel persistent REPL.** Code steps run in named persistent kernels with check-in timeouts, process vitals, and a supervised interrupt/restart kill ladder.
+- **2026-06-20 — Generic external-code primitive.** `run_command` runs any simulation code (ABACUS, LAMMPS, ...) on HPC from hand-written input decks, no per-code integration required.
+- **2026-06-01 — ripgrep replaces the RAG index.** The agent greps installed package sources and registered doc corpora directly, with no retrieval index to build or maintain.
+- **2026-05-31 — Whole-process container runtime.** A locked-down Docker container wraps the entire agent process and serves as the real safety boundary for unrestricted code execution.
+- **2026-05-31 — Coding-CLI file and shell tools.** Read/write/edit, glob, ripgrep search, and a background-capable shell, following the tool designs proven in Claude's and OpenAI's coding agents.
+- **2026-05-31 — Self-contained core.** The agent loop is a vendored, heavily customized copy of [smolagents](https://github.com/huggingface/smolagents), with no external agent-framework dependency.
 
 ## Install
 
