@@ -67,8 +67,10 @@ agent:
     (site-packages) by default; pass path= to search elsewhere, such as the doc corpus
     directories listed in the system prompt. A bash timeout returns control without killing
     the command; use wait_command/kill_command to re-enter or stop it, and
-    run_in_background=True for known-long independent shell work. Use whichever interface
-    fits the task.
+    run_in_background=True for known-long independent shell work. Waiting on long work is
+    bimodal: either check in at most every 55 min (timeout<=3300, keeps the 1h prompt cache
+    warm -- ~10x cheaper per check-in), or set one long timeout sized to the job's expected
+    completion; avoid intermediate intervals (1-4h). Use whichever interface fits the task.
 
     If real computations are requested, use jobflow-remote to submit jobs to remote HPC:
     - Prefer to use atomate2 Makers (e.g., RelaxMaker) to create jobs if possible, otherwise define custom jobs

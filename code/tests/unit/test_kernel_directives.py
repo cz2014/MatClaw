@@ -33,8 +33,8 @@ def test_string_literal_is_not_a_directive():
     assert parse_directives("text = '# kernel: ignored'") == ExecutionDirectives()
 
 
-def test_timeout_is_capped_at_600():
-    assert parse_directives("# timeout: 9999\nx=1").timeout == 600
+def test_timeout_is_capped_at_max():
+    assert parse_directives("# timeout: 99999\nx=1").timeout == 72000
 
 
 def test_trailing_comment_on_directive_value_is_tolerated():

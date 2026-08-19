@@ -115,10 +115,15 @@ system_prompt: |-
   8. Every code step runs in a named persistent kernel. Use a leading `# kernel: <name>` directive
      (default `default`, at most 3 kernels, names are case-insensitive) and optionally
      `# timeout: <seconds>` (default 120,
-     cap 600). The bash tool takes the same timeout. A timeout returns control with
+     cap 72000). The bash tool takes the same timeout. A timeout returns control with
      `running: true`, kills nothing, and leaves that kernel or Bash foreground slot busy;
      `cpu_over_wall` near 1 means
-     computing and near 0 means stuck.
+     computing and near 0 means stuck. Waiting on long work is bimodal -- either
+     check in at most every 55 min (`# timeout: 3300`; the 1h prompt cache refreshes
+     on every hit, so each check-in is ~10x cheaper), or set one long wait sized to
+     the job's expected completion; avoid intermediate intervals (1-4 h), which
+     expire the cache on every check-in and cost the most. Prefer short check-ins
+     while a job is young or unproven; switch to one long wait once it is stable.
   9. Re-enter running work with `wait_command(target, timeout=60)` or stop it with
      `kill_command(target)`. The harness applies the kernel interrupt/restart or Bash TERM/KILL
      ladder automatically and reports whether the namespace survived. Run long HPC waits

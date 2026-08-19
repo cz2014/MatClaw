@@ -356,7 +356,7 @@ def test_concurrent_samplers_share_one_scan_per_tick(tmp_path, monkeypatch):
         state.shutdown()
 
 
-def test_bash_wait_command_timeout_is_capped_at_600(tmp_path, monkeypatch):
+def test_bash_wait_command_timeout_is_capped_at_max(tmp_path, monkeypatch):
     state = _LocalExecState(tmp_path, kill_grace_s=0.2)
     try:
         assert state.run_bash("sleep 5", timeout=1)["running"]
@@ -368,7 +368,7 @@ def test_bash_wait_command_timeout_is_capped_at_600(tmp_path, monkeypatch):
             lambda record, timeout: calls.append(timeout) or original(record, 0.01),
         )
         assert state.wait_command("bash", timeout=100000)["running"]
-        assert calls and max(calls) <= 600
+        assert calls and max(calls) <= 72000
     finally:
         state.shutdown()
 

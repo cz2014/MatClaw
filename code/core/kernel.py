@@ -25,7 +25,7 @@ from core.toolserver import FinalAnswerSignal
 # prompt, so they are public: the prompt-parity test imports them and fails when a
 # change here is not carried into the prompt text.
 DEFAULT_STEP_TIMEOUT_S = 120
-MAX_STEP_TIMEOUT_S = 600
+MAX_STEP_TIMEOUT_S = 72000
 MAX_KERNELS = 3
 
 # Names must start with a letter so a kernel name can never be confused with a

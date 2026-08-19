@@ -464,7 +464,7 @@ def wait_for_jobflow(
     wait again, or use the diagnostics to investigate and act.
 
     Interaction with the per-step timeout: the code step itself returns control
-    after at most 600 s (the `# timeout:` cap) with `running: true` while this call
+    after at most its `# timeout:` (cap 72000 s) with `running: true` while this call
     keeps waiting inside its kernel. For long HPC waits, run this call in a
     dedicated kernel (e.g. `# kernel: hpc`) and check in from later steps with
     `wait_command("hpc")`; timeout_s only bounds the wait inside that kernel.
@@ -1687,7 +1687,7 @@ class _LocalExecState:
         run_in_background: bool = False,
     ) -> dict:
         run_cwd = str(self.workspace if cwd is None else Path(cwd))
-        timeout = min(int(timeout or 120), 600)
+        timeout = min(int(timeout or 120), 72000)  # kernel.MAX_STEP_TIMEOUT_S (no import: kernel.py imports this module)
         cap = int(max_output_chars or 30_000)
         with self._lock:
             self._reap()
@@ -1819,7 +1819,7 @@ class _LocalExecState:
 
     def wait_command(self, target: str | int, timeout: int = 60) -> dict:
         # Same per-call cap as kernel execution: a check-in is always bounded.
-        timeout = min(max(0, int(timeout or 60)), 600)
+        timeout = min(max(0, int(timeout or 60)), 72000)  # kernel.MAX_STEP_TIMEOUT_S
         with self._lock:
             record = self._resolve(target)
             notes = self._take_notes()
@@ -1942,8 +1942,12 @@ class BashTool(Tool):
 
 The explicit shell escape hatch -- bounded by the container, not by path checks.
 stdout and stderr are merged into stdout. Default cwd is the workspace; set cwd
-to run elsewhere. timeout defaults to 120s (cap 600s) and returns control without
+to run elsewhere. timeout defaults to 120s (cap 72000s) and returns control without
 killing a still-running command. Use wait_command or kill_command to re-enter it.
+Waiting on long work is bimodal: either check in at most every 55 min (timeout<=3300,
+keeps the 1h prompt cache warm -- ~10x cheaper per check-in), or set one long timeout
+sized to the job's expected completion. Avoid intermediate intervals (1-4h): each
+such check-in expires the cache and costs the most.
 
 For long-running HPC compute, submit jobs and use wait_for_jobflow -- not local bash.
 run_in_background launches the command detached, streaming output to a workspace log
@@ -1951,7 +1955,7 @@ file, and returns {"pid","background","log_file"} without waiting."""
 
     inputs = {
         "command": {"type": "string", "description": "The shell command to run."},
-        "timeout": {"type": "integer", "description": "Seconds before returning control without killing work (default 120, cap 600).", "nullable": True},
+        "timeout": {"type": "integer", "description": "Seconds before returning control without killing work (default 120, cap 72000). Either <=3300 (cache-warm check-in) or one long wait to expected completion; avoid 1-4h.", "nullable": True},
         "max_output_chars": {"type": "integer", "description": "Cap on captured stdout/stderr (default 30000).", "nullable": True},
         "cwd": {"type": "string", "description": "Working directory (default: workspace).", "nullable": True},
         "run_in_background": {"type": "boolean", "description": "Launch detached, stream to a log file. Default False.", "nullable": True},
@@ -1997,20 +2001,25 @@ def _require_bash_target(state: _LocalExecState, target: str | int) -> None:
 
 class WaitCommandTool(Tool):
     name = "wait_command"
-    description = """Wait briefly for a running local kernel or Bash target.
+    description = """Wait for a running local kernel or Bash target.
 
 This is a bounded check-in, not a second execution. It returns completed output, or
 current output and process vitals when the target is still running. Re-call it to
 wait again, or use the diagnostics to decide whether to act. Default timeout is 60
-seconds, capped at 600. A wait issued from inside a running kernel step is clamped
+seconds, capped at 72000. A wait issued from inside a running kernel step is clamped
 to finish before that step's own deadline (a note in the result says so).
+
+Waiting on long work is bimodal: either check in at most every 55 min (timeout<=3300,
+keeps the 1h prompt cache warm -- ~10x cheaper per check-in), or set one long timeout
+sized to the job's expected completion. Avoid intermediate intervals (1-4h): each
+such check-in expires the cache and costs the most.
 
 Vitals semantics: rss_delta and log_growth_bytes are deltas since the previous
 status render, not rates. log_bytes counts only harness-captured output; it stays
 0 when the program redirects its own output to a file."""
     inputs = {
         "target": {"type": "string", "description": "Kernel name, 'bash', or background PID."},
-        "timeout": {"type": "integer", "description": "Maximum check-in wait in seconds (default 60, cap 600).", "nullable": True},
+        "timeout": {"type": "integer", "description": "Maximum check-in wait in seconds (default 60, cap 72000). Either <=3300 (cache-warm check-in) or one long wait to expected completion; avoid 1-4h.", "nullable": True},
     }
     output_type = "object"
 

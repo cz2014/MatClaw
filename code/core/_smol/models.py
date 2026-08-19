@@ -859,8 +859,9 @@ class LiteLLMModel(ApiModel):
         """Add cache_control breakpoints for Anthropic prompt caching (no-op otherwise).
 
         Marks the system message and the last message's final content block with
-        cache_control so Anthropic's incremental caching reads cached prefixes and
-        extends the cache each step.
+        cache_control (1h TTL; refreshed on every hit) so Anthropic's incremental
+        caching reads cached prefixes and extends the cache each step. The 1h TTL
+        matches the recommended <=55 min check-in cadence for long-running work.
         """
         if not self.model_id.startswith("anthropic/"):
             return
@@ -869,15 +870,15 @@ class LiteLLMModel(ApiModel):
             if role == "system" or (hasattr(role, "value") and role.value == "system"):
                 content = msg.content if hasattr(msg, "content") else msg.get("content")
                 if isinstance(content, list) and content:
-                    content[-1]["cache_control"] = {"type": "ephemeral"}
+                    content[-1]["cache_control"] = {"type": "ephemeral", "ttl": "1h"}
                 break
         if len(messages) >= 2:
             last = messages[-1]
             content = last.content if hasattr(last, "content") else last.get("content")
             if isinstance(content, list) and content:
-                content[-1]["cache_control"] = {"type": "ephemeral"}
+                content[-1]["cache_control"] = {"type": "ephemeral", "ttl": "1h"}
             elif isinstance(content, str):
-                new_content = [{"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}]
+                new_content = [{"type": "text", "text": content, "cache_control": {"type": "ephemeral", "ttl": "1h"}}]
                 if hasattr(last, "content"):
                     last.content = new_content
                 else:

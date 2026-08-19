@@ -123,7 +123,7 @@ def test_error_preserves_partial_stdout_and_traceback(kernel_pool):
     assert "before" in result["logs"] and "ValueError" in result["logs"]
 
 
-def test_wait_command_timeout_is_capped_at_600(fresh_manager, monkeypatch):
+def test_wait_command_timeout_is_capped_at_max(fresh_manager, monkeypatch):
     fresh_manager.execute("import time\ntime.sleep(3)", "default", 1)
     execution = fresh_manager.kernels["default"].current
     assert execution is not None
@@ -133,7 +133,7 @@ def test_wait_command_timeout_is_capped_at_600(fresh_manager, monkeypatch):
         execution.done, "wait", lambda timeout=None: calls.append(timeout) or original_wait(0.01)
     )
     fresh_manager.wait_command("default", timeout=100000)
-    assert calls and max(calls) <= 600
+    assert calls and max(calls) <= 72000
 
 
 def test_roster_line_is_safe_under_concurrent_calls(kernel_pool):

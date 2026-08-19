@@ -67,12 +67,19 @@ system_prompt: |-
      - Every code step runs in a named persistent kernel. Choose it with a leading
        `# kernel: <name>` directive; the default is `default`, at most 3 kernels are created,
        and names are case-insensitive.
-     - Set a per-call check-in with leading `# timeout: <seconds>` (default 120, cap 600).
+     - Set a per-call check-in with leading `# timeout: <seconds>` (default 120, cap 72000).
        `bash(..., timeout=...)` uses the same semantics. A timeout returns control with
        `running: true` and kills nothing; the work continues and that kernel or Bash
        foreground slot remains busy. `cpu_over_wall` near 1 means computing; near 0 means stuck.
        `rss_delta`/`log_growth_bytes` are deltas since the previous status render, not rates;
        `log_bytes` counts only harness-captured output (0 if the program writes its own file).
+     - Waiting on long work is bimodal -- pick one of two modes, never in between:
+       (a) cache-warm check-ins at most 55 min apart (`# timeout: 3300`; the 1h prompt
+       cache refreshes on every hit, so each check-in is ~10x cheaper), or (b) one long
+       wait sized to the job's expected completion (up to the cap). Intermediate
+       intervals (1-4 h) expire the cache on every check-in and cost the most. Prefer
+       (a) while a job is young or unproven -- most failures happen in the first hour;
+       switch to (b) once it is demonstrably stable.
      - Re-enter work with `wait_command(target, timeout=60)`. A wait issued inside a running
        step is clamped to return before that step's own deadline; prefer a bare
        `wait_command(...)` step for long waits. To stop it, call
