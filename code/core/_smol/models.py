@@ -862,9 +862,22 @@ class LiteLLMModel(ApiModel):
         cache_control (1h TTL; refreshed on every hit) so Anthropic's incremental
         caching reads cached prefixes and extends the cache each step. The 1h TTL
         matches the recommended <=55 min check-in cadence for long-running work.
+
+        Stale markers are swept first. Message objects outlive a single call:
+        core/context.py's pruning snapshot retains them across steps, so a marker
+        set on step N's last message is still attached at step N+1. Anthropic
+        accepts at most 4 cache_control blocks per request, so without the sweep
+        the count grows by one per step after the first prune and the request is
+        rejected on the third one.
         """
         if not self.model_id.startswith("anthropic/"):
             return
+        for msg in messages:
+            content = msg.content if hasattr(msg, "content") else msg.get("content")
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict):
+                        block.pop("cache_control", None)
         for msg in messages:
             role = msg.role if hasattr(msg, "role") else msg.get("role")
             if role == "system" or (hasattr(role, "value") and role.value == "system"):
