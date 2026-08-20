@@ -12,6 +12,23 @@ from core.kernel import parse_directives
 from core.tools import build_stateless_tools
 
 _STATEFUL_NAMES = {"bash", "wait_command", "kill_command", "final_answer"}
+_STATUS_OUTPUT_KEYS = {
+    "running",
+    "refused",
+    "kernel",
+    "bash",
+    "target",
+    "pid",
+    "elapsed",
+    "vitals",
+    "truncated",
+    "log_file",
+    "returncode",
+    "error",
+    "method",
+    "namespace_preserved",
+    "survivors",
+}
 
 
 def _bare_control_call(code: str) -> tuple[str, dict[str, Any]] | None:
@@ -118,7 +135,7 @@ class ExecPythonExecutor(PythonExecutor):
             background = (
                 f"background: foreground bash({bash.removeprefix('bash: ')}){suffix}"
             )
-        return roster + "\n" + background
+        return roster if background == "background: none" else roster + "\n" + background
 
     def _logs(self, result: dict[str, Any]) -> str:
         status = self._status(result)
@@ -129,8 +146,9 @@ class ExecPythonExecutor(PythonExecutor):
         parts = [f"[completed] {note}" for note in notes]
         if result.get("note"):
             parts.append(str(result["note"]))
-        if result.get("logs"):
-            parts.append(str(result["logs"]))
+        payload = result.get("logs") or result.get("stdout")
+        if payload:
+            parts.append(str(payload))
         body = truncate_content("\n".join(parts), max_length=30_000)
         return f"{body}\n{status}" if body else status
 
@@ -169,7 +187,9 @@ class ExecPythonExecutor(PythonExecutor):
             elif "output" in result:
                 output = result["output"]
             elif control is not None or result.get("running") or result.get("refused"):
-                output = result
+                output = {
+                    key: value for key, value in result.items() if key in _STATUS_OUTPUT_KEYS
+                }
             else:
                 output = None
             return CodeOutput(

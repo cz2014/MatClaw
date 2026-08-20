@@ -99,7 +99,13 @@ def test_wait_command_expiry_reports_vitals(tmp_path):
         state.run_bash("sleep 10", timeout=1)
         result = state.wait_command("bash", timeout=1)
         assert result["running"] is True
-        assert result["vitals"]["pid"] == result["pid"]
+        assert result["pid"] > 0
+        assert set(result["vitals"]) == {
+            "cpu_over_wall",
+            "rss_bytes",
+            "rss_delta",
+            "log_growth_bytes",
+        }
     finally:
         state.shutdown()
 
@@ -207,7 +213,6 @@ def test_recent_cpu_window_detects_compute_then_sleep(tmp_path):
             timeout=2,
         )
         assert result["running"] is True
-        assert result["vitals"]["cpu_time_s"] > 0.3
         assert result["vitals"]["cpu_over_wall"] < 0.2
     finally:
         state.shutdown()
@@ -271,6 +276,40 @@ def test_head_and_tail_are_retained(tmp_path):
     )
     assert result["truncated"] is True
     assert "HEAD" in result["stdout"] and "TAIL" in result["stdout"]
+    assert "tail" not in result
+
+
+def test_resource_totals_exclude_zombie_and_dead_group_members(monkeypatch, tmp_path):
+    import psutil
+
+    class FakeProcess:
+        def __init__(self, status, cpu, rss):
+            self._status = status
+            self._cpu = cpu
+            self._rss = rss
+
+        def is_running(self):
+            return self._status != "dead"
+
+        def status(self):
+            return self._status
+
+        def cpu_times(self):
+            return (self._cpu, 0.0)
+
+        def memory_info(self):
+            return SimpleNamespace(rss=self._rss)
+
+    live = FakeProcess(psutil.STATUS_RUNNING, 2.0, 100)
+    zombie = FakeProcess(psutil.STATUS_ZOMBIE, 50.0, 10_000)
+    dead = FakeProcess("dead", 60.0, 20_000)
+    monkeypatch.setattr(
+        _LocalExecState,
+        "_group_processes",
+        classmethod(lambda cls, pgid, max_age_s=0.0: [live, zombie, dead]),
+    )
+    record = SimpleNamespace(proc=SimpleNamespace(pid=123))
+    assert _LocalExecState._resource_totals(record) == (2.0, 100)
 
 
 def test_stale_group_signal_does_not_wedge_a_finished_job(tmp_path, monkeypatch):
@@ -370,6 +409,7 @@ def test_bash_wait_command_timeout_is_capped_at_max(tmp_path, monkeypatch):
         assert state.wait_command("bash", timeout=100000)["running"]
         assert calls and max(calls) <= 72000
     finally:
+        monkeypatch.undo()
         state.shutdown()
 
 

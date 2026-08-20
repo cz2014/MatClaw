@@ -170,13 +170,16 @@ def test_timeout_keeps_kernel_busy_and_other_kernel_usable(kernel_pool):
             kernel_pool.kill_command("default")
 
 
-def test_busy_target_refusal_has_roster_and_same_log(kernel_pool):
+def test_busy_target_refusal_has_roster_and_same_log(kernel_pool, monkeypatch):
+    monkeypatch.setattr("core.kernel._BUSY_SUBMISSION_WAIT_S", 0.1)
     try:
         first = kernel_pool.execute("import time; time.sleep(5)", "default", 1)
         refused = kernel_pool.execute("raise AssertionError('must not run')", "default", 1)
         assert refused["running"] and refused["refused"]
         assert refused["log_file"] == first["log_file"]
         assert "default(busy" in refused["roster"]
+        assert "wait_command" in refused["note"] and "kill_command" in refused["note"]
+        assert "remaining_step_time" not in refused
     finally:
         kernel_pool.kill_command("default")
 
@@ -257,13 +260,13 @@ def test_kernel_crash_does_not_kill_other_kernel(fresh_manager):
     assert restarted["output"] == 2
 
 
-def test_lazy_completion_note_prepended_to_next_use(kernel_pool):
-    running = kernel_pool.execute("import time; time.sleep(1.2)", "default", 1)
+def test_busy_submit_returns_prior_completion_before_new_code(kernel_pool):
+    running = kernel_pool.execute("import time; time.sleep(2); 'old'", "default", 1)
     assert running["running"]
-    time.sleep(0.4)
     next_result = kernel_pool.execute("'next'", "default", 10)
-    assert next_result["output"] == "next"
-    assert any("completed" in note for note in next_result["completion_notes"])
+    assert next_result["output"] == "old"
+    assert "NOT executed" in next_result["note"]
+    assert kernel_pool.execute("'next'", "default", 10)["output"] == "next"
 
 
 def test_completion_notes_survive_a_superseding_step(fresh_manager):

@@ -484,7 +484,14 @@ You have been provided with these additional arguments, that you can access dire
             level=LogLevel.INFO,
             title=self.name if hasattr(self, "name") else None,
         )
-        self.memory.steps.append(TaskStep(task=self.task, task_images=images))
+        task_step = TaskStep(task=self.task, task_images=images)
+        if reset or not self.memory.steps:
+            self.memory.steps.append(task_step)
+        else:
+            # A resumed run already contains reconstructed action steps.  Keep the
+            # original system -> task -> actions order so the context manager does
+            # not mistake the entire restored conversation for bootstrap content.
+            self.memory.steps.insert(0, task_step)
 
         if getattr(self, "python_executor", None):
             self.python_executor.send_variables(variables=self.state)

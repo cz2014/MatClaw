@@ -137,18 +137,32 @@ def test_runs_non_root(image: str):
     assert r.stdout.strip() != "0", "container must run as a non-root user"
 
 
-def test_workspace_write_visible_on_host(image: str):
+def test_workspace_and_task_venv_survive_fresh_container(image: str):
     ws = _mounted_workspace()
     try:
         subprocess.run(
             [
                 "docker", "run", "--rm", "--entrypoint", "",
                 "-v", f"{ws}:/work/workspace", image,
-                "bash", "-c", "echo hi > /work/workspace/out.txt",
+                "bash", "-c",
+                "mkdir -p /work/workspace/.venvs && "
+                "echo hi > /work/workspace/out.txt && "
+                "echo persisted > /work/workspace/.venvs/probe",
             ],
             check=True, capture_output=True, text=True,
         )
         assert (ws / "out.txt").read_text().strip() == "hi"
+        fresh = subprocess.run(
+            [
+                "docker", "run", "--rm", "--entrypoint", "",
+                "-v", f"{ws}:/work/workspace", image,
+                "bash", "-c", "cat /work/workspace/.venvs/probe",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        assert fresh.stdout.strip() == "persisted"
     finally:
         shutil.rmtree(ws, ignore_errors=True)
 

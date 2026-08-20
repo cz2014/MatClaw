@@ -113,7 +113,8 @@ def test_print_captured_with_status_lines(fresh_manager):
     out = _exec(fresh_manager)("print('hello world')")
     assert "hello world" in out.logs
     assert "kernels: default(idle, rss " in out.logs
-    assert out.logs.endswith("background: none")
+    assert out.logs.endswith(")")
+    assert "background: none" not in out.logs
 
 
 def test_partial_stdout_and_status_on_error(fresh_manager):
@@ -308,7 +309,46 @@ def test_stub_pins_directive_routing_and_status_after_logs(tmp_path):
     out = _exec(manager)("# kernel: probe\n# timeout: 9\n1 + 1")
     assert manager.executions == [("# kernel: probe\n# timeout: 9\n1 + 1", "probe", 9)]
     assert out.output == 7
-    assert out.logs.startswith("ok\n") and out.logs.endswith("background: none")
+    assert out.logs.startswith("ok\n") and out.logs.endswith("kernels: default(idle)")
+
+
+def test_model_observation_deduplicates_transport_fields(tmp_path):
+    marker = "UNIQUE-SCIENTIFIC-LOG"
+    note = "UNIQUE-COMPLETION-NOTE"
+    roster = "kernels: default(busy 1s, cpu 0%, rss 0.1G)"
+
+    class Manager(_StubManager):
+        def execute(self, code, kernel_name, timeout):
+            return {
+                "running": True,
+                "refused": True,
+                "kernel": kernel_name,
+                "logs": marker,
+                "stdout": marker,
+                "tail": marker,
+                "roster": roster,
+                "completion_notes": [note],
+                "elapsed": 1.0,
+                "vitals": {"cpu_over_wall": 0.0, "rss_bytes": 1},
+                "log_file": ".kernel.log",
+            }
+
+    out = _exec(Manager(tmp_path))("1 + 1")
+    assert out.logs.count(marker) == 1
+    assert out.logs.count(note) == 1
+    assert out.logs.count(roster) == 1
+    assert "background: none" not in out.logs
+    assert not ({"logs", "stdout", "tail", "roster", "completion_notes"} & set(out.output))
+
+
+def test_empty_background_status_is_suppressed_but_live_status_is_kept(tmp_path):
+    manager = _StubManager(tmp_path)
+    executor = _exec(manager)
+    assert "background: none" not in executor._status({})
+    manager.tool_server.state.status_lines = lambda: (
+        "bash: idle\nbackground: PID 123 training (elapsed 1m, cpu 99%)"
+    )
+    assert "background: PID 123 training" in executor._status({})
 
 
 def test_stub_bare_wait_runs_harness_side(tmp_path):

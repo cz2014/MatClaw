@@ -787,6 +787,7 @@ class LiteLLMModel(ApiModel):
         # MatClaw hooks (set by the product; default no-op). P2/V3.
         self._pause_controller = None   # duck-typed: .request_pause(reason=), .wait_if_paused()
         self.context_manager = None     # callable(messages) -> messages (context pruning)
+        self.context_feedback = None    # callable(provider_input_tokens) -> cap calibration
 
     def set_pause_controller(self, pc):
         """Inject a pause controller (duck-typed) used to auto-pause on connection/API errors."""
@@ -940,9 +941,23 @@ class LiteLLMModel(ApiModel):
         transient_attempt = 0
         while True:
             try:
-                return self._generate_with_empty_retry(
+                result = self._generate_with_empty_retry(
                     messages, stop_sequences=stop_sequences, **kwargs
                 )
+                context_feedback = getattr(self, "context_feedback", None)
+                if (
+                    context_feedback is not None
+                    and result is not None
+                    and result.token_usage is not None
+                ):
+                    try:
+                        context_feedback(result.token_usage.input_tokens)
+                    except Exception as feedback_error:
+                        logger.warning(
+                            "Context token calibration feedback failed: %s",
+                            feedback_error,
+                        )
+                return result
             except Exception as exc:
                 # Connection errors: auto-pause immediately (user must resume)
                 if self._is_connection_error(exc):

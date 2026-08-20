@@ -9,7 +9,8 @@
 #   docker/run.sh --help
 #
 # Tunables (env):
-#   IMAGE=matclaw:dev        image tag (built on first use if missing)
+#   IMAGE=matclaw:dev        image tag (rebuilt through Docker's cache on each launch)
+#   MATCLAW_PREBUILT=1       explicitly use an existing custom image without building
 #   MEM=8g  CPUS=4  PIDS=512  resource caps
 #   MATCLAW_MONGO_HOST=host.docker.internal   host alias for the shared Mongo
 #   MATCLAW_ENV_VOLUME=matclaw-env            optional named volume -> /home/agent
@@ -55,10 +56,15 @@ CPUS="${CPUS:-4}"
 PIDS="${PIDS:-512}"
 MONGO_HOST="${MATCLAW_MONGO_HOST:-host.docker.internal}"
 
-# Build on first use, matching the host UID/GID so the read-only-mounted SSH keys
-# (perms 700/600) are readable by the non-root container user.
-if ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
-    echo "[run.sh] image ${IMAGE} not found; building..."
+# Build the checkout on every ordinary launch. Docker's cache makes unchanged
+# launches cheap and, unlike a commit label, this also includes dirty-tree edits.
+if [ "${MATCLAW_PREBUILT:-}" = "1" ]; then
+    if ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
+        echo "[run.sh] prebuilt image ${IMAGE} does not exist" >&2
+        exit 1
+    fi
+else
+    echo "[run.sh] building ${IMAGE} from the current checkout..."
     docker build -f docker/Dockerfile \
         --build-arg UID="$(id -u)" --build-arg GID="$(id -g)" \
         -t "${IMAGE}" .

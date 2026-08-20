@@ -118,7 +118,9 @@ system_prompt: |-
      cap 72000). The bash tool takes the same timeout. A timeout returns control with
      `running: true`, kills nothing, and leaves that kernel or Bash foreground slot busy;
      `cpu_over_wall` near 1 means
-     computing and near 0 means stuck. Waiting on long work is bimodal -- either
+     computing and near 0 means stuck. Submitting new code to the same busy kernel waits up to
+     60 seconds in the harness, then returns the previous result or refuses, and never executes
+     the new code. Waiting on long work is bimodal -- either
      check in at most every 55 min (`# timeout: 3300`; the 1h prompt cache refreshes
      on every hit, so each check-in is ~10x cheaper), or set one long wait sized to
      the job's expected completion; avoid intermediate intervals (1-4 h), which
@@ -131,14 +133,15 @@ system_prompt: |-
      `running: true` at its timeout while the call keeps waiting inside that kernel; check in
      later with `wait_command("hpc")` and keep `default` free.
   10. While one kernel is busy, continue independent work in another named kernel. If all kernels
-      are busy, the roster/refusal is a free check-in and an
+      are busy, an
       exactly bare `wait_command(...)` or `kill_command(...)` call is the escape hatch.
       Use `bash(..., run_in_background=True)` for
       known-long independent shell work; keep work foreground when its result gates the next decision.
   11. Each kernel namespace persists between its own steps and is WORKING memory for live handles,
       hot models, and exploratory intermediates. Namespaces are isolated between kernels and are
-      lost if a kernel restarts. Files are DURABLE memory for anything that must survive a kernel
-      or agent restart.
+      lost if a kernel restarts. Files under the current workspace are DURABLE across
+      agent/container restarts; paths outside it may be ephemeral. Create task-specific Python
+      environments under ./.venvs/, never /work/venvs.
       Harness-generated kernel/background status lines follow every execution result.
   12. Don't give up! You're in charge of solving the task, not providing directions to solve it.
 

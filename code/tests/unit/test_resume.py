@@ -12,10 +12,148 @@ import json
 import pytest
 
 from core._smol import ActionStep
+from core._smol.models import MessageRole
 
 
 def _history(records: list[dict]) -> str:
     return "\n".join(json.dumps(r) for r in records) + "\n"
+
+
+def _tool_call(step: int, call_id: str, arguments: str) -> dict:
+    payload = [
+        {
+            "id": call_id,
+            "type": "function",
+            "function": {"name": "python_interpreter", "arguments": arguments},
+        }
+    ]
+    return {"step": step, "role": "tool-call", "content": "Calling tools:\n" + str(payload)}
+
+
+def _message_text(message) -> str:
+    content = message.content
+    if isinstance(content, str):
+        return content
+    return "".join(
+        block.get("text", "") for block in (content or []) if isinstance(block, dict)
+    )
+
+
+def test_resume_prompt_orders_task_before_restored_actions(make_agent, tmp_workspace):
+    """The resumed task is bootstrap context, not a trailing post-history user turn."""
+    records = [
+        {"step": 0, "role": "system", "content": "system prompt"},
+        {"step": 0, "role": "user", "content": "the task"},
+        {
+            "step": 1,
+            "role": "assistant",
+            "content": json.dumps(
+                {"phase": "P1", "plan": "pl", "code": "x = 1", "summary": "s1"}
+            ),
+            "summary": "s1",
+            "phase": "P1",
+        },
+        {"step": 1, "role": "tool-response", "content": "RESTORED-OBSERVATION"},
+    ]
+    (tmp_workspace / "history.jsonl").write_text(_history(records))
+    agent = make_agent(
+        steps=[
+            {
+                "phase": "end",
+                "plan": "fin",
+                "code": "final_answer('ok')",
+                "summary": "fin",
+            }
+        ],
+        resume=True,
+    )
+
+    agent.run("the task", reset=False)
+
+    sent = agent._fake_calls[0]
+    roles = [message.role for message in sent]
+    texts = [_message_text(message) for message in sent]
+    task_positions = [
+        i
+        for i, (role, text) in enumerate(zip(roles, texts, strict=True))
+        if role == MessageRole.USER and "the task" in text
+    ]
+    restored_position = next(i for i, text in enumerate(texts) if "RESTORED-OBSERVATION" in text)
+    assert roles[0] == MessageRole.SYSTEM
+    assert task_positions == [1]
+    assert roles[1] == MessageRole.USER
+    assert restored_position > task_positions[0]
+
+
+def test_fresh_run_prompt_order_is_unchanged(make_agent):
+    agent = make_agent(
+        steps=[
+            {
+                "phase": "end",
+                "plan": "fin",
+                "code": "final_answer('ok')",
+                "summary": "fin",
+            }
+        ]
+    )
+    agent.run("fresh task", reset=True)
+    sent = agent._fake_calls[0]
+    assert sent[0].role == MessageRole.SYSTEM
+    assert sent[1].role == MessageRole.USER
+    assert "fresh task" in _message_text(sent[1])
+
+
+def test_oversized_resume_prompt_keeps_latest_post_resume_turn(
+    make_agent, tmp_workspace, monkeypatch
+):
+    """A pruned resumed prompt must still contain the immediately preceding result."""
+    marker = "LATEST-POST-RESUME-OBSERVATION"
+    records = [
+        {"step": 0, "role": "system", "content": "system prompt"},
+        {"step": 0, "role": "user", "content": "the task"},
+        {
+            "step": 1,
+            "role": "assistant",
+            "content": json.dumps(
+                {"phase": "P1", "plan": "pl", "code": "x = 1", "summary": "s1"}
+            ),
+            "summary": "s1",
+            "phase": "P1",
+        },
+        {"step": 1, "role": "tool-response", "content": "x" * 1_000_000},
+    ]
+    (tmp_workspace / "history.jsonl").write_text(_history(records))
+    agent = make_agent(
+        steps=[
+            {"phase": "P2", "plan": "run", "code": f"print('{marker}')", "summary": "run"},
+            {
+                "phase": "end",
+                "plan": "fin",
+                "code": "final_answer('ok')",
+                "summary": "fin",
+            },
+        ],
+        resume=True,
+    )
+    monkeypatch.setattr(
+        "core.context._count_tokens",
+        lambda messages, _model_id, **_kwargs: (
+            sum(len(_message_text(m)) for m in messages) // 4
+        ),
+    )
+    scripted_generate = agent.model.generate
+    sent_calls = []
+
+    def managed_generate(messages, **kwargs):
+        sent = agent.model.context_manager(messages)
+        sent_calls.append(sent)
+        return scripted_generate(sent, **kwargs)
+
+    agent.model.generate = managed_generate
+    agent.run("the task", reset=False)
+
+    assert len(sent_calls) >= 2
+    assert marker in "\n".join(_message_text(message) for message in sent_calls[1])
 
 
 def test_resume_reconstructs_memory(make_agent, tmp_workspace):
@@ -51,6 +189,109 @@ def test_resume_reconstructs_memory(make_agent, tmp_workspace):
     # the restart marker is injected so the agent knows executor variables were lost
     observations = " ".join((s.observations or "") for s in action_steps)
     assert "AGENT RESTARTED" in observations
+
+
+def test_resume_restores_exact_tool_call_and_single_observation_prefix(
+    make_agent, tmp_workspace
+):
+    code = "value = {'x': [1, 2]}"
+    records = [
+        {"step": 0, "role": "system", "content": "system"},
+        {"step": 0, "role": "user", "content": "task"},
+        {
+            "step": 1,
+            "role": "assistant",
+            "content": json.dumps(
+                {"phase": "P1", "plan": "p", "code": code, "summary": "s"}
+            ),
+            "code_action": code,
+        },
+        _tool_call(1, "original-call-id", code),
+        {"step": 1, "role": "tool-response", "content": "Observation:\nOBSERVED"},
+    ]
+    (tmp_workspace / "history.jsonl").write_text(_history(records))
+
+    agent = make_agent(resume=True)
+    step = next(s for s in agent.memory.steps if isinstance(s, ActionStep))
+    assert len(step.tool_calls) == 1
+    call = step.tool_calls[0]
+    assert (call.id, call.name, call.arguments) == (
+        "original-call-id",
+        "python_interpreter",
+        code,
+    )
+    rendered = step.to_messages()
+    tool_text = "\n".join(_message_text(message) for message in rendered)
+    assert tool_text.count("Observation:\n") == 1
+    assert "original-call-id" in tool_text
+
+
+def test_resume_error_does_not_duplicate_rendered_error_response(make_agent, tmp_workspace):
+    records = [
+        {"step": 0, "role": "system", "content": "system"},
+        {"step": 0, "role": "user", "content": "task"},
+        {
+            "step": 1,
+            "role": "assistant",
+            "content": json.dumps(
+                {"phase": "P1", "plan": "p", "code": "boom()", "summary": "s"}
+            ),
+            "code_action": "boom()",
+            "error": {"message": "NameError: boom"},
+        },
+        _tool_call(1, "error-call", "boom()"),
+        {
+            "step": 1,
+            "role": "tool-response",
+            "content": "Call id: error-call\nError:\nNameError: boom",
+        },
+        {
+            "step": 2,
+            "role": "assistant",
+            "content": json.dumps(
+                {"phase": "P2", "plan": "p", "code": "x = 1", "summary": "s2"}
+            ),
+            "code_action": "x = 1",
+        },
+        _tool_call(2, "next-call", "x = 1"),
+        {"step": 2, "role": "tool-response", "content": "Observation:\nok"},
+    ]
+    (tmp_workspace / "history.jsonl").write_text(_history(records))
+
+    agent = make_agent(resume=True)
+    errored = next(
+        step for step in agent.memory.steps if isinstance(step, ActionStep) and step.error
+    )
+    assert errored.observations is None
+    responses = [m for m in errored.to_messages() if m.role == MessageRole.TOOL_RESPONSE]
+    assert len(responses) == 1
+    assert _message_text(responses[0]).count("NameError: boom") == 1
+
+
+def test_resume_malformed_tool_call_uses_code_action_fallback(make_agent, tmp_workspace):
+    code = "x = 1"
+    records = [
+        {"step": 0, "role": "system", "content": "system"},
+        {"step": 0, "role": "user", "content": "task"},
+        {"step": 1, "role": "user", "content": "legacy duplicate task"},
+        {
+            "step": 2,
+            "role": "assistant",
+            "content": json.dumps(
+                {"phase": "P2", "plan": "p", "code": code, "summary": "s"}
+            ),
+            "code_action": code,
+        },
+        {"step": 2, "role": "tool-call", "content": "not a literal payload"},
+        {"step": 2, "role": "tool-response", "content": "Observation:\nok"},
+    ]
+    (tmp_workspace / "history.jsonl").write_text(_history(records))
+
+    agent = make_agent(resume=True)
+    actions = [s for s in agent.memory.steps if isinstance(s, ActionStep)]
+    assert len(actions) == 1
+    assert actions[0].tool_calls[0].arguments == code
+    assert actions[0].tool_calls[0].id == "call_2"
 
 
 def test_resume_reconstructs_error_steps(make_agent, tmp_workspace):

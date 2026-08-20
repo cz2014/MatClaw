@@ -41,13 +41,18 @@ _RUNTIME_CONTRACT_SNAPSHOT = (
     "exactly bare `wait_command(...)` or `kill_command(...)` call",
     "run_in_background=True",
     "WORKING memory",
-    "DURABLE memory",
+    "current workspace",
+    "DURABLE across",
+    "paths outside it may be ephemeral",
+    "./.venvs/",
     "Namespaces are isolated between kernels",
     "lost if a kernel restarts",
     "kernel/background status lines",
     "names are case-insensitive",
     "Run long HPC waits",
     'wait_command("hpc")',
+    "60 seconds in the harness",
+    "never executes",
 )
 
 
@@ -85,6 +90,8 @@ def test_system_prompt_framing(make_agent):
     # and the step timeout is a directive, not an `exec_timeout_s` knob.
     for gone in ("rag_search", "corpus knowledge base", "corpus/sources", "exec_timeout_s"):
         assert gone not in sp, f"rendered prompt resurrected {gone!r}"
+    for gone in ("log_bytes", "children", "zombies"):
+        assert gone not in sp, f"rendered prompt exposes removed runtime statistic {gone!r}"
 
 
 def test_vendored_fallback_mirrors_runtime_contract():

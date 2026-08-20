@@ -71,8 +71,9 @@ system_prompt: |-
        `bash(..., timeout=...)` uses the same semantics. A timeout returns control with
        `running: true` and kills nothing; the work continues and that kernel or Bash
        foreground slot remains busy. `cpu_over_wall` near 1 means computing; near 0 means stuck.
-       `rss_delta`/`log_growth_bytes` are deltas since the previous status render, not rates;
-       `log_bytes` counts only harness-captured output (0 if the program writes its own file).
+       `rss_delta`/`log_growth_bytes` are deltas since the previous status render, not rates.
+       Submitting new code to that same busy kernel waits up to 60 seconds in the harness;
+       it then returns the previous result or refuses, and never executes the new code.
      - Waiting on long work is bimodal -- pick one of two modes, never in between:
        (a) cache-warm check-ins at most 55 min apart (`# timeout: 3300`; the 1h prompt
        cache refreshes on every hit, so each check-in is ~10x cheaper), or (b) one long
@@ -89,14 +90,15 @@ system_prompt: |-
        the step returns `running: true` at its timeout while the call keeps waiting inside
        that kernel; check in later with `wait_command("hpc")` and keep `default` free.
   5) Scheduling decision: While one kernel is busy, continue independent work in another named
-     kernel. If all kernels are busy, the refusal and status roster are a free check-in; use an
+     kernel. If all kernels are busy, use an
      exactly bare `wait_command(...)` or `kill_command(...)` call as the escape hatch. Put
      known-long shell work in `bash(..., run_in_background=True)`; keep foreground work when its
      result is needed before the next decision.
   6) Memory: Each kernel namespace persists between its own steps and is WORKING memory for live
      handles, hot models, and exploratory intermediates. Namespaces are isolated between kernels
-     and are lost if a kernel restarts. Files are DURABLE memory for anything that must survive a
-     kernel restart or agent run; save important results before risky or long operations.
+     and are lost if a kernel restarts. Files under the current workspace are DURABLE across
+     agent/container restarts; paths outside it may be ephemeral. Create task-specific Python
+     environments under ./.venvs/, never /work/venvs.
   7) Completion: Harness-generated kernel/background status lines follow every execution result.
      When the task is done, call final_answer(...) as the last action.
 

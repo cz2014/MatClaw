@@ -60,18 +60,25 @@ def test_run_sh_does_not_use_read_only_or_privileged():
 
 @pytest.fixture
 def stub_docker(tmp_path):
-    """A fake `docker` on PATH that records the `run` argv and skips the build."""
+    """A fake `docker` on PATH that records build/run order without a daemon."""
     bindir = tmp_path / "bin"
     bindir.mkdir()
     argfile = tmp_path / "run_argv.txt"
+    calls = tmp_path / "docker_calls.txt"
     _write_exec(
         bindir / "docker",
         "#!/usr/bin/env bash\n"
-        'if [ "$1" = "image" ]; then exit 0; fi\n'          # image inspect -> exists, skip build
+        'printf "%s\\n" "$*" >> "$STUB_DOCKER_CALLS"\n'
+        'if [ "$1" = "image" ]; then [ -z "${STUB_IMAGE_MISSING:-}" ]; exit $?; fi\n'
+        'if [ "$1" = "build" ]; then [ -z "${STUB_BUILD_FAIL:-}" ]; exit $?; fi\n'
         f'if [ "$1" = "run" ]; then shift; printf "%s\\n" "$@" > "{argfile}"; exit 0; fi\n'
         "exit 0\n",
     )
-    env = dict(os.environ, PATH=f"{bindir}:{os.environ['PATH']}")
+    env = dict(
+        os.environ,
+        PATH=f"{bindir}:{os.environ['PATH']}",
+        STUB_DOCKER_CALLS=str(calls),
+    )
     return env, argfile
 
 
@@ -136,6 +143,71 @@ def test_run_sh_respects_explicit_config(stub_docker):
     argv = argfile.read_text().splitlines()
     assert "/custom/cfg" in argv
     assert "/work/configs" not in argv, "must not inject the default when --config is given"
+
+
+def test_default_builds_before_run_even_when_image_exists(stub_docker):
+    env, _ = stub_docker
+    subprocess.run(
+        ["bash", str(RUN_SH), "run", "--task", "t"],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    calls = Path(env["STUB_DOCKER_CALLS"]).read_text().splitlines()
+    assert calls[0].startswith("build ")
+    assert calls[-1].startswith("run ")
+    assert not any(call.startswith("image inspect") for call in calls)
+
+
+def test_build_uses_checkout_dockerfile_uid_gid_context_and_tag(stub_docker):
+    env, _ = stub_docker
+    subprocess.run(["bash", str(RUN_SH), "run"], cwd=REPO_ROOT, env=env, check=True)
+    build = Path(env["STUB_DOCKER_CALLS"]).read_text().splitlines()[0]
+    assert "-f docker/Dockerfile" in build
+    assert f"UID={os.getuid()}" in build and f"GID={os.getgid()}" in build
+    assert "-t matclaw:dev ." in build
+
+
+def test_build_failure_prevents_docker_run(stub_docker):
+    env, argfile = stub_docker
+    env["STUB_BUILD_FAIL"] = "1"
+    result = subprocess.run(
+        ["bash", str(RUN_SH), "run"], cwd=REPO_ROOT, env=env, capture_output=True
+    )
+    assert result.returncode != 0
+    assert not argfile.exists()
+    assert not any(
+        call.startswith("run ")
+        for call in Path(env["STUB_DOCKER_CALLS"]).read_text().splitlines()
+    )
+
+
+def test_prebuilt_mode_skips_build_and_requires_existing_image(stub_docker):
+    env, argfile = stub_docker
+    env["MATCLAW_PREBUILT"] = "1"
+    env["IMAGE"] = "matclaw:mace"
+    subprocess.run(
+        ["bash", str(RUN_SH), "run", "--task", "t"],
+        cwd=REPO_ROOT,
+        env=env,
+        check=True,
+    )
+    calls = Path(env["STUB_DOCKER_CALLS"]).read_text().splitlines()
+    assert calls[0].startswith("image inspect matclaw:mace")
+    assert not any(call.startswith("build ") for call in calls)
+    assert "matclaw:mace" in argfile.read_text().splitlines()
+    assert argfile.exists()
+
+    Path(env["STUB_DOCKER_CALLS"]).write_text("")
+    argfile.unlink()
+    env["STUB_IMAGE_MISSING"] = "1"
+    missing = subprocess.run(
+        ["bash", str(RUN_SH), "run"], cwd=REPO_ROOT, env=env, capture_output=True
+    )
+    assert missing.returncode != 0
+    assert not argfile.exists()
 
 
 # --------------------------------------------------------------------------- entrypoint rewrite

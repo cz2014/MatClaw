@@ -14,13 +14,21 @@ between triggers, preserving LLM provider cache hits.
 from __future__ import annotations
 
 import logging
+import math
 from copy import deepcopy
+from typing import Callable
 
 logger = logging.getLogger(__name__)
 
 # --- Constants ---
 
 _CHARS_PER_TOKEN = 4  # standard approximation for English/code text
+_FALLBACK_CHARS_PER_TOKEN = 3
+_IMAGE_TOKEN_RESERVE = 2_000
+_RATIO_SEED = 1.60
+_RATIO_ALPHA = 0.30
+_RATIO_MIN = 1.0
+_RATIO_MAX = 3.0
 
 _SOFT_TRIM_MAX_CHARS = 4_000
 _SOFT_TRIM_HEAD_CHARS = 1_500
@@ -111,8 +119,25 @@ def _make_marker(n: int) -> dict:
     }
 
 
-def _count_tokens(messages: list, model_id: str) -> int:
-    """Count tokens using litellm, with char/4 fallback."""
+def _image_count(messages: list) -> int:
+    count = 0
+    for message in messages:
+        content = message.get("content") if isinstance(message, dict) else getattr(message, "content", None)
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") in {"image", "image_url"} or "image" in block:
+                count += 1
+    return count
+
+
+def _count_tokens(
+    messages: list, model_id: str, *, fallback_state: dict | None = None
+) -> int:
+    """Count local text tokens and reserve provider context for image blocks."""
+    image_tokens = _image_count(messages) * _IMAGE_TOKEN_RESERVE
     try:
         import litellm
         msg_dicts = []
@@ -123,10 +148,51 @@ def _count_tokens(messages: list, model_id: str) -> int:
             elif role == "tool-call":
                 role = "assistant"
             msg_dicts.append({"role": role, "content": _get_content_str(m)})
-        return litellm.token_counter(model=model_id, messages=msg_dicts)
-    except Exception:
+        return litellm.token_counter(model=model_id, messages=msg_dicts) + image_tokens
+    except Exception as exc:
+        if fallback_state is None or not fallback_state.get("warned"):
+            logger.warning(
+                "Context token counter failed for %s (%s: %s); using chars//%d fallback",
+                model_id,
+                type(exc).__name__,
+                exc,
+                _FALLBACK_CHARS_PER_TOKEN,
+            )
+            if fallback_state is not None:
+                fallback_state["warned"] = True
         total_chars = sum(len(_get_content_str(m)) for m in messages)
-        return total_chars // _CHARS_PER_TOKEN
+        return total_chars // _FALLBACK_CHARS_PER_TOKEN + image_tokens
+
+
+class _TokenRatioCalibrator:
+    """Per-model-run EMA of provider prompt tokens divided by local count."""
+
+    def __init__(self) -> None:
+        self.ratio = _RATIO_SEED
+        self.samples = 0
+        self._pending_count: int | None = None
+        self._fallback_state = {"warned": False}
+
+    def count(self, messages: list, model_id: str) -> int:
+        return _count_tokens(messages, model_id, fallback_state=self._fallback_state)
+
+    def note_sent(self, messages: list, model_id: str) -> None:
+        counted = self.count(messages, model_id)
+        self._pending_count = counted if counted > 0 else None
+
+    def observe_actual(self, actual: int | None) -> None:
+        counted, self._pending_count = self._pending_count, None
+        if counted is None or not isinstance(actual, (int, float)) or actual <= 0:
+            return
+        sample = float(actual) / counted
+        if not math.isfinite(sample) or sample <= 0:
+            return
+        updated = (1.0 - _RATIO_ALPHA) * self.ratio + _RATIO_ALPHA * sample
+        self.ratio = min(_RATIO_MAX, max(_RATIO_MIN, updated))
+        self.samples += 1
+
+    def effective_cap(self, configured_cap: int) -> int:
+        return max(1, int(configured_cap / self.ratio))
 
 
 # --- Zone-based context management ---
@@ -158,7 +224,10 @@ def _cap_oversized_messages(messages: list, context_tokens: int, bootstrap_end: 
 
 
 def _enforce_token_cap(
-    messages: list, context_tokens: int, model_id: str
+    messages: list,
+    context_tokens: int,
+    model_id: str,
+    counter: Callable[[list], int] | None = None,
 ) -> list:
     """Zone-based context truncation.
 
@@ -167,7 +236,8 @@ def _enforce_token_cap(
     Returns input unchanged (same reference) when under window.
     Returns deepcopy-based result when pruning fires.
     """
-    total_tokens = _count_tokens(messages, model_id)
+    count_tokens = counter or (lambda value: _count_tokens(value, model_id))
+    total_tokens = count_tokens(messages)
     if total_tokens <= context_tokens:
         return messages
 
@@ -183,7 +253,7 @@ def _enforce_token_cap(
 
     # Cap oversized individual messages before zone processing
     if _cap_oversized_messages(messages, context_tokens, bootstrap_end):
-        total_tokens = _count_tokens(messages, model_id)
+        total_tokens = count_tokens(messages)
         if total_tokens <= context_tokens:
             logger.info(
                 "Context pruning: message capping sufficient (%d tokens), "
@@ -226,7 +296,7 @@ def _enforce_token_cap(
     else:
         result = messages
 
-    result_tokens = _count_tokens(result, model_id)
+    result_tokens = count_tokens(result)
 
     if result_tokens <= context_tokens:
         logger.info(
@@ -257,7 +327,7 @@ def _enforce_token_cap(
             + [_make_marker(expanded_removed)]
             + remaining[tail_start_in_remaining:]
         )
-        candidate_tokens = _count_tokens(candidate, model_id)
+        candidate_tokens = count_tokens(candidate)
         if candidate_tokens <= context_tokens:
             logger.info(
                 "Context pruning: expanded truncation (%d -> %d tokens, "
@@ -278,14 +348,17 @@ def _enforce_token_cap(
 # --- Public API ---
 
 def manage_context(
-    messages: list, context_tokens: int, model_id: str
+    messages: list,
+    context_tokens: int,
+    model_id: str,
+    counter: Callable[[list], int] | None = None,
 ) -> list:
     """Zone-based context management.
 
     Single unified mechanism: fires when total tokens exceed context_window.
     No-op when total tokens <= context_window, preserving cache hits.
     """
-    return _enforce_token_cap(messages, context_tokens, model_id)
+    return _enforce_token_cap(messages, context_tokens, model_id, counter=counter)
 
 
 def wrap_model_with_context_management(model, context_tokens: int, model_id: str):
@@ -296,6 +369,7 @@ def wrap_model_with_context_management(model, context_tokens: int, model_id: str
     staying under the window for ~8 turns without re-pruning.
     """
     _state: dict = {"snapshot": None, "seen_count": 0}
+    calibrator = _TokenRatioCalibrator()
 
     def managed_context(messages):
         snapshot = _state["snapshot"]
@@ -306,7 +380,13 @@ def wrap_model_with_context_management(model, context_tokens: int, model_id: str
         else:
             candidate = messages
 
-        result = manage_context(candidate, context_tokens, model_id)
+        effective_cap = calibrator.effective_cap(context_tokens)
+        result = manage_context(
+            candidate,
+            effective_cap,
+            model_id,
+            counter=lambda value: calibrator.count(value, model_id),
+        )
 
         if result is not candidate:
             _state["snapshot"] = result
@@ -315,11 +395,14 @@ def wrap_model_with_context_management(model, context_tokens: int, model_id: str
             _state["snapshot"] = candidate
             _state["seen_count"] = len(messages)
 
+        calibrator.note_sent(result, model_id)
         return result
 
     # Install as a hook (P2/V3): the vendored LiteLLMModel.generate calls
     # self.context_manager(messages) before each API call. No instance-method reassignment.
     model.context_manager = managed_context
+    model.context_feedback = calibrator.observe_actual
+    model.context_calibrator = calibrator
     logger.info(
         "Context management enabled: context_window=%d tokens, "
         "zones=[protect=%.0f%%, soft-trim=%.0f%%, hard-clear=%.0f%%, truncate=%.0f%%]",

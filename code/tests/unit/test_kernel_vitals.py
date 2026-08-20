@@ -22,7 +22,7 @@ def test_spin_and_sleep_cpu_windows(fresh_manager):
         fresh_manager.kill_command("default")
 
 
-def test_rss_delta_and_children_summary(fresh_manager):
+def test_rss_delta_and_actionable_field_summary(fresh_manager):
     running = fresh_manager.execute(
         "import subprocess, time\n"
         "vitals_mem = bytearray(64 * 1024 * 1024)\n"
@@ -33,31 +33,48 @@ def test_rss_delta_and_children_summary(fresh_manager):
     )
     try:
         assert running["vitals"]["rss_delta"] > 32 * 1024 * 1024
-        assert running["vitals"]["children"] >= 1
+        assert set(running["vitals"]) == {
+            "cpu_over_wall",
+            "rss_bytes",
+            "rss_delta",
+            "log_growth_bytes",
+        }
     finally:
         fresh_manager.kill_command("default")
 
 
-def test_children_count_nested_and_detached_descendants(fresh_manager):
-    """Vitals follow parentage, not the process group.
+def test_kernel_resource_totals_exclude_zombie_and_dead_descendants(monkeypatch):
+    import psutil
+    from core.kernel import KernelManager
 
-    The sampler reads the shared process-table snapshot, which is keyed by pgid;
-    a descendant that starts its own session leaves that group but is still the
-    kernel's child, so it must keep showing up in the counted forest.
-    """
-    running = fresh_manager.execute(
-        "import subprocess, time\n"
-        "vitals_nested = subprocess.Popen(['sh', '-c', 'sleep 10 & wait'])\n"
-        "vitals_detached = subprocess.Popen(['sleep', '10'], start_new_session=True)\n"
-        "time.sleep(10)",
-        "default",
-        1,
-    )
-    try:
-        # sh + its backgrounded sleep + the detached sleep
-        assert running["vitals"]["children"] >= 3
-    finally:
-        fresh_manager.kill_command("default")
+    class FakeProcess:
+        def __init__(self, status, cpu, rss, children=()):
+            self._status = status
+            self._cpu = cpu
+            self._rss = rss
+            self._children = list(children)
+
+        def children(self, recursive=True):
+            return self._children
+
+        def is_running(self):
+            return self._status != "dead"
+
+        def status(self):
+            return self._status
+
+        def cpu_times(self):
+            return (self._cpu, 0.0)
+
+        def memory_info(self):
+            return SimpleNamespace(rss=self._rss)
+
+    live = FakeProcess(psutil.STATUS_RUNNING, 2.0, 100)
+    zombie = FakeProcess(psutil.STATUS_ZOMBIE, 50.0, 10_000)
+    dead = FakeProcess("dead", 60.0, 20_000)
+    parent = FakeProcess(psutil.STATUS_RUNNING, 1.0, 50, [live, zombie, dead])
+    monkeypatch.setattr("core.kernel.psutil.Process", lambda _pid: parent)
+    assert KernelManager._kernel_resources(SimpleNamespace(pid=123)) == (3.0, 150)
 
 
 def test_log_growth_between_checkins(fresh_manager):

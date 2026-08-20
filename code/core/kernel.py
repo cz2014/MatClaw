@@ -27,6 +27,7 @@ from core.toolserver import FinalAnswerSignal
 DEFAULT_STEP_TIMEOUT_S = 120
 MAX_STEP_TIMEOUT_S = 72000
 MAX_KERNELS = 3
+_BUSY_SUBMISSION_WAIT_S = 60.0
 
 # Names must start with a letter so a kernel name can never be confused with a
 # numeric background-PID target in wait_command/kill_command routing.
@@ -245,6 +246,7 @@ class KernelManager:
         self.kernels: dict[str, _Kernel] = {}
         self.variables: dict[str, Any] = {}
         self._step = 0
+        self._run_id = f"{os.getpid()}_{time.time_ns()}"
         self._notes: list[str] = []
         self._lock = threading.RLock()
         self._closed = False
@@ -357,6 +359,20 @@ class KernelManager:
         self, code: str, kernel_name: str = "default", timeout: int = DEFAULT_STEP_TIMEOUT_S
     ) -> dict:
         timeout = min(max(1, int(timeout)), MAX_STEP_TIMEOUT_S)
+        # A check-in returns while the previous cell is still running.  Keep the
+        # resulting busy retry inside the harness for one bounded interval instead
+        # of spending another model turn immediately.  Never hold the manager lock
+        # while waiting: other kernels and control calls must remain usable.
+        with self._lock:
+            existing = self.kernels.get(kernel_name)
+            if existing is not None:
+                self._lazy_reap(existing)
+                busy = existing.current
+            else:
+                busy = None
+        if busy is not None:
+            return self._wait_on_busy_submission(existing, busy)
+
         with self._lock:
             try:
                 kernel = self._ensure_kernel(kernel_name)
@@ -373,44 +389,92 @@ class KernelManager:
                 )
             self._lazy_reap(kernel)
             if kernel.current is not None:
-                return self._running_result(kernel, refused=True)
-            # A new step supersedes the previous one's collectable result, never
-            # its note: the note stays queued until a return announces it.
-            kernel.completed = None
-            kernel.completed_note = None
-            # This counter only advances for steps that reach a kernel, so the
-            # on-disk .kernel_* numbering trails the agent's step numbering
-            # whenever a step was handled harness-side (bare wait/kill calls).
-            self._step += 1
-            safe_name = re.sub(r"[^A-Za-z0-9_-]", "_", kernel.name)
-            log_path = self.workspace / f".kernel_{safe_name}_step_{self._step}.log"
-            result_path = self.workspace / f".kernel_{safe_name}_step_{self._step}.result"
-            source_path = self.workspace / f".kernel_{safe_name}_step_{self._step}.py"
-            source_path.write_text(code, encoding="utf-8")
-            # A prior cell may have deliberately caught BaseException after the
-            # final-answer RPC, or crashed before emitting its error message.
-            # Never let that stale record turn a later unrelated error into a
-            # final answer.
-            self.tool_server.take_final_answer(kernel.name)
-            wrapper = f"_matclaw_execute({str(source_path)!r}, {str(result_path)!r})"
-            msg_id = kernel.client.execute(wrapper, store_history=False, allow_stdin=False)
-            execution = _KernelExecution(
-                msg_id, log_path, result_path, source_path, time.monotonic()
-            )
-            execution.deadline = execution.started_at + timeout
-            kernel.current = execution
-            execution.reader = threading.Thread(
-                target=self._read_execution,
-                args=(kernel, execution),
-                name=f"matclaw-iopub-{kernel.name}-{self._step}",
-                daemon=True,
-            )
-            execution.reader.start()
+                busy = kernel.current
+            else:
+                busy = None
+            if busy is not None:
+                # A concurrent submitter claimed the kernel after the lock-free
+                # preflight.  Drop the lock and apply the same bounded wait below.
+                execution = None
+            else:
+                execution = self._install_execution_locked(kernel, code, timeout)
+        if busy is not None:
+            return self._wait_on_busy_submission(kernel, busy)
+        assert execution is not None
         if execution.done.wait(timeout):
             with self._lock:
                 return self._with_notes(self._collect(kernel, execution))
         with self._lock:
             return self._running_result(kernel)
+
+    def _install_execution_locked(
+        self, kernel: _Kernel, code: str, timeout: int
+    ) -> _KernelExecution:
+        """Install one execution while ``self._lock`` is held."""
+        # A new step supersedes the previous one's collectable result, never
+        # its note: the note stays queued until a return announces it.
+        kernel.completed = None
+        kernel.completed_note = None
+        # This counter only advances for steps that reach a kernel, so the
+        # on-disk .kernel_* numbering trails the agent's step numbering
+        # whenever a step was handled harness-side (bare wait/kill calls).
+        self._step += 1
+        safe_name = re.sub(r"[^A-Za-z0-9_-]", "_", kernel.name)
+        stem = f".kernel_{safe_name}_{self._run_id}_step_{self._step}"
+        log_path = self.workspace / f"{stem}.log"
+        result_path = self.workspace / f"{stem}.result"
+        source_path = self.workspace / f"{stem}.py"
+        # Initialise the spool once per execution.  Opening it in append mode in
+        # the reader is then safe within the step and can never inherit old bytes.
+        log_path.write_bytes(b"")
+        source_path.write_text(code, encoding="utf-8")
+        # A prior cell may have deliberately caught BaseException after the
+        # final-answer RPC, or crashed before emitting its error message.
+        # Never let that stale record turn a later unrelated error into a
+        # final answer.
+        self.tool_server.take_final_answer(kernel.name)
+        wrapper = f"_matclaw_execute({str(source_path)!r}, {str(result_path)!r})"
+        msg_id = kernel.client.execute(wrapper, store_history=False, allow_stdin=False)
+        execution = _KernelExecution(
+            msg_id, log_path, result_path, source_path, time.monotonic()
+        )
+        execution.deadline = execution.started_at + timeout
+        kernel.current = execution
+        kernel.sample_log_size = 0
+        execution.reader = threading.Thread(
+            target=self._read_execution,
+            args=(kernel, execution),
+            name=f"matclaw-iopub-{kernel.name}-{self._step}",
+            daemon=True,
+        )
+        execution.reader.start()
+        return execution
+
+    def _wait_on_busy_submission(
+        self, kernel: _Kernel, execution: _KernelExecution
+    ) -> dict:
+        """Return the prior result or a truthful refusal; never run submitted code."""
+        finished = execution.done.wait(_BUSY_SUBMISSION_WAIT_S)
+        with self._lock:
+            if finished or execution.done.is_set():
+                result = self._collect(kernel, execution)
+                message = (
+                    f"Kernel {kernel.name!r} finished its previous step during the "
+                    "60-second busy wait. This is that previous result; the newly "
+                    "submitted code was NOT executed. Review the result before resubmitting."
+                )
+                result["note"] = (
+                    f"{result['note']}\n{message}" if result.get("note") else message
+                )
+                return self._with_notes(result)
+            result = self._running_result(kernel, refused=True)
+            result["note"] = (
+                f"Kernel {kernel.name!r} is still running the previous step after a "
+                "60-second wait; the newly submitted code was NOT executed. Use "
+                f"wait_command({kernel.name!r}, timeout=<seconds>) to keep waiting or "
+                f"kill_command({kernel.name!r}) to abandon it."
+            )
+            return result
 
     def dispatch(self, code: str) -> dict:
         directives = parse_directives(code)
@@ -426,7 +490,6 @@ class KernelManager:
         return None if deadline is None else max(0.0, deadline - time.monotonic())
 
     def _read_execution(self, kernel: _Kernel, execution: _KernelExecution) -> None:
-        execution.log_path.touch()
         try:
             with execution.log_path.open("a", encoding="utf-8") as log:
                 while not execution.cancelled.is_set():
@@ -622,7 +685,6 @@ class KernelManager:
             "kernel": kernel.name,
             "elapsed": time.monotonic() - execution.started_at,
             "logs": logs,
-            "tail": logs[-4000:],
             "truncated": truncated,
             "log_file": os.path.relpath(execution.log_path, self.workspace),
             "vitals": vitals,
@@ -769,24 +831,32 @@ class KernelManager:
             pass
 
     @staticmethod
-    def _kernel_resources(kernel: _Kernel) -> tuple[float, int, int]:
+    def _kernel_resources(kernel: _Kernel) -> tuple[float, int]:
         process = psutil.Process(kernel.pid)
         processes = [process, *process.children(recursive=True)]
-        cpu = sum(sum(proc.cpu_times()[:2]) for proc in processes if proc.is_running())
-        rss = sum(proc.memory_info().rss for proc in processes if proc.is_running())
-        return cpu, rss, max(0, len(processes) - 1)
+        cpu = 0.0
+        rss = 0
+        for proc in processes:
+            if not KernelManager._is_live(proc):
+                continue
+            try:
+                cpu += sum(proc.cpu_times()[:2])
+                rss += proc.memory_info().rss
+            except psutil.Error:
+                continue
+        return cpu, rss
 
     def _start_sampler(self, kernel: _Kernel, window_s: float = 1.0, tick_s: float = 0.2) -> None:
         def sample() -> None:
             try:
-                cpu, rss, _ = self._kernel_resources(kernel)
+                cpu, rss = self._kernel_resources(kernel)
                 kernel.sample_rss = rss
             except psutil.Error:
                 cpu = 0.0
             history = [(time.monotonic(), cpu)]
             while not kernel.sample_stop.wait(tick_s):
                 try:
-                    cpu, rss, children = self._kernel_resources(kernel)
+                    cpu, rss = self._kernel_resources(kernel)
                     now = time.monotonic()
                     history.append((now, cpu))
                     cutoff = now - window_s
@@ -794,12 +864,8 @@ class KernelManager:
                         history.pop(0)
                     old_at, old_cpu = history[0]
                     kernel.latest_vitals = {
-                        "pid": kernel.pid,
-                        "elapsed_s": now - kernel.started_at,
-                        "cpu_time_s": cpu,
                         "cpu_over_wall": max(0.0, cpu - old_cpu) / max(1e-9, now - old_at),
                         "rss_bytes": rss,
-                        "children": children,
                     }
                     kernel.sample_ready.set()
                 except psutil.Error:
@@ -909,17 +975,13 @@ class KernelManager:
         result = dict(kernel.latest_vitals)
         if not result:
             try:
-                cpu, rss, children = self._kernel_resources(kernel)
+                _cpu, rss = self._kernel_resources(kernel)
                 result = {
-                    "pid": kernel.pid,
-                    "elapsed_s": time.monotonic() - kernel.started_at,
-                    "cpu_time_s": cpu,
                     "cpu_over_wall": 0.0,
                     "rss_bytes": rss,
-                    "children": children,
                 }
             except psutil.Error:
-                result = {"pid": kernel.pid, "elapsed_s": time.monotonic() - kernel.started_at}
+                result = {"cpu_over_wall": 0.0, "rss_bytes": 0}
         execution = kernel.current
         log_size = (
             execution.log_path.stat().st_size
@@ -927,7 +989,6 @@ class KernelManager:
             else 0
         )
         result["rss_delta"] = result.get("rss_bytes", 0) - kernel.sample_rss
-        result["log_bytes"] = log_size
         result["log_growth_bytes"] = log_size - kernel.sample_log_size
         kernel.sample_rss = result.get("rss_bytes", 0)
         kernel.sample_log_size = log_size

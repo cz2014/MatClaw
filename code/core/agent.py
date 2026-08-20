@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import atexit
+import ast
 import json
 import logging
 import os
@@ -408,17 +409,17 @@ def _inject_workspace_images(workspace: Path):
     return cb
 
 
-def _restart_from_history(agent: CodeAgent, history_file: Path) -> int:
+def _restart_from_history(agent: CodeAgent, history_file: Path) -> None:
     """Reconstruct agent memory from history.jsonl for restart.
 
     Populates agent.memory.steps with ActionStep objects reconstructed
-    from the history file. Returns the next step_number to use.
+    from the history file.
 
     Executor variables are NOT restored (Python state is lost on crash).
     A restart message is injected to inform the agent.
     """
     from core._smol import ActionStep
-    from core._smol.memory import Timing
+    from core._smol.memory import Timing, ToolCall
 
     records: list[dict] = []
     with history_file.open("r", encoding="utf-8") as f:
@@ -428,7 +429,7 @@ def _restart_from_history(agent: CodeAgent, history_file: Path) -> int:
                 records.append(json.loads(line))
 
     if not records:
-        return 1
+        return
 
     by_step: dict[int, list[dict]] = {}
     for rec in records:
@@ -449,6 +450,8 @@ def _restart_from_history(agent: CodeAgent, history_file: Path) -> int:
         is_final_answer = False
         token_usage = None
         images: list = []
+        tool_calls: list[ToolCall] = []
+        saw_tool_call = False
 
         for rec in step_records:
             role = rec["role"]
@@ -490,8 +493,45 @@ def _restart_from_history(agent: CodeAgent, history_file: Path) -> int:
                     })
                 if rec.get("code_action") is not None:
                     code_action = rec["code_action"]
+            elif role == "tool-call":
+                saw_tool_call = True
+                try:
+                    payload_text = content.removeprefix("Calling tools:\n")
+                    payload = ast.literal_eval(payload_text)
+                    if not isinstance(payload, list):
+                        raise ValueError("tool-call payload is not a list")
+                    parsed_calls = []
+                    for item in payload:
+                        if not isinstance(item, dict) or item.get("type") != "function":
+                            raise ValueError("tool-call item is not a function mapping")
+                        function = item.get("function")
+                        if not isinstance(function, dict):
+                            raise ValueError("tool-call function is not a mapping")
+                        call_id = item.get("id")
+                        name = function.get("name")
+                        if not isinstance(call_id, str) or not isinstance(name, str):
+                            raise ValueError("tool-call id/name is missing")
+                        if "arguments" not in function:
+                            raise ValueError("tool-call arguments are missing")
+                        parsed_calls.append(
+                            ToolCall(
+                                id=call_id,
+                                name=name,
+                                arguments=function["arguments"],
+                            )
+                        )
+                    tool_calls.extend(parsed_calls)
+                except (SyntaxError, ValueError, TypeError):
+                    logger.warning(
+                        "Malformed legacy tool-call payload at step %d; using code_action fallback",
+                        step_num,
+                    )
             elif role in ("tool-response", "tool"):
-                observations = content
+                observations = content.removeprefix("Observation:\n")
+            elif role in ("user", "system"):
+                # Histories written before bootstrap moved to step 0 can carry
+                # the task as step 1. It is not an ActionStep.
+                continue
 
             if "images_b64" in rec:
                 import base64
@@ -503,10 +543,28 @@ def _restart_from_history(agent: CodeAgent, history_file: Path) -> int:
                     img.load()
                     images.append(img)
 
+        if model_output is None and code_action is None and observations is None and error is None:
+            continue
+        if not tool_calls and code_action is not None:
+            tool_calls = [
+                ToolCall(
+                    id=f"call_{step_num}",
+                    name="python_interpreter",
+                    arguments=code_action,
+                )
+            ]
+            if saw_tool_call:
+                logger.info("Synthesized tool call for malformed history step %d", step_num)
+        # Error rendering already produces the tool response. Restoring the
+        # rendered response as an observation would duplicate and corrupt it.
+        if error is not None:
+            observations = None
+
         action_step = ActionStep(
             step_number=step_num,
             timing=timing,
             model_output=model_output,
+            tool_calls=tool_calls or None,
             code_action=code_action,
             observations=observations,
             error=error,

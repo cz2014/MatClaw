@@ -1503,21 +1503,21 @@ class _LocalExecState:
         return bool(members)
 
     @classmethod
-    def _resource_totals(cls, record: _LocalProcess) -> tuple[float, int, int]:
+    def _resource_totals(cls, record: _LocalProcess) -> tuple[float, int]:
         import psutil
 
         members = cls._group_processes(record.proc.pid, _PROCESS_SCAN_TTL_S)
         cpu_time = 0.0
         rss = 0
-        live = 0
         for proc in members:
             try:
+                if not proc.is_running() or proc.status() == psutil.STATUS_ZOMBIE:
+                    continue
                 cpu_time += sum(proc.cpu_times()[:2])
                 rss += proc.memory_info().rss
             except psutil.Error:
                 continue
-            live += 1
-        return cpu_time, rss, max(0, live - 1)
+        return cpu_time, rss
 
     @classmethod
     def _start_sampler(
@@ -1527,30 +1527,24 @@ class _LocalExecState:
 
         def sample() -> None:
             try:
-                cpu_time, _, _ = cls._resource_totals(record)
+                cpu_time, _ = cls._resource_totals(record)
             except (psutil.Error, OSError):
                 cpu_time = 0.0
             history = [(time.monotonic(), cpu_time)]
             while not record.sample_stop.wait(tick_s):
                 try:
-                    cpu_time, rss, child_count = cls._resource_totals(record)
+                    cpu_time, rss = cls._resource_totals(record)
                     now = time.monotonic()
                     history.append((now, cpu_time))
                     cutoff = now - sample_window_s
                     while len(history) > 2 and history[1][0] <= cutoff:
                         history.pop(0)
                     sampled_at, cpu_before = history[0]
-                    log_size = record.log_path.stat().st_size if record.log_path.exists() else 0
                     record.latest_vitals = {
-                        "pid": record.proc.pid,
-                        "elapsed_s": round(max(0.0, now - record.started_at), 3),
-                        "cpu_time_s": round(cpu_time, 3),
                         "cpu_over_wall": round(
                             max(0.0, cpu_time - cpu_before) / max(1e-9, now - sampled_at), 3
                         ),
                         "rss_bytes": rss,
-                        "children": child_count,
-                        "log_bytes": log_size,
                     }
                     record.sample_at = now
                     record.sample_cpu_time = cpu_time
@@ -1573,33 +1567,28 @@ class _LocalExecState:
         import psutil
 
         record.sample_ready.wait(timeout=0.05)
+        log_size = record.log_path.stat().st_size if record.log_path.exists() else 0
         if record.latest_vitals:
             result = dict(record.latest_vitals)
-            result["elapsed_s"] = round(max(0.0, time.monotonic() - record.started_at), 3)
             result["rss_delta"] = result["rss_bytes"] - record.sample_rss
-            result["log_growth_bytes"] = result["log_bytes"] - record.sample_log_size
+            result["log_growth_bytes"] = log_size - record.sample_log_size
             record.sample_rss = result["rss_bytes"]
-            record.sample_log_size = result["log_bytes"]
+            record.sample_log_size = log_size
             return result
         try:
-            cpu_time, rss, child_count = cls._resource_totals(record)
-            log_size = record.log_path.stat().st_size if record.log_path.exists() else 0
+            _cpu_time, rss = cls._resource_totals(record)
             return {
-                "pid": record.proc.pid,
-                "elapsed_s": round(max(0.0, time.monotonic() - record.started_at), 3),
-                "cpu_time_s": round(cpu_time, 3),
                 "cpu_over_wall": 0.0,
                 "rss_bytes": rss,
                 "rss_delta": rss,
-                "children": child_count,
-                "log_bytes": log_size,
                 "log_growth_bytes": log_size,
             }
         except (psutil.Error, OSError):
             return {
-                "pid": record.proc.pid,
-                "elapsed_s": round(max(0.0, time.monotonic() - record.started_at), 3),
-                "log_bytes": record.log_path.stat().st_size if record.log_path.exists() else 0,
+                "cpu_over_wall": 0.0,
+                "rss_bytes": 0,
+                "rss_delta": 0,
+                "log_growth_bytes": log_size,
             }
 
     def _reap(self) -> None:
@@ -1662,7 +1651,7 @@ class _LocalExecState:
             else:
                 v = self._vitals(self.foreground)
                 foreground = (
-                    f"bash: busy {_fmt_duration(v['elapsed_s'])}, "
+                    f"bash: busy {_fmt_duration(time.monotonic() - self.foreground.started_at)}, "
                     f"cpu {v.get('cpu_over_wall', 0) * 100:.0f}%, "
                     f"rss {v.get('rss_bytes', 0) / (1024 ** 2):.1f}M"
                 )
@@ -1732,7 +1721,6 @@ class _LocalExecState:
                     "pid": record.proc.pid,
                     "elapsed": time.monotonic() - record.started_at,
                     "stdout": output,
-                    "tail": output[-4000:],
                     "truncated": truncated,
                     "log_file": os.path.relpath(record.log_path, self.workspace),
                     "vitals": self._vitals(record),
@@ -1772,7 +1760,6 @@ class _LocalExecState:
                     "pid": proc.pid,
                     "elapsed": time.monotonic() - record.started_at,
                     "stdout": output,
-                    "tail": output[-4000:],
                     "truncated": truncated,
                     "log_file": os.path.relpath(log, self.workspace),
                     "vitals": self._vitals(record),
@@ -1834,7 +1821,6 @@ class _LocalExecState:
                     "pid": record.proc.pid,
                     "elapsed": time.monotonic() - record.started_at,
                     "stdout": output,
-                    "tail": output[-4000:],
                     "truncated": truncated,
                     "log_file": os.path.relpath(record.log_path, self.workspace),
                     "vitals": self._vitals(record),
@@ -2015,8 +2001,7 @@ sized to the job's expected completion. Avoid intermediate intervals (1-4h): eac
 such check-in expires the cache and costs the most.
 
 Vitals semantics: rss_delta and log_growth_bytes are deltas since the previous
-status render, not rates. log_bytes counts only harness-captured output; it stays
-0 when the program redirects its own output to a file."""
+status render, not rates."""
     inputs = {
         "target": {"type": "string", "description": "Kernel name, 'bash', or background PID."},
         "timeout": {"type": "integer", "description": "Maximum check-in wait in seconds (default 60, cap 72000). Either <=3300 (cache-warm check-in) or one long wait to expected completion; avoid 1-4h.", "nullable": True},
