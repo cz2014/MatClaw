@@ -42,15 +42,35 @@ class TokenUsage:
     input_tokens: int
     output_tokens: int
     total_tokens: int = field(init=False)
+    # MatClaw (direct edit): Anthropic prompt-cache breakdown. litellm folds both
+    # of these into prompt_tokens, so they partition input_tokens rather than add
+    # to it -- never sum them with input_tokens. They are recorded because the
+    # three components bill at different rates (a cache read costs a fraction of
+    # the base input rate, a cache write a premium on it), so a run's cost cannot
+    # be reconstructed from input_tokens alone.
+    cache_read_input_tokens: int = 0
+    cache_creation_input_tokens: int = 0
 
     def __post_init__(self):
         self.total_tokens = self.input_tokens + self.output_tokens
+
+    def __add__(self, other: "TokenUsage") -> "TokenUsage":
+        """Component-wise sum, for rolling steps up into a run total."""
+        return TokenUsage(
+            input_tokens=self.input_tokens + other.input_tokens,
+            output_tokens=self.output_tokens + other.output_tokens,
+            cache_read_input_tokens=self.cache_read_input_tokens + other.cache_read_input_tokens,
+            cache_creation_input_tokens=self.cache_creation_input_tokens
+            + other.cache_creation_input_tokens,
+        )
 
     def dict(self):
         return {
             "input_tokens": self.input_tokens,
             "output_tokens": self.output_tokens,
             "total_tokens": self.total_tokens,
+            "cache_read_input_tokens": self.cache_read_input_tokens,
+            "cache_creation_input_tokens": self.cache_creation_input_tokens,
         }
 
 
@@ -83,19 +103,14 @@ class Monitor:
         self.step_durations = []
         self.tracked_model = tracked_model
         self.logger = logger
-        self.total_input_token_count = 0
-        self.total_output_token_count = 0
+        self.total_token_usage = TokenUsage(input_tokens=0, output_tokens=0)
 
     def get_total_token_counts(self) -> TokenUsage:
-        return TokenUsage(
-            input_tokens=self.total_input_token_count,
-            output_tokens=self.total_output_token_count,
-        )
+        return self.total_token_usage
 
     def reset(self):
         self.step_durations = []
-        self.total_input_token_count = 0
-        self.total_output_token_count = 0
+        self.total_token_usage = TokenUsage(input_tokens=0, output_tokens=0)
 
     def update_metrics(self, step_log):
         """Update the metrics of the monitor.
@@ -112,11 +127,16 @@ class Monitor:
         console_outputs = f"[Step {step_no}: Duration {step_duration:.2f} seconds"
 
         if step_log.token_usage is not None:
-            self.total_input_token_count += step_log.token_usage.input_tokens
-            self.total_output_token_count += step_log.token_usage.output_tokens
+            self.total_token_usage = self.total_token_usage + step_log.token_usage
+            total = self.total_token_usage
             console_outputs += (
-                f"| Input tokens: {self.total_input_token_count:,} | Output tokens: {self.total_output_token_count:,}"
+                f"| Input tokens: {total.input_tokens:,} | Output tokens: {total.output_tokens:,}"
             )
+            # MatClaw (direct edit): input_tokens already includes the cached
+            # reads, so show what fraction of it was billed at the cache rate.
+            if total.input_tokens:
+                cached_pct = 100.0 * total.cache_read_input_tokens / total.input_tokens
+                console_outputs += f" | Cached: {cached_pct:.1f}%"
         console_outputs += "]"
         self.logger.log(Text(console_outputs, style="dim"), level=1)
 

@@ -510,8 +510,7 @@ You have been provided with these additional arguments, that you can access dire
 
         return_full_result = return_full_result if return_full_result is not None else self.return_full_result
         if return_full_result:
-            total_input_tokens = 0
-            total_output_tokens = 0
+            total_usage = TokenUsage(input_tokens=0, output_tokens=0)
             correct_token_usage = True
             for step in self.memory.steps:
                 if isinstance(step, (ActionStep, PlanningStep)):
@@ -519,10 +518,9 @@ You have been provided with these additional arguments, that you can access dire
                         correct_token_usage = False
                         break
                     else:
-                        total_input_tokens += step.token_usage.input_tokens
-                        total_output_tokens += step.token_usage.output_tokens
+                        total_usage = total_usage + step.token_usage
             if correct_token_usage:
-                token_usage = TokenUsage(input_tokens=total_input_tokens, output_tokens=total_output_tokens)
+                token_usage = total_usage
             else:
                 token_usage = None
 
@@ -677,23 +675,28 @@ You have been provided with these additional arguments, that you can access dire
             if self.stream_outputs and hasattr(self.model, "generate_stream"):
                 plan_message_content = ""
                 output_stream = self.model.generate_stream(input_messages, stop_sequences=["<end_plan>"])  # type: ignore
-                input_tokens, output_tokens = 0, 0
+                plan_usage = TokenUsage(input_tokens=0, output_tokens=0)
                 with Live("", console=self.logger.console, vertical_overflow="visible") as live:
                     for event in output_stream:
                         if event.content is not None:
                             plan_message_content += event.content
                             live.update(Markdown(plan_message_content))
                             if event.token_usage:
-                                input_tokens = event.token_usage.input_tokens
-                                output_tokens += event.token_usage.output_tokens
+                                # prompt-side counts repeat every event, output accumulates
+                                plan_usage = TokenUsage(
+                                    input_tokens=event.token_usage.input_tokens,
+                                    output_tokens=plan_usage.output_tokens
+                                    + event.token_usage.output_tokens,
+                                    cache_read_input_tokens=event.token_usage.cache_read_input_tokens,
+                                    cache_creation_input_tokens=event.token_usage.cache_creation_input_tokens,
+                                )
                         yield event
             else:
                 plan_message = self.model.generate(input_messages, stop_sequences=["<end_plan>"])
                 plan_message_content = plan_message.content
-                input_tokens, output_tokens = 0, 0
+                plan_usage = TokenUsage(input_tokens=0, output_tokens=0)
                 if plan_message.token_usage:
-                    input_tokens = plan_message.token_usage.input_tokens
-                    output_tokens = plan_message.token_usage.output_tokens
+                    plan_usage = plan_message.token_usage
             plan = textwrap.dedent(
                 f"""Here are the facts I know and the plan of action that I will follow to solve the task:\n```\n{plan_message_content}\n```"""
             )
@@ -732,7 +735,7 @@ You have been provided with these additional arguments, that you can access dire
             input_messages = [plan_update_pre] + memory_messages + [plan_update_post]
             if self.stream_outputs and hasattr(self.model, "generate_stream"):
                 plan_message_content = ""
-                input_tokens, output_tokens = 0, 0
+                plan_usage = TokenUsage(input_tokens=0, output_tokens=0)
                 with Live("", console=self.logger.console, vertical_overflow="visible") as live:
                     for event in self.model.generate_stream(
                         input_messages,
@@ -742,16 +745,21 @@ You have been provided with these additional arguments, that you can access dire
                             plan_message_content += event.content
                             live.update(Markdown(plan_message_content))
                             if event.token_usage:
-                                input_tokens = event.token_usage.input_tokens
-                                output_tokens += event.token_usage.output_tokens
+                                # prompt-side counts repeat every event, output accumulates
+                                plan_usage = TokenUsage(
+                                    input_tokens=event.token_usage.input_tokens,
+                                    output_tokens=plan_usage.output_tokens
+                                    + event.token_usage.output_tokens,
+                                    cache_read_input_tokens=event.token_usage.cache_read_input_tokens,
+                                    cache_creation_input_tokens=event.token_usage.cache_creation_input_tokens,
+                                )
                         yield event
             else:
                 plan_message = self.model.generate(input_messages, stop_sequences=["<end_plan>"])
                 plan_message_content = plan_message.content
-                input_tokens, output_tokens = 0, 0
+                plan_usage = TokenUsage(input_tokens=0, output_tokens=0)
                 if plan_message.token_usage:
-                    input_tokens = plan_message.token_usage.input_tokens
-                    output_tokens = plan_message.token_usage.output_tokens
+                    plan_usage = plan_message.token_usage
             plan = textwrap.dedent(
                 f"""I still need to solve the task I was given:\n```\n{self.task}\n```\n\nHere are the facts I know and my new/updated plan of action to solve the task:\n```\n{plan_message_content}\n```"""
             )
@@ -761,7 +769,7 @@ You have been provided with these additional arguments, that you can access dire
             model_input_messages=input_messages,
             plan=plan,
             model_output_message=ChatMessage(role=MessageRole.ASSISTANT, content=plan_message_content),
-            token_usage=TokenUsage(input_tokens=input_tokens, output_tokens=output_tokens),
+            token_usage=plan_usage,
             timing=Timing(start_time=start_time, end_time=time.time()),
         )
 

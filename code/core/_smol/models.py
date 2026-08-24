@@ -241,12 +241,10 @@ def agglomerate_stream_deltas(
     """
     accumulated_tool_calls: dict[int, ChatMessageToolCallStreamDelta] = {}
     accumulated_content = ""
-    total_input_tokens = 0
-    total_output_tokens = 0
+    total_usage = TokenUsage(input_tokens=0, output_tokens=0)
     for stream_delta in stream_deltas:
         if stream_delta.token_usage:
-            total_input_tokens += stream_delta.token_usage.input_tokens
-            total_output_tokens += stream_delta.token_usage.output_tokens
+            total_usage = total_usage + stream_delta.token_usage
         if stream_delta.content:
             accumulated_content += stream_delta.content
         if stream_delta.tool_calls:
@@ -288,10 +286,7 @@ def agglomerate_stream_deltas(
             for tool_call_stream_delta in accumulated_tool_calls.values()
             if tool_call_stream_delta.function
         ],
-        token_usage=TokenUsage(
-            input_tokens=total_input_tokens,
-            output_tokens=total_output_tokens,
-        ),
+        token_usage=total_usage,
     )
 
 
@@ -853,6 +848,8 @@ class LiteLLMModel(ApiModel):
             token_usage=TokenUsage(
                 input_tokens=response.usage.prompt_tokens,
                 output_tokens=response.usage.completion_tokens,
+                cache_read_input_tokens=getattr(response.usage, "cache_read_input_tokens", 0) or 0,
+                cache_creation_input_tokens=getattr(response.usage, "cache_creation_input_tokens", 0) or 0,
             ),
         )
 
@@ -1027,6 +1024,8 @@ class LiteLLMModel(ApiModel):
                     token_usage=TokenUsage(
                         input_tokens=event.usage.prompt_tokens,
                         output_tokens=event.usage.completion_tokens,
+                        cache_read_input_tokens=getattr(event.usage, "cache_read_input_tokens", 0) or 0,
+                        cache_creation_input_tokens=getattr(event.usage, "cache_creation_input_tokens", 0) or 0,
                     ),
                 )
             if event.choices:

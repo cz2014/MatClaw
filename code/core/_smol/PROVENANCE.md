@@ -64,4 +64,19 @@ Recorded as each phase lands (V1 mechanical vendor + prune; V2-V4 fold patches +
 ### V4 -- steps.jsonl kept (opt-in writer); all consumers read history.jsonl
 No `_smol` change. (`scripts`/`tests`/skills updated outside `_smol`.)
 
+### V5 -- record the Anthropic prompt-cache breakdown
+- `monitoring.py` `TokenUsage`: added `cache_read_input_tokens` /
+  `cache_creation_input_tokens` (default 0) plus component-wise `__add__`; `dict()` carries
+  them. litellm folds both into `prompt_tokens`, so they partition `input_tokens` rather than
+  add to it, and `total_tokens` stays `input + output`.
+- `monitoring.py` `Monitor`: accumulates a single `TokenUsage` instead of two ints, and the
+  per-step console line gains `| Cached: NN.N%`.
+- `models.py`: both population sites (`_generate_once`, `generate_stream`) read the two fields
+  off `response.usage` via `getattr(..., 0)`, so providers that do not report them record 0;
+  `agglomerate_stream_deltas` sums a `TokenUsage` instead of scalar pairs.
+- `agents.py`: the run total and both planning-step paths accumulate `TokenUsage` values.
+
+Rationale: Anthropic bills cache reads and cache writes at different rates from base input, so
+run cost was not reconstructable from the recorded usage. Tests: `code/tests/unit/test_token_usage_cache.py`.
+
 **Deferred (separate pass):** C2 (history-writer off-by-one fix) + C3 (`AgentMemory.load_history`).
