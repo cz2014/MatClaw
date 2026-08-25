@@ -13,16 +13,32 @@ MoS2 lattice relaxation on Perlmutter — from natural language task to VASP res
 ## How It Works
 
 <p align="center">
-  <img src="matclaw.jpg" alt="MatClaw architecture" width="800">
+  <img src="assets/matclaw.jpg" alt="MatClaw architecture" width="800">
 </p>
 
 You describe a task in natural language. The agent writes and runs Python to build structures, submit HPC jobs (e.g. VASP), and analyze results. It reads its own output and errors, self-corrects, and iterates until the task is done.
 
 **Key design choices.** Coding agents live in a repository. MatClaw lives in a long-running Python session wired to a supercomputer — closer to a scientist at a notebook than a bot in a shell.
 
-- **Exploration runs against live state.** Each step executes in a named persistent IPython kernel, so the namespace — a loaded ML potential, an in-memory trajectory, a half-built DataFrame, a handle to a remote job — is working memory that carries across steps. And the agent maintains multiple kernels: an interpreter blocks while it evaluates, so a long computation ties up only one while exploration continues in the others — and its result arrives as a live object, not a log file to reparse.
-- **Its tools are whatever it writes.** The action space is the interpreter itself — Python against pymatgen, ASE, and atomate2, with loops, branches, and functions defined on the spot — not a fixed menu of schema-defined tools.
+- **Exploration runs against live state.** Each step runs in a persistent IPython kernel: a loaded ML potential, a trajectory, a handle to a remote job all stay in memory across steps. Several kernels run side by side, so a long computation never blocks the next one.
+- **Its tools are whatever it writes.** The action space is the interpreter itself — Python against pymatgen, ASE, and atomate2 — not a fixed menu of schema-defined tools.
 - **The cluster is part of the agent.** It authors input decks, submits SLURM jobs through jobflow-remote, and supervises hours-long DFT/MD runs from a laptop-weight process.
+- **Your code is its code.** Drop any `.py` into the workspace and the agent can `import mycode` — a custom scorer, a trained potential, an in-house workflow — with no tool registration.
+
+## vs. Claude Code / Codex
+
+Claude Code and Codex write a script, then run it in a shell. MatClaw runs the Python directly, in a kernel that stays alive: half the turns, and nothing is loaded twice.
+
+**Demo.** Find the CuInP2S6 structure on which a committee of seven ML potentials disagrees most in atomic forces — the standard way to pick training data for an ML potential. One sentence of task, at most 10 committee evaluations, same model, same GPU, n=8 per cell.
+
+Same model, same score, half the turns: 2.2x faster and 2.8x cheaper than Claude Code on Opus 5, 1.7x faster than Codex on gpt-5.6-sol (p = 0.00008). Loading the seven models costs ~20 s: MatClaw paid it once, Claude Code paid it on 5 of 10 evaluations because each `python script.py` starts cold.
+
+<p align="center">
+  <img src="assets/demo_score_vs_time.png" alt="Best force disagreement found against wall-clock time" width="800">
+</p>
+<p align="center">
+  <img src="assets/demo_cost_per_eval.png" alt="Output tokens against structures evaluated" width="800">
+</p>
 
 ## What's New
 
