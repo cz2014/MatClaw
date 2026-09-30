@@ -56,11 +56,13 @@ main(task="Your task description here", workspace_dir=Path("workspace"))
 
 Three end-to-end demonstrations on CuInP2S6 (CIPS) are described in the paper. Full agent conversation logs, outputs, and workspace artifacts are included in this repository:
 
+Each workspace holds the agent log as `history.jsonl` (the message sequence: system prompt, task, model outputs, tool observations). Demo 2a is the exception: its log is `steps.jsonl`, one JSON record per agent step with `model_input_messages`, `model_output`, `code_action`, `observations`, `token_usage` and `timing`.
+
 | Task | Description | Workspace |
 |------|-------------|-----------|
 | 1a. MLFF distillation | Active-learning force field training from a VASP teacher model | `workspace_demo1a_distill/` |
 | 1b. MLFF distillation (literature-guided) | Same task with a reference paper provided for methodology extraction | `workspace_demo1b_distill_pdf/` |
-| 2a. Curie temperature (first attempt) | Temperature sweep without convergence validation — produces unreliable result | `workspace_demo2a_curie_no_convergence/` |
+| 2a. Curie temperature (first attempt) | Temperature sweep without convergence validation — produces unreliable result | `workspace_demo2a_curie_no_convergence/` (log: `steps.jsonl`) |
 | 2b. Curie temperature (with constraint) | Adding a one-sentence convergence requirement yields 3.5x more precise result | `workspace_demo2b_curie_with_convergence/` |
 
 Demo test scripts that launch each task are in `tests/` (e.g., `tests/demo1a_cips_distill.py`).
